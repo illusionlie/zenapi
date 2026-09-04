@@ -47,18 +47,13 @@ export const UserUsageView = ({ usage }: UserUsageViewProps) => (
 									{log.total_tokens ?? 0}
 									{log.prompt_tokens != null && (
 										<span class="ml-1 text-xs text-stone-400">
-											({log.prompt_tokens}+
-											{log.completion_tokens ?? 0})
+											({log.prompt_tokens}+{log.completion_tokens ?? 0})
 										</span>
 									)}
 								</td>
+								<td class="py-2 pr-4 text-stone-600">{formatCost(log.cost)}</td>
 								<td class="py-2 pr-4 text-stone-600">
-									{formatCost(log.cost)}
-								</td>
-								<td class="py-2 pr-4 text-stone-600">
-									{log.latency_ms != null
-										? `${log.latency_ms}ms`
-										: "-"}
+									{log.latency_ms != null ? `${log.latency_ms}ms` : "-"}
 								</td>
 								<td class="py-2 pr-4">
 									<span

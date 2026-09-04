@@ -15,7 +15,11 @@ type LoginViewProps = {
  */
 export const LoginView = ({ notice, onSubmit, onNavigate }: LoginViewProps) => (
 	<div class="mx-auto mt-24 max-w-md rounded-2xl border border-stone-200 bg-white p-8 shadow-lg">
-		<button type="button" class="mb-2 font-['Space_Grotesk'] text-2xl tracking-tight text-stone-900" onClick={() => onNavigate("/")}>
+		<button
+			type="button"
+			class="mb-2 font-['Space_Grotesk'] text-2xl tracking-tight text-stone-900"
+			onClick={() => onNavigate("/")}
+		>
 			ZenAPI
 		</button>
 		<p class="text-sm text-stone-500">请输入管理员密码登录管理台。</p>

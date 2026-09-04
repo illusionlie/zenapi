@@ -1,5 +1,8 @@
 export function parseApiKeys(apiKey: string): string[] {
-	return apiKey.split("\n").map((k) => k.trim()).filter(Boolean);
+	return apiKey
+		.split("\n")
+		.map((k) => k.trim())
+		.filter(Boolean);
 }
 
 export function shuffleArray<T>(arr: T[]): T[] {

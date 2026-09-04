@@ -74,9 +74,7 @@ export async function loadAliasMap(
 /**
  * Returns the set of model_ids that are alias-only (original name hidden).
  */
-export async function loadAliasOnlySet(
-	db: D1Database,
-): Promise<Set<string>> {
+export async function loadAliasOnlySet(db: D1Database): Promise<Set<string>> {
 	const result = await db
 		.prepare("SELECT DISTINCT model_id FROM model_aliases WHERE alias_only = 1")
 		.all<{ model_id: string }>();
@@ -88,16 +86,28 @@ export async function loadAliasOnlySet(
  */
 export async function listAllAliases(
 	db: D1Database,
-): Promise<Map<string, Array<{ alias: string; is_primary: boolean; alias_only: boolean }>>> {
+): Promise<
+	Map<
+		string,
+		Array<{ alias: string; is_primary: boolean; alias_only: boolean }>
+	>
+> {
 	const result = await db
 		.prepare(
 			"SELECT model_id, alias, is_primary, alias_only FROM model_aliases ORDER BY model_id, is_primary DESC, alias",
 		)
 		.all<AliasRow>();
-	const map = new Map<string, Array<{ alias: string; is_primary: boolean; alias_only: boolean }>>();
+	const map = new Map<
+		string,
+		Array<{ alias: string; is_primary: boolean; alias_only: boolean }>
+	>();
 	for (const row of result.results ?? []) {
 		const existing = map.get(row.model_id) ?? [];
-		existing.push({ alias: row.alias, is_primary: row.is_primary === 1, alias_only: row.alias_only === 1 });
+		existing.push({
+			alias: row.alias,
+			is_primary: row.is_primary === 1,
+			alias_only: row.alias_only === 1,
+		});
 		map.set(row.model_id, existing);
 	}
 	return map;
@@ -187,7 +197,9 @@ export async function saveChannelAliases(
 ): Promise<void> {
 	const now = nowIso();
 	const deleteStmt = db
-		.prepare("DELETE FROM channel_model_aliases WHERE channel_id = ? AND model_id = ?")
+		.prepare(
+			"DELETE FROM channel_model_aliases WHERE channel_id = ? AND model_id = ?",
+		)
 		.bind(channelId, modelId);
 
 	const insertStmts = aliases.map((a) =>
@@ -217,9 +229,13 @@ export async function saveChannelAliases(
 export async function loadChannelAliasesByAlias(
 	db: D1Database,
 	alias: string,
-): Promise<Array<{ channel_id: string; model_id: string; alias_only: boolean }>> {
+): Promise<
+	Array<{ channel_id: string; model_id: string; alias_only: boolean }>
+> {
 	const result = await db
-		.prepare("SELECT channel_id, model_id, alias_only FROM channel_model_aliases WHERE alias = ?")
+		.prepare(
+			"SELECT channel_id, model_id, alias_only FROM channel_model_aliases WHERE alias = ?",
+		)
 		.bind(alias)
 		.all<{ channel_id: string; model_id: string; alias_only: number }>();
 	return (result.results ?? []).map((r) => ({
@@ -239,7 +255,10 @@ export async function loadAllChannelAliasMap(
 	const result = await db
 		.prepare("SELECT alias, model_id, channel_id FROM channel_model_aliases")
 		.all<{ alias: string; model_id: string; channel_id: string }>();
-	const map = new Map<string, Array<{ channel_id: string; model_id: string }>>();
+	const map = new Map<
+		string,
+		Array<{ channel_id: string; model_id: string }>
+	>();
 	for (const row of result.results ?? []) {
 		const existing = map.get(row.alias) ?? [];
 		existing.push({ channel_id: row.channel_id, model_id: row.model_id });
@@ -257,7 +276,9 @@ export async function loadChannelPrimaryNameMap(
 	db: D1Database,
 ): Promise<Map<string, string>> {
 	const result = await db
-		.prepare("SELECT model_id, alias FROM channel_model_aliases WHERE is_primary = 1")
+		.prepare(
+			"SELECT model_id, alias FROM channel_model_aliases WHERE is_primary = 1",
+		)
 		.all<{ model_id: string; alias: string }>();
 	const map = new Map<string, string>();
 	for (const row of result.results ?? []) {
@@ -276,7 +297,9 @@ export async function loadChannelAliasOnlyMap(
 	db: D1Database,
 ): Promise<Map<string, Set<string>>> {
 	const result = await db
-		.prepare("SELECT DISTINCT channel_id, model_id FROM channel_model_aliases WHERE alias_only = 1")
+		.prepare(
+			"SELECT DISTINCT channel_id, model_id FROM channel_model_aliases WHERE alias_only = 1",
+		)
 		.all<{ channel_id: string; model_id: string }>();
 	const map = new Map<string, Set<string>>();
 	for (const row of result.results ?? []) {
@@ -293,11 +316,23 @@ export async function loadChannelAliasOnlyMap(
  */
 export async function loadAllChannelAliasesGrouped(
 	db: D1Database,
-): Promise<Map<string, Map<string, { aliases: string[]; alias_only: boolean }>>> {
+): Promise<
+	Map<string, Map<string, { aliases: string[]; alias_only: boolean }>>
+> {
 	const result = await db
-		.prepare("SELECT channel_id, model_id, alias, alias_only FROM channel_model_aliases")
-		.all<{ channel_id: string; model_id: string; alias: string; alias_only: number }>();
-	const map = new Map<string, Map<string, { aliases: string[]; alias_only: boolean }>>();
+		.prepare(
+			"SELECT channel_id, model_id, alias, alias_only FROM channel_model_aliases",
+		)
+		.all<{
+			channel_id: string;
+			model_id: string;
+			alias: string;
+			alias_only: number;
+		}>();
+	const map = new Map<
+		string,
+		Map<string, { aliases: string[]; alias_only: boolean }>
+	>();
 	for (const row of result.results ?? []) {
 		let channelMap = map.get(row.channel_id);
 		if (!channelMap) {
@@ -334,7 +369,9 @@ export async function batchSaveAliasesForModel(
 	for (const channelId of channelIds) {
 		stmts.push(
 			db
-				.prepare("DELETE FROM channel_model_aliases WHERE channel_id = ? AND model_id = ?")
+				.prepare(
+					"DELETE FROM channel_model_aliases WHERE channel_id = ? AND model_id = ?",
+				)
 				.bind(channelId, modelId),
 		);
 		for (const alias of aliases) {

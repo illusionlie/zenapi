@@ -11,13 +11,19 @@ type ModelsViewProps = {
 	) => Promise<void>;
 	onPriceSave?: (
 		modelId: string,
-		prices: Array<{ channel_id: string; input_price: number; output_price: number }>,
+		prices: Array<{
+			channel_id: string;
+			input_price: number;
+			output_price: number;
+		}>,
 	) => Promise<void>;
 };
 
 const MiniSparkline = ({
 	data,
-}: { data: { day: string; requests: number; tokens: number }[] }) => {
+}: {
+	data: { day: string; requests: number; tokens: number }[];
+}) => {
 	if (data.length === 0) return null;
 	const values = data.map((d) => d.requests);
 	const max = Math.max(...values, 1);
@@ -29,7 +35,7 @@ const MiniSparkline = ({
 	const points = values
 		.map((v, i) => {
 			const x = padding + i * step;
-			const y = height - padding - ((v / max) * (height - padding * 2));
+			const y = height - padding - (v / max) * (height - padding * 2);
 			return `${x},${y}`;
 		})
 		.join(" ");
@@ -77,7 +83,11 @@ const ModelCard = ({
 	model,
 	onAliasClick,
 	onPriceClick,
-}: { model: ModelItem; onAliasClick?: () => void; onPriceClick?: () => void }) => {
+}: {
+	model: ModelItem;
+	onAliasClick?: () => void;
+	onPriceClick?: () => void;
+}) => {
 	return (
 		<div class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
 			<div class="mb-2 flex items-start justify-between gap-2">
@@ -234,9 +244,7 @@ const AliasEditModal = ({
 						<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
 							编辑别名
 						</h3>
-						<p class="break-all text-xs text-stone-500">
-							模型：{modelId}
-						</p>
+						<p class="break-all text-xs text-stone-500">模型：{modelId}</p>
 					</div>
 					<button
 						type="button"
@@ -279,9 +287,7 @@ const AliasEditModal = ({
 						placeholder="输入别名..."
 						value={newAlias}
 						onInput={(e) =>
-							setNewAlias(
-								(e.currentTarget as HTMLInputElement)?.value ?? "",
-							)
+							setNewAlias((e.currentTarget as HTMLInputElement)?.value ?? "")
 						}
 						onKeyDown={(e) => {
 							if (e.key === "Enter") {
@@ -304,11 +310,15 @@ const AliasEditModal = ({
 						<input
 							type="checkbox"
 							checked={aliasOnly}
-							onChange={(e) => setAliasOnly((e.currentTarget as HTMLInputElement).checked)}
+							onChange={(e) =>
+								setAliasOnly((e.currentTarget as HTMLInputElement).checked)
+							}
 							class="accent-amber-500"
 						/>
 						<span class="text-sm text-stone-700">仅限别名</span>
-						<span class="text-xs text-stone-400">— 隐藏原始模型名，只能通过别名调用</span>
+						<span class="text-xs text-stone-400">
+							— 隐藏原始模型名，只能通过别名调用
+						</span>
 					</label>
 				)}
 
@@ -341,8 +351,19 @@ const PriceEditModal = ({
 	onClose,
 }: {
 	modelId: string;
-	channels: Array<{ id: string; name: string; input_price: number | null; output_price: number | null }>;
-	onSave: (prices: Array<{ channel_id: string; input_price: number; output_price: number }>) => Promise<void>;
+	channels: Array<{
+		id: string;
+		name: string;
+		input_price: number | null;
+		output_price: number | null;
+	}>;
+	onSave: (
+		prices: Array<{
+			channel_id: string;
+			input_price: number;
+			output_price: number;
+		}>,
+	) => Promise<void>;
 	onClose: () => void;
 }) => {
 	const [prices, setPrices] = useState(() =>
@@ -357,8 +378,14 @@ const PriceEditModal = ({
 	const [batchOutput, setBatchOutput] = useState("");
 	const [saving, setSaving] = useState(false);
 
-	const handleFieldChange = (index: number, field: "input_price" | "output_price", value: string) => {
-		setPrices((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+	const handleFieldChange = (
+		index: number,
+		field: "input_price" | "output_price",
+		value: string,
+	) => {
+		setPrices((prev) =>
+			prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
+		);
 	};
 
 	const handleBatchApply = () => {
@@ -394,9 +421,7 @@ const PriceEditModal = ({
 						<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
 							编辑价格
 						</h3>
-						<p class="break-all text-xs text-stone-500">
-							模型：{modelId}
-						</p>
+						<p class="break-all text-xs text-stone-500">模型：{modelId}</p>
 					</div>
 					<button
 						type="button"
@@ -425,7 +450,11 @@ const PriceEditModal = ({
 								class="w-full rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 								value={p.input_price}
 								onInput={(e) =>
-									handleFieldChange(index, "input_price", (e.currentTarget as HTMLInputElement)?.value ?? "")
+									handleFieldChange(
+										index,
+										"input_price",
+										(e.currentTarget as HTMLInputElement)?.value ?? "",
+									)
 								}
 							/>
 							<input
@@ -434,7 +463,11 @@ const PriceEditModal = ({
 								class="w-full rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 								value={p.output_price}
 								onInput={(e) =>
-									handleFieldChange(index, "output_price", (e.currentTarget as HTMLInputElement)?.value ?? "")
+									handleFieldChange(
+										index,
+										"output_price",
+										(e.currentTarget as HTMLInputElement)?.value ?? "",
+									)
 								}
 							/>
 						</div>
@@ -450,7 +483,11 @@ const PriceEditModal = ({
 							class="w-24 rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 							placeholder="输入价格"
 							value={batchInput}
-							onInput={(e) => setBatchInput((e.currentTarget as HTMLInputElement)?.value ?? "")}
+							onInput={(e) =>
+								setBatchInput(
+									(e.currentTarget as HTMLInputElement)?.value ?? "",
+								)
+							}
 						/>
 						<input
 							type="number"
@@ -458,7 +495,11 @@ const PriceEditModal = ({
 							class="w-24 rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 							placeholder="输出价格"
 							value={batchOutput}
-							onInput={(e) => setBatchOutput((e.currentTarget as HTMLInputElement)?.value ?? "")}
+							onInput={(e) =>
+								setBatchOutput(
+									(e.currentTarget as HTMLInputElement)?.value ?? "",
+								)
+							}
 						/>
 						<button
 							type="button"
@@ -494,7 +535,11 @@ const PriceEditModal = ({
 
 const pageSizeOptions = [12, 24, 48];
 
-export const ModelsView = ({ models, onAliasSave, onPriceSave }: ModelsViewProps) => {
+export const ModelsView = ({
+	models,
+	onAliasSave,
+	onPriceSave,
+}: ModelsViewProps) => {
 	const [search, setSearch] = useState("");
 	const [pageSize, setPageSize] = useState(12);
 	const [page, setPage] = useState(1);
@@ -535,7 +580,9 @@ export const ModelsView = ({ models, onAliasSave, onPriceSave }: ModelsViewProps
 
 	// For alias editing, we need to find all aliases for this real model
 	// by looking at other models that have real_model_id pointing to it
-	const getAliasesForModel = (modelId: string): { aliases: string[]; aliasOnly: boolean } => {
+	const getAliasesForModel = (
+		modelId: string,
+	): { aliases: string[]; aliasOnly: boolean } => {
 		const aliases: string[] = [];
 		let aliasOnly = false;
 		for (const m of models) {
@@ -545,17 +592,20 @@ export const ModelsView = ({ models, onAliasSave, onPriceSave }: ModelsViewProps
 			}
 		}
 		// If the original model is not in the list, it means alias_only is true
-		const originalExists = models.some((m) => m.id === modelId && m.real_model_id === null);
+		const originalExists = models.some(
+			(m) => m.id === modelId && m.real_model_id === null,
+		);
 		aliasOnly = aliases.length > 0 && !originalExists;
 		return { aliases, aliasOnly };
 	};
 
 	const aliasModel = aliasModelId
-		? models.find((m) => m.id === aliasModelId && m.real_model_id === null) ?? null
+		? (models.find((m) => m.id === aliasModelId && m.real_model_id === null) ??
+			null)
 		: null;
 
 	const priceModel = priceModelId
-		? models.find((m) => m.id === priceModelId) ?? null
+		? (models.find((m) => m.id === priceModelId) ?? null)
 		: null;
 
 	return (
@@ -668,18 +718,22 @@ export const ModelsView = ({ models, onAliasSave, onPriceSave }: ModelsViewProps
 					</div>
 				</>
 			)}
-			{aliasModel && onAliasSave && (() => {
-				const { aliases, aliasOnly } = getAliasesForModel(aliasModel.id);
-				return (
-					<AliasEditModal
-						modelId={aliasModel.id}
-						initialAliases={aliases}
-						initialAliasOnly={aliasOnly}
-						onSave={(newAliases, newAliasOnly) => onAliasSave(aliasModel.id, newAliases, newAliasOnly)}
-						onClose={() => setAliasModelId(null)}
-					/>
-				);
-			})()}
+			{aliasModel &&
+				onAliasSave &&
+				(() => {
+					const { aliases, aliasOnly } = getAliasesForModel(aliasModel.id);
+					return (
+						<AliasEditModal
+							modelId={aliasModel.id}
+							initialAliases={aliases}
+							initialAliasOnly={aliasOnly}
+							onSave={(newAliases, newAliasOnly) =>
+								onAliasSave(aliasModel.id, newAliases, newAliasOnly)
+							}
+							onClose={() => setAliasModelId(null)}
+						/>
+					);
+				})()}
 			{priceModel && onPriceSave && (
 				<PriceEditModal
 					modelId={priceModel.id}

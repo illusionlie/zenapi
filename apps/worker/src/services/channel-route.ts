@@ -20,9 +20,7 @@ export function resolveChannelRoute(
 	}
 
 	// Sort channel names by length descending (longest match first)
-	const sorted = channels
-		.slice()
-		.sort((a, b) => b.name.length - a.name.length);
+	const sorted = channels.slice().sort((a, b) => b.name.length - a.name.length);
 
 	for (const channel of sorted) {
 		const prefix = channel.name + "/";

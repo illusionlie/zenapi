@@ -72,14 +72,19 @@ export function openaiToAnthropicRequest(
 
 	// Convert OpenAI tools to Anthropic tools format
 	if (body.tools) {
-		result.tools = (body.tools as Array<Record<string, unknown>>).map((tool) => {
-			const fn = ((tool as Record<string, unknown>).function ?? tool) as Record<string, unknown>;
-			return {
-				name: fn.name as string,
-				description: (fn.description as string) ?? "",
-				input_schema: (fn.parameters as Record<string, unknown>) ?? { type: "object" },
-			};
-		});
+		result.tools = (body.tools as Array<Record<string, unknown>>).map(
+			(tool) => {
+				const fn = ((tool as Record<string, unknown>).function ??
+					tool) as Record<string, unknown>;
+				return {
+					name: fn.name as string,
+					description: (fn.description as string) ?? "",
+					input_schema: (fn.parameters as Record<string, unknown>) ?? {
+						type: "object",
+					},
+				};
+			},
+		);
 	}
 
 	// Convert tool_choice
@@ -101,7 +106,10 @@ export function openaiToAnthropicRequest(
 	}
 
 	const systemParts: string[] = [];
-	const rawMessages: Array<{ role: string; content: string | AnthropicContentBlock[] }> = [];
+	const rawMessages: Array<{
+		role: string;
+		content: string | AnthropicContentBlock[];
+	}> = [];
 
 	for (const msg of body.messages ?? []) {
 		if (msg.role === "system") {
@@ -122,7 +130,9 @@ export function openaiToAnthropicRequest(
 				contentBlocks.push(...(msg.content as AnthropicContentBlock[]));
 			}
 			// Convert tool_calls to tool_use content blocks
-			const toolCalls = msg.tool_calls as Array<Record<string, unknown>> | undefined;
+			const toolCalls = msg.tool_calls as
+				| Array<Record<string, unknown>>
+				| undefined;
 			if (toolCalls) {
 				for (const tc of toolCalls) {
 					const fn = tc.function as Record<string, unknown> | undefined;
@@ -144,9 +154,10 @@ export function openaiToAnthropicRequest(
 			}
 			rawMessages.push({
 				role: "assistant",
-				content: contentBlocks.length === 1 && contentBlocks[0].type === "text"
-					? (contentBlocks[0].text ?? "")
-					: contentBlocks,
+				content:
+					contentBlocks.length === 1 && contentBlocks[0].type === "text"
+						? (contentBlocks[0].text ?? "")
+						: contentBlocks,
 			});
 		} else if (msg.role === "tool") {
 			// Tool result → user message with tool_result block
@@ -154,11 +165,13 @@ export function openaiToAnthropicRequest(
 			const contentText = typeof msg.content === "string" ? msg.content : "";
 			rawMessages.push({
 				role: "user",
-				content: [{
-					type: "tool_result",
-					tool_use_id: toolCallId ?? "",
-					content: contentText,
-				}],
+				content: [
+					{
+						type: "tool_result",
+						tool_use_id: toolCallId ?? "",
+						content: contentText,
+					},
+				],
 			});
 		} else {
 			const content =
@@ -178,12 +191,14 @@ export function openaiToAnthropicRequest(
 	for (const msg of rawMessages) {
 		const last = messages[messages.length - 1];
 		if (last && last.role === msg.role) {
-			const lastContent = typeof last.content === "string"
-				? [{ type: "text", text: last.content } as AnthropicContentBlock]
-				: last.content;
-			const curContent = typeof msg.content === "string"
-				? [{ type: "text", text: msg.content } as AnthropicContentBlock]
-				: msg.content;
+			const lastContent =
+				typeof last.content === "string"
+					? [{ type: "text", text: last.content } as AnthropicContentBlock]
+					: last.content;
+			const curContent =
+				typeof msg.content === "string"
+					? [{ type: "text", text: msg.content } as AnthropicContentBlock]
+					: msg.content;
 			last.content = [...lastContent, ...curContent];
 		} else {
 			messages.push({ ...msg });
@@ -222,14 +237,16 @@ export function anthropicToOpenaiRequest(
 
 	// Convert Anthropic tools to OpenAI tools format
 	if (body.tools) {
-		result.tools = (body.tools as Array<Record<string, unknown>>).map((tool) => ({
-			type: "function" as const,
-			function: {
-				name: tool.name as string,
-				description: (tool.description as string) ?? "",
-				parameters: (tool.input_schema as Record<string, unknown>) ?? {},
-			},
-		}));
+		result.tools = (body.tools as Array<Record<string, unknown>>).map(
+			(tool) => ({
+				type: "function" as const,
+				function: {
+					name: tool.name as string,
+					description: (tool.description as string) ?? "",
+					parameters: (tool.input_schema as Record<string, unknown>) ?? {},
+				},
+			}),
+		);
 	}
 
 	// Convert tool_choice
@@ -396,18 +413,20 @@ export function anthropicToOpenaiResponse(
 
 	// Convert tool_use content blocks to OpenAI tool_calls
 	const toolUseBlocks = (content ?? []).filter((b) => b.type === "tool_use");
-	const toolCalls = toolUseBlocks.length > 0
-		? toolUseBlocks.map((b) => ({
-				id: (b.id as string) ?? `call_${crypto.randomUUID()}`,
-				type: "function" as const,
-				function: {
-					name: (b.name as string) ?? "",
-					arguments: typeof b.input === "string"
-						? b.input
-						: JSON.stringify(b.input ?? {}),
-				},
-			}))
-		: undefined;
+	const toolCalls =
+		toolUseBlocks.length > 0
+			? toolUseBlocks.map((b) => ({
+					id: (b.id as string) ?? `call_${crypto.randomUUID()}`,
+					type: "function" as const,
+					function: {
+						name: (b.name as string) ?? "",
+						arguments:
+							typeof b.input === "string"
+								? b.input
+								: JSON.stringify(b.input ?? {}),
+					},
+				}))
+			: undefined;
 
 	const usage = anthropicBody.usage as Record<string, unknown> | undefined;
 
@@ -457,7 +476,9 @@ export function openaiToAnthropicResponse(
 	const firstChoice = choices?.[0];
 	const message = firstChoice?.message as Record<string, unknown> | undefined;
 	const contentText = (message?.content as string) ?? "";
-	const toolCalls = message?.tool_calls as Array<Record<string, unknown>> | undefined;
+	const toolCalls = message?.tool_calls as
+		| Array<Record<string, unknown>>
+		| undefined;
 	const usage = openaiBody.usage as Record<string, unknown> | undefined;
 
 	const contentBlocks: AnthropicContentBlock[] = [];
@@ -487,7 +508,9 @@ export function openaiToAnthropicResponse(
 		contentBlocks.push({ type: "text", text: "" });
 	}
 
-	let stopReason = mapFinishReason(firstChoice?.finish_reason as string | undefined);
+	let stopReason = mapFinishReason(
+		firstChoice?.finish_reason as string | undefined,
+	);
 	if (toolCalls && toolCalls.length > 0) {
 		stopReason = "tool_use";
 	}
@@ -555,7 +578,8 @@ export function createAnthropicToOpenaiStreamTransform(): TransformStream<
 
 						// Track tool_use content blocks for index mapping
 						if (
-							(currentEventType === "content_block_start" || data.type === "content_block_start") &&
+							(currentEventType === "content_block_start" ||
+								data.type === "content_block_start") &&
 							data.content_block?.type === "tool_use"
 						) {
 							toolCallIndex++;
@@ -660,7 +684,9 @@ function convertAnthropicEventToOpenaiChunk(
 			};
 		}
 		case "content_block_start": {
-			const contentBlock = data.content_block as Record<string, unknown> | undefined;
+			const contentBlock = data.content_block as
+				| Record<string, unknown>
+				| undefined;
 			if (contentBlock?.type === "tool_use") {
 				return {
 					...base,
@@ -795,10 +821,17 @@ export function createOpenaiToAnthropicStreamTransform(
 
 				try {
 					const data = JSON.parse(payload);
-					const choices = data.choices as Array<Record<string, unknown>> | undefined;
+					const choices = data.choices as
+						| Array<Record<string, unknown>>
+						| undefined;
 					const firstChoice = choices?.[0];
-					const delta = firstChoice?.delta as Record<string, unknown> | undefined;
-					const finishReason = firstChoice?.finish_reason as string | null | undefined;
+					const delta = firstChoice?.delta as
+						| Record<string, unknown>
+						| undefined;
+					const finishReason = firstChoice?.finish_reason as
+						| string
+						| null
+						| undefined;
 					const usage = data.usage as Record<string, unknown> | undefined;
 
 					// Emit message_start if not yet sent
@@ -818,14 +851,22 @@ export function createOpenaiToAnthropicStreamTransform(
 								},
 							},
 						};
-						controller.enqueue(encoder.encode(`event: message_start\ndata: ${JSON.stringify(messageStart)}\n\n`));
+						controller.enqueue(
+							encoder.encode(
+								`event: message_start\ndata: ${JSON.stringify(messageStart)}\n\n`,
+							),
+						);
 						sentMessageStart = true;
 					}
 
 					// Handle text content delta
 					if (delta?.content != null) {
 						if (!hasTextBlock) {
-							controller.enqueue(encoder.encode(`event: content_block_start\ndata: ${JSON.stringify({ type: "content_block_start", index: contentBlockIndex, content_block: { type: "text", text: "" } })}\n\n`));
+							controller.enqueue(
+								encoder.encode(
+									`event: content_block_start\ndata: ${JSON.stringify({ type: "content_block_start", index: contentBlockIndex, content_block: { type: "text", text: "" } })}\n\n`,
+								),
+							);
 							hasTextBlock = true;
 							contentBlockIndex++;
 						}
@@ -834,11 +875,17 @@ export function createOpenaiToAnthropicStreamTransform(
 							index: contentBlockIndex - 1,
 							delta: { type: "text_delta", text: delta.content as string },
 						};
-						controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(textDelta)}\n\n`));
+						controller.enqueue(
+							encoder.encode(
+								`event: content_block_delta\ndata: ${JSON.stringify(textDelta)}\n\n`,
+							),
+						);
 					}
 
 					// Handle tool_calls delta
-					const toolCallsArr = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+					const toolCallsArr = delta?.tool_calls as
+						| Array<Record<string, unknown>>
+						| undefined;
 					if (toolCallsArr) {
 						for (const tc of toolCallsArr) {
 							const tcIndex = (tc.index as number) ?? 0;
@@ -847,40 +894,65 @@ export function createOpenaiToAnthropicStreamTransform(
 							if (tc.id && fn?.name != null) {
 								// New tool call — close text block if open and no tool blocks yet
 								if (hasTextBlock && activeToolIndices.size === 0) {
-									controller.enqueue(encoder.encode(`event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: contentBlockIndex - 1 })}\n\n`));
+									controller.enqueue(
+										encoder.encode(
+											`event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: contentBlockIndex - 1 })}\n\n`,
+										),
+									);
 								}
 
 								const blockIdx = contentBlockIndex;
 								activeToolIndices.set(tcIndex, blockIdx);
-								controller.enqueue(encoder.encode(`event: content_block_start\ndata: ${JSON.stringify({
-									type: "content_block_start",
-									index: blockIdx,
-									content_block: {
-										type: "tool_use",
-										id: tc.id as string,
-										name: fn.name as string,
-										input: {},
-									},
-								})}\n\n`));
+								controller.enqueue(
+									encoder.encode(
+										`event: content_block_start\ndata: ${JSON.stringify({
+											type: "content_block_start",
+											index: blockIdx,
+											content_block: {
+												type: "tool_use",
+												id: tc.id as string,
+												name: fn.name as string,
+												input: {},
+											},
+										})}\n\n`,
+									),
+								);
 								contentBlockIndex++;
 
 								// Send initial arguments if present
 								if (fn.arguments && (fn.arguments as string).length > 0) {
-									controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify({
-										type: "content_block_delta",
-										index: blockIdx,
-										delta: { type: "input_json_delta", partial_json: fn.arguments as string },
-									})}\n\n`));
+									controller.enqueue(
+										encoder.encode(
+											`event: content_block_delta\ndata: ${JSON.stringify({
+												type: "content_block_delta",
+												index: blockIdx,
+												delta: {
+													type: "input_json_delta",
+													partial_json: fn.arguments as string,
+												},
+											})}\n\n`,
+										),
+									);
 								}
 							} else if (fn?.arguments != null) {
 								// Continuation of arguments for existing tool call
 								const blockIdx = activeToolIndices.get(tcIndex);
-								if (blockIdx !== undefined && (fn.arguments as string).length > 0) {
-									controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify({
-										type: "content_block_delta",
-										index: blockIdx,
-										delta: { type: "input_json_delta", partial_json: fn.arguments as string },
-									})}\n\n`));
+								if (
+									blockIdx !== undefined &&
+									(fn.arguments as string).length > 0
+								) {
+									controller.enqueue(
+										encoder.encode(
+											`event: content_block_delta\ndata: ${JSON.stringify({
+												type: "content_block_delta",
+												index: blockIdx,
+												delta: {
+													type: "input_json_delta",
+													partial_json: fn.arguments as string,
+												},
+											})}\n\n`,
+										),
+									);
 								}
 							}
 						}
@@ -890,19 +962,33 @@ export function createOpenaiToAnthropicStreamTransform(
 					if (finishReason) {
 						// Close any open tool blocks
 						for (const [, blockIdx] of activeToolIndices) {
-							controller.enqueue(encoder.encode(`event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: blockIdx })}\n\n`));
+							controller.enqueue(
+								encoder.encode(
+									`event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: blockIdx })}\n\n`,
+								),
+							);
 						}
 						// Close text block if still open and no tools were used
 						if (hasTextBlock && activeToolIndices.size === 0) {
-							controller.enqueue(encoder.encode(`event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: contentBlockIndex - 1 })}\n\n`));
+							controller.enqueue(
+								encoder.encode(
+									`event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: contentBlockIndex - 1 })}\n\n`,
+								),
+							);
 						}
 
 						const messageDelta = {
 							type: "message_delta",
 							delta: { stop_reason: mapFinishReason(finishReason) },
-							usage: { output_tokens: (usage?.completion_tokens as number) ?? 0 },
+							usage: {
+								output_tokens: (usage?.completion_tokens as number) ?? 0,
+							},
 						};
-						controller.enqueue(encoder.encode(`event: message_delta\ndata: ${JSON.stringify(messageDelta)}\n\n`));
+						controller.enqueue(
+							encoder.encode(
+								`event: message_delta\ndata: ${JSON.stringify(messageDelta)}\n\n`,
+							),
+						);
 					}
 				} catch {
 					// Skip invalid JSON

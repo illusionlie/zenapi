@@ -1,9 +1,18 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
-import { extractModelPricings, extractSharedModelPricings } from "../services/channel-models";
+import {
+	extractModelPricings,
+	extractSharedModelPricings,
+} from "../services/channel-models";
 import { listActiveChannels } from "../services/channel-repo";
 import { loadAllChannelAliasesGrouped } from "../services/model-aliases";
-import { getAnnouncement, getLdcPaymentEnabled, getRegistrationMode, getRequireInviteCode, getSiteMode } from "../services/settings";
+import {
+	getAnnouncement,
+	getLdcPaymentEnabled,
+	getRegistrationMode,
+	getRequireInviteCode,
+	getSiteMode,
+} from "../services/settings";
 
 const publicRoutes = new Hono<AppEnv>();
 
@@ -17,7 +26,14 @@ publicRoutes.get("/site-info", async (c) => {
 	const requireInviteCode = await getRequireInviteCode(c.env.DB);
 	const ldcPaymentEnabled = await getLdcPaymentEnabled(c.env.DB);
 	const announcement = await getAnnouncement(c.env.DB);
-	return c.json({ site_mode: siteMode, registration_mode: registrationMode, linuxdo_enabled: linuxdoEnabled, require_invite_code: requireInviteCode, ldc_payment_enabled: ldcPaymentEnabled, announcement });
+	return c.json({
+		site_mode: siteMode,
+		registration_mode: registrationMode,
+		linuxdo_enabled: linuxdoEnabled,
+		require_invite_code: requireInviteCode,
+		ldc_payment_enabled: ldcPaymentEnabled,
+		announcement,
+	});
 });
 
 /**
@@ -40,21 +56,41 @@ publicRoutes.get("/models", async (c) => {
 	const aliasGroups = await loadAllChannelAliasesGrouped(c.env.DB);
 
 	// Compute effective mapping
-	type ChannelEntry = { id: string; name: string; input_price: number | null; output_price: number | null };
-	const effectiveMap = new Map<string, { channels: Map<string, ChannelEntry> }>();
+	type ChannelEntry = {
+		id: string;
+		name: string;
+		input_price: number | null;
+		output_price: number | null;
+	};
+	const effectiveMap = new Map<
+		string,
+		{ channels: Map<string, ChannelEntry> }
+	>();
 
 	for (const channel of channels) {
-		const pricings = siteMode === "shared"
-			? extractSharedModelPricings(channel)
-			: extractModelPricings(channel);
+		const pricings =
+			siteMode === "shared"
+				? extractSharedModelPricings(channel)
+				: extractModelPricings(channel);
 		const chAliases = aliasGroups.get(channel.id);
 
 		for (const p of pricings) {
 			const aliasInfo = chAliases?.get(p.id);
 			const isAliasOnly = aliasInfo?.alias_only ?? false;
-			const chInfo: ChannelEntry = siteMode === "shared"
-				? { id: channel.id, name: "共享渠道", input_price: null, output_price: null }
-				: { id: channel.id, name: channel.name, input_price: p.input_price ?? null, output_price: p.output_price ?? null };
+			const chInfo: ChannelEntry =
+				siteMode === "shared"
+					? {
+							id: channel.id,
+							name: "共享渠道",
+							input_price: null,
+							output_price: null,
+						}
+					: {
+							id: channel.id,
+							name: channel.name,
+							input_price: p.input_price ?? null,
+							output_price: p.output_price ?? null,
+						};
 
 			// Original name (unless alias_only)
 			if (!isAliasOnly) {
@@ -82,7 +118,10 @@ publicRoutes.get("/models", async (c) => {
 
 	const models: Array<{ id: string; channels: ChannelEntry[] }> = [];
 	for (const [callableName, entry] of effectiveMap) {
-		models.push({ id: callableName, channels: Array.from(entry.channels.values()) });
+		models.push({
+			id: callableName,
+			channels: Array.from(entry.channels.values()),
+		});
 	}
 
 	return c.json({ models, site_mode: siteMode });
@@ -118,7 +157,9 @@ publicRoutes.get("/contributions", async (c) => {
 	const contributions = (contribRows.results ?? []).map((row) => ({
 		user_name: String(row.user_name),
 		linuxdo_id: row.linuxdo_id ? String(row.linuxdo_id) : null,
-		linuxdo_username: row.linuxdo_username ? String(row.linuxdo_username) : null,
+		linuxdo_username: row.linuxdo_username
+			? String(row.linuxdo_username)
+			: null,
 		tip_url: row.tip_url ? String(row.tip_url) : null,
 		channel_count: Number(row.channel_count),
 		total_requests: Number(row.total_requests),

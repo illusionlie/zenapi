@@ -1,14 +1,15 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
-import {
-	type ChannelRecord,
-	createWeightedOrder,
-} from "../services/channels";
 import { collectUniqueModelIds } from "../services/channel-models";
-import { buildChannelRequest, channelSupportsModel, convertResponse } from "./proxy";
+import { type ChannelRecord, createWeightedOrder } from "../services/channels";
 import { jsonError } from "../utils/http";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
 import { isRetryableStatus, sleep } from "../utils/retry";
+import {
+	buildChannelRequest,
+	channelSupportsModel,
+	convertResponse,
+} from "./proxy";
 
 const playground = new Hono<AppEnv>();
 
@@ -40,7 +41,12 @@ playground.post("/chat", async (c) => {
 	const { model, messages, stream: isStream = true } = body;
 
 	if (!model || !messages || messages.length === 0) {
-		return jsonError(c, 400, "invalid_request", "model and messages are required");
+		return jsonError(
+			c,
+			400,
+			"invalid_request",
+			"model and messages are required",
+		);
 	}
 
 	// Build OpenAI-compatible request body

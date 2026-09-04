@@ -1,6 +1,11 @@
 import { useCallback, useMemo, useState } from "hono/jsx/dom";
 import { createApiFetch } from "../core/api";
-import type { ContributionEntry, LdohViolation, User, UserDashboardData } from "../core/types";
+import type {
+	ContributionEntry,
+	LdohViolation,
+	User,
+	UserDashboardData,
+} from "../core/types";
 
 type UserDashboardProps = {
 	data: UserDashboardData | null;
@@ -24,7 +29,11 @@ function formatNumber(n: number): string {
 	return String(n);
 }
 
-const ContributionBoard = ({ contributions }: { contributions: ContributionEntry[] }) => {
+const ContributionBoard = ({
+	contributions,
+}: {
+	contributions: ContributionEntry[];
+}) => {
 	const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
 	return (
@@ -58,9 +67,13 @@ const ContributionBoard = ({ contributions }: { contributions: ContributionEntry
 									>
 										<td class="py-2.5 pr-4 text-stone-400">{idx + 1}</td>
 										<td class="py-2.5 pr-4">
-											<span class="font-medium text-stone-700">{entry.user_name}</span>
+											<span class="font-medium text-stone-700">
+												{entry.user_name}
+											</span>
 											{entry.linuxdo_id && (
-												<span class="ml-1.5 text-xs text-stone-400">L{entry.linuxdo_id}</span>
+												<span class="ml-1.5 text-xs text-stone-400">
+													L{entry.linuxdo_id}
+												</span>
 											)}
 											{entry.tip_url && (
 												<a
@@ -74,7 +87,9 @@ const ContributionBoard = ({ contributions }: { contributions: ContributionEntry
 												</a>
 											)}
 										</td>
-										<td class="py-2.5 pr-4 text-right text-stone-600">{entry.channel_count}</td>
+										<td class="py-2.5 pr-4 text-right text-stone-600">
+											{entry.channel_count}
+										</td>
 										<td class="py-2.5 pr-4 text-right font-['Space_Grotesk'] text-stone-600">
 											{formatNumber(entry.total_requests)}
 										</td>
@@ -89,17 +104,24 @@ const ContributionBoard = ({ contributions }: { contributions: ContributionEntry
 													<table class="w-full text-xs">
 														<thead>
 															<tr class="text-stone-400">
-																<th class="pb-1 text-left font-medium">渠道名称</th>
-																<th class="pb-1 text-right font-medium">请求</th>
-																<th class="pb-1 text-right font-medium">Token</th>
+																<th class="pb-1 text-left font-medium">
+																	渠道名称
+																</th>
+																<th class="pb-1 text-right font-medium">
+																	请求
+																</th>
+																<th class="pb-1 text-right font-medium">
+																	Token
+																</th>
 															</tr>
 														</thead>
 														<tbody>
 															{entry.channels.map((ch) => (
-																<tr key={ch.name} class="border-t border-stone-100">
-																	<td class="py-1 text-stone-600">
-																		{ch.name}
-																	</td>
+																<tr
+																	key={ch.name}
+																	class="border-t border-stone-100"
+																>
+																	<td class="py-1 text-stone-600">{ch.name}</td>
 																	<td class="py-1 text-right font-['Space_Grotesk'] text-stone-500">
 																		{formatNumber(ch.requests)}
 																	</td>
@@ -124,7 +146,15 @@ const ContributionBoard = ({ contributions }: { contributions: ContributionEntry
 	);
 };
 
-export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, onUnbind, onUserRefresh }: UserDashboardProps) => {
+export const UserDashboard = ({
+	data,
+	user,
+	token,
+	updateToken,
+	linuxdoEnabled,
+	onUnbind,
+	onUserRefresh,
+}: UserDashboardProps) => {
 	const [tipUrl, setTipUrl] = useState(user.tip_url ?? "");
 	const [profileNotice, setProfileNotice] = useState("");
 	const [checkinLoading, setCheckinLoading] = useState(false);
@@ -144,7 +174,11 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 	const handleCheckin = useCallback(async () => {
 		setCheckinLoading(true);
 		try {
-			const result = await apiFetch<{ ok?: boolean; already_checked_in?: boolean; reward?: number }>("/api/u/checkin", {
+			const result = await apiFetch<{
+				ok?: boolean;
+				already_checked_in?: boolean;
+				reward?: number;
+			}>("/api/u/checkin", {
 				method: "POST",
 			});
 			if (result.already_checked_in) {
@@ -182,10 +216,13 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 		setRechargeLoading(true);
 		setRechargeNotice("");
 		try {
-			const result = await apiFetch<{ order_id: string; redirect_url: string }>("/api/recharge/create", {
-				method: "POST",
-				body: JSON.stringify({ ldc_amount: amount }),
-			});
+			const result = await apiFetch<{ order_id: string; redirect_url: string }>(
+				"/api/recharge/create",
+				{
+					method: "POST",
+					body: JSON.stringify({ ldc_amount: amount }),
+				},
+			);
 			if (result.redirect_url) {
 				window.location.href = result.redirect_url;
 			}
@@ -205,12 +242,18 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 		setWithdrawLoading(true);
 		setWithdrawNotice("");
 		try {
-			const result = await apiFetch<{ ok?: boolean; ldc_amount?: number; fee_amount?: number }>("/api/u/withdrawal/create", {
+			const result = await apiFetch<{
+				ok?: boolean;
+				ldc_amount?: number;
+				fee_amount?: number;
+			}>("/api/u/withdrawal/create", {
 				method: "POST",
 				body: JSON.stringify({ amount }),
 			});
 			if (result.ok) {
-				setWithdrawNotice(`提现成功，到账 ${result.ldc_amount} LDC${result.fee_amount ? `（手续费 ${result.fee_amount} LDC）` : ""}`);
+				setWithdrawNotice(
+					`提现成功，到账 ${result.ldc_amount} LDC${result.fee_amount ? `（手续费 ${result.fee_amount} LDC）` : ""}`,
+				);
 				setWithdrawAmount("");
 				onUserRefresh();
 			}
@@ -270,108 +313,127 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 
 			{/* Recharge card */}
 			{data.ldc_payment_enabled && (
-			<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
-				<h3 class="font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-					LDC 充值
-				</h3>
-				<p class="mb-3 text-xs text-stone-500">
-					1 LDC = ${data.ldc_exchange_rate} 余额
-				</p>
-				<div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-					<div class="flex-1">
-						<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
-							LDC 积分数量
-						</label>
-						<input
-							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-							type="number"
-							min="1"
-							step="1"
-							placeholder="输入 LDC 积分数量"
-							value={rechargeAmount}
-							onInput={(e) => setRechargeAmount((e.currentTarget as HTMLInputElement)?.value ?? "")}
-						/>
-					</div>
-					<button
-						type="button"
-						disabled={rechargeLoading || !rechargeAmount}
-						class="h-[42px] rounded-lg bg-stone-900 px-5 text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
-						onClick={handleRecharge}
-					>
-						{rechargeLoading ? "处理中..." : "充值"}
-					</button>
-				</div>
-				{rechargeAmount && Number(rechargeAmount) > 0 && (
-					<p class="mt-2 text-sm text-stone-600">
-						支付 {rechargeAmount} LDC 积分 → 获得 ${(Number(rechargeAmount) * data.ldc_exchange_rate).toFixed(2)} 余额
+				<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
+					<h3 class="font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+						LDC 充值
+					</h3>
+					<p class="mb-3 text-xs text-stone-500">
+						1 LDC = ${data.ldc_exchange_rate} 余额
 					</p>
-				)}
-				{rechargeNotice && (
-					<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
-						{rechargeNotice}
-					</div>
-				)}
-			</div>
-			)}
-
-			{/* Withdrawal card */}
-			{data.withdrawal_enabled && (
-			<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
-				<h3 class="font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-					余额提现
-				</h3>
-				<p class="mb-3 text-xs text-stone-500">
-					可提现余额: ${data.withdrawable_balance.toFixed(2)}{data.withdrawal_fee_rate > 0 ? ` | 手续费: ${data.withdrawal_fee_rate}%` : ""}
-				</p>
-				{!user.linuxdo_id ? (
-					<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
-						请先绑定 Linux DO 账号才能提现
-					</div>
-				) : (
-					<>
 					<div class="flex flex-col gap-3 sm:flex-row sm:items-end">
 						<div class="flex-1">
 							<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
-								提现余额数量
+								LDC 积分数量
 							</label>
 							<input
 								class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 								type="number"
-								min="0.01"
-								step="0.01"
-								placeholder="输入要提现的余额数量"
-								value={withdrawAmount}
-								onInput={(e) => setWithdrawAmount((e.currentTarget as HTMLInputElement)?.value ?? "")}
+								min="1"
+								step="1"
+								placeholder="输入 LDC 积分数量"
+								value={rechargeAmount}
+								onInput={(e) =>
+									setRechargeAmount(
+										(e.currentTarget as HTMLInputElement)?.value ?? "",
+									)
+								}
 							/>
 						</div>
 						<button
 							type="button"
-							disabled={withdrawLoading || !withdrawAmount}
+							disabled={rechargeLoading || !rechargeAmount}
 							class="h-[42px] rounded-lg bg-stone-900 px-5 text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
-							onClick={handleWithdraw}
+							onClick={handleRecharge}
 						>
-							{withdrawLoading ? "处理中..." : "提现"}
+							{rechargeLoading ? "处理中..." : "充值"}
 						</button>
 					</div>
-					{withdrawAmount && Number(withdrawAmount) > 0 && data.ldc_exchange_rate > 0 && (
+					{rechargeAmount && Number(rechargeAmount) > 0 && (
 						<p class="mt-2 text-sm text-stone-600">
-							{(() => {
-								const amt = Number(withdrawAmount);
-								const grossLdc = Math.round((amt / data.ldc_exchange_rate) * 100) / 100;
-								const fee = Math.round(grossLdc * (data.withdrawal_fee_rate / 100) * 100) / 100;
-								const net = Math.round((grossLdc - fee) * 100) / 100;
-								return `${amt} 余额 → ${grossLdc} LDC${fee > 0 ? ` - ${fee} 手续费` : ""} = ${net} LDC 到账`;
-							})()}
+							支付 {rechargeAmount} LDC 积分 → 获得 $
+							{(Number(rechargeAmount) * data.ldc_exchange_rate).toFixed(2)}{" "}
+							余额
 						</p>
 					)}
-					</>
-				)}
-				{withdrawNotice && (
-					<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
-						{withdrawNotice}
-					</div>
-				)}
-			</div>
+					{rechargeNotice && (
+						<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+							{rechargeNotice}
+						</div>
+					)}
+				</div>
+			)}
+
+			{/* Withdrawal card */}
+			{data.withdrawal_enabled && (
+				<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
+					<h3 class="font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+						余额提现
+					</h3>
+					<p class="mb-3 text-xs text-stone-500">
+						可提现余额: ${data.withdrawable_balance.toFixed(2)}
+						{data.withdrawal_fee_rate > 0
+							? ` | 手续费: ${data.withdrawal_fee_rate}%`
+							: ""}
+					</p>
+					{!user.linuxdo_id ? (
+						<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+							请先绑定 Linux DO 账号才能提现
+						</div>
+					) : (
+						<>
+							<div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+								<div class="flex-1">
+									<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+										提现余额数量
+									</label>
+									<input
+										class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+										type="number"
+										min="0.01"
+										step="0.01"
+										placeholder="输入要提现的余额数量"
+										value={withdrawAmount}
+										onInput={(e) =>
+											setWithdrawAmount(
+												(e.currentTarget as HTMLInputElement)?.value ?? "",
+											)
+										}
+									/>
+								</div>
+								<button
+									type="button"
+									disabled={withdrawLoading || !withdrawAmount}
+									class="h-[42px] rounded-lg bg-stone-900 px-5 text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+									onClick={handleWithdraw}
+								>
+									{withdrawLoading ? "处理中..." : "提现"}
+								</button>
+							</div>
+							{withdrawAmount &&
+								Number(withdrawAmount) > 0 &&
+								data.ldc_exchange_rate > 0 && (
+									<p class="mt-2 text-sm text-stone-600">
+										{(() => {
+											const amt = Number(withdrawAmount);
+											const grossLdc =
+												Math.round((amt / data.ldc_exchange_rate) * 100) / 100;
+											const fee =
+												Math.round(
+													grossLdc * (data.withdrawal_fee_rate / 100) * 100,
+												) / 100;
+											const net = Math.round((grossLdc - fee) * 100) / 100;
+											return `${amt} 余额 → ${grossLdc} LDC${fee > 0 ? ` - ${fee} 手续费` : ""} = ${net} LDC 到账`;
+										})()}
+									</p>
+								)}
+						</>
+					)}
+					{withdrawNotice && (
+						<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+							{withdrawNotice}
+						</div>
+					)}
+				</div>
 			)}
 
 			{/* Stats cards */}
@@ -435,7 +497,9 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 							type="url"
 							placeholder="https://example.com/tip"
 							value={tipUrl}
-							onInput={(e) => setTipUrl((e.currentTarget as HTMLInputElement)?.value ?? "")}
+							onInput={(e) =>
+								setTipUrl((e.currentTarget as HTMLInputElement)?.value ?? "")
+							}
 						/>
 					</div>
 					<button
@@ -450,39 +514,37 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 
 			{/* Account binding */}
 			{linuxdoEnabled && (
-			<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
-				<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-					账号绑定
-				</h3>
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-stone-700">Linux DO</p>
-						<p class="text-xs text-stone-500">
-							{user.linuxdo_id
-								? `已绑定 (ID: ${user.linuxdo_id})`
-								: "未绑定"}
-						</p>
-					</div>
-					<div>
-						{user.linuxdo_id ? (
-							<button
-								type="button"
-								class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition-all hover:border-red-200 hover:text-red-600"
-								onClick={onUnbind}
-							>
-								解除绑定
-							</button>
-						) : (
-							<a
-								href={`/api/u/auth/linuxdo/bind?token=${encodeURIComponent(token)}`}
-								class="inline-flex rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-all hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
-							>
-								绑定 Linux DO
-							</a>
-						)}
+				<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
+					<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+						账号绑定
+					</h3>
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-stone-700">Linux DO</p>
+							<p class="text-xs text-stone-500">
+								{user.linuxdo_id ? `已绑定 (ID: ${user.linuxdo_id})` : "未绑定"}
+							</p>
+						</div>
+						<div>
+							{user.linuxdo_id ? (
+								<button
+									type="button"
+									class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition-all hover:border-red-200 hover:text-red-600"
+									onClick={onUnbind}
+								>
+									解除绑定
+								</button>
+							) : (
+								<a
+									href={`/api/u/auth/linuxdo/bind?token=${encodeURIComponent(token)}`}
+									class="inline-flex rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-all hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
+								>
+									绑定 Linux DO
+								</a>
+							)}
+						</div>
 					</div>
 				</div>
-			</div>
 			)}
 
 			{/* Recent usage */}
@@ -491,9 +553,7 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 					最近使用
 				</h3>
 				{data.recent_usage.length === 0 ? (
-					<p class="py-8 text-center text-sm text-stone-400">
-						暂无使用记录
-					</p>
+					<p class="py-8 text-center text-sm text-stone-400">暂无使用记录</p>
 				) : (
 					<div class="overflow-x-auto">
 						<table class="w-full text-left text-sm">
@@ -507,15 +567,9 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 							<tbody>
 								{data.recent_usage.map((item) => (
 									<tr class="border-b border-stone-50">
-										<td class="py-2 pr-4 text-stone-600">
-											{item.day}
-										</td>
-										<td class="py-2 pr-4 text-stone-600">
-											{item.requests}
-										</td>
-										<td class="py-2 text-stone-600">
-											{formatCost(item.cost)}
-										</td>
+										<td class="py-2 pr-4 text-stone-600">{item.day}</td>
+										<td class="py-2 pr-4 text-stone-600">{item.requests}</td>
+										<td class="py-2 text-stone-600">{formatCost(item.cost)}</td>
 									</tr>
 								))}
 							</tbody>
@@ -551,10 +605,16 @@ export const UserDashboard = ({ data, user, token, updateToken, linuxdoEnabled, 
 								{data.violations.map((v: LdohViolation) => (
 									<tr key={v.id} class="border-b border-red-50">
 										<td class="py-2 pr-4 text-stone-700">{v.user_name}</td>
-										<td class="py-2 pr-4 text-stone-500">{v.linuxdo_username ?? "-"}</td>
-										<td class="py-2 pr-4 text-xs text-stone-500 max-w-[200px] truncate">{v.attempted_base_url}</td>
+										<td class="py-2 pr-4 text-stone-500">
+											{v.linuxdo_username ?? "-"}
+										</td>
+										<td class="py-2 pr-4 text-xs text-stone-500 max-w-[200px] truncate">
+											{v.attempted_base_url}
+										</td>
 										<td class="py-2 pr-4 text-stone-600">{v.site_name}</td>
-										<td class="py-2 text-xs text-stone-400">{v.created_at?.slice(0, 16)}</td>
+										<td class="py-2 text-xs text-stone-400">
+											{v.created_at?.slice(0, 16)}
+										</td>
 									</tr>
 								))}
 							</tbody>

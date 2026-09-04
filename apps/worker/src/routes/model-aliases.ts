@@ -73,10 +73,15 @@ modelAliasRoutes.put("/:modelId", async (c) => {
 	}
 
 	try {
-		await batchSaveAliasesForModel(c.env.DB, modelId, aliases, aliasOnly, channelIds);
+		await batchSaveAliasesForModel(
+			c.env.DB,
+			modelId,
+			aliases,
+			aliasOnly,
+			channelIds,
+		);
 	} catch (error) {
-		const message =
-			error instanceof Error ? error.message : "unknown error";
+		const message = error instanceof Error ? error.message : "unknown error";
 		if (message.includes("UNIQUE")) {
 			return jsonError(
 				c,
@@ -96,8 +101,7 @@ modelAliasRoutes.put("/:modelId", async (c) => {
  */
 modelAliasRoutes.delete("/:modelId", async (c) => {
 	const modelId = c.req.param("modelId");
-	await c.env.DB
-		.prepare("DELETE FROM channel_model_aliases WHERE model_id = ?")
+	await c.env.DB.prepare("DELETE FROM channel_model_aliases WHERE model_id = ?")
 		.bind(modelId)
 		.run();
 	return c.json({ ok: true });

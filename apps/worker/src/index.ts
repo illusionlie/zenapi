@@ -17,17 +17,17 @@ import monitoringRoutes from "./routes/monitoring";
 import newapiChannelRoutes from "./routes/newapiChannels";
 import newapiGroupRoutes from "./routes/newapiGroups";
 import newapiUserRoutes from "./routes/newapiUsers";
+import playgroundRoutes from "./routes/playground";
 import proxyRoutes from "./routes/proxy";
 import publicRoutes from "./routes/public";
 import rechargeRoutes from "./routes/recharge";
-import withdrawalRoutes from "./routes/withdrawal";
 import settingsRoutes from "./routes/settings";
 import tokenRoutes from "./routes/tokens";
+import usageRoutes from "./routes/usage";
 import userApiRoutes from "./routes/user-api";
 import userAuthRoutes from "./routes/user-auth";
 import userChannelRoutes from "./routes/user-channels";
-import playgroundRoutes from "./routes/playground";
-import usageRoutes from "./routes/usage";
+import withdrawalRoutes from "./routes/withdrawal";
 
 const app = new Hono<AppEnv>({ strict: false });
 
@@ -115,9 +115,12 @@ app.use("/api/*", async (c, next) => {
 	const p = c.req.path;
 	if (
 		p === "/api/auth/login" ||
-		p === "/api/channel" || p.startsWith("/api/channel/") ||
-		p === "/api/user" || p.startsWith("/api/user/") ||
-		p === "/api/group" || p.startsWith("/api/group/") ||
+		p === "/api/channel" ||
+		p.startsWith("/api/channel/") ||
+		p === "/api/user" ||
+		p.startsWith("/api/user/") ||
+		p === "/api/group" ||
+		p.startsWith("/api/group/") ||
 		p.startsWith("/api/public") ||
 		p.startsWith("/api/u/") ||
 		p.startsWith("/api/recharge") ||

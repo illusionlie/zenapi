@@ -22,7 +22,12 @@ adminUsers.get("/", async (c) => {
 adminUsers.post("/", async (c) => {
 	const body = await c.req.json().catch(() => null);
 	if (!body?.email || !body?.name || !body?.password) {
-		return jsonError(c, 400, "missing_fields", "email, name, password required");
+		return jsonError(
+			c,
+			400,
+			"missing_fields",
+			"email, name, password required",
+		);
 	}
 
 	const email = String(body.email).trim().toLowerCase();
@@ -117,9 +122,7 @@ adminUsers.patch("/:id", async (c) => {
 	// If password is provided, update it
 	if (body.password) {
 		const passwordHash = await sha256Hex(String(body.password));
-		await c.env.DB.prepare(
-			"UPDATE users SET password_hash = ? WHERE id = ?",
-		)
+		await c.env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
 			.bind(passwordHash, id)
 			.run();
 	}

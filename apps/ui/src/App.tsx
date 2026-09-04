@@ -1,8 +1,8 @@
 import "./styles.css";
 import { render, useCallback, useEffect, useState } from "hono/jsx/dom";
-import { createApiFetch } from "./core/api";
-import type { SiteMode, User, RegistrationMode } from "./core/types";
 import { AdminApp } from "./AdminApp";
+import { createApiFetch } from "./core/api";
+import type { RegistrationMode, SiteMode, User } from "./core/types";
 import { LoginView } from "./features/LoginView";
 import { PublicApp } from "./PublicApp";
 import { UserApp } from "./UserApp";
@@ -28,7 +28,8 @@ const App = () => {
 	const [userRecord, setUserRecord] = useState<User | null>(null);
 	const [userChecked, setUserChecked] = useState(false);
 	const [siteMode, setSiteMode] = useState<SiteMode | null>(null);
-	const [registrationMode, setRegistrationMode] = useState<RegistrationMode>("open");
+	const [registrationMode, setRegistrationMode] =
+		useState<RegistrationMode>("open");
 	const [linuxdoEnabled, setLinuxdoEnabled] = useState(false);
 	const [requireInviteCode, setRequireInviteCode] = useState(false);
 	const [notice, setNotice] = useState("");
@@ -61,7 +62,13 @@ const App = () => {
 	// Fetch site mode on mount
 	useEffect(() => {
 		const api = createApiFetch(null, () => {});
-		api<{ site_mode: SiteMode; registration_mode?: RegistrationMode; linuxdo_enabled?: boolean; require_invite_code?: boolean; announcement?: string }>("/api/public/site-info")
+		api<{
+			site_mode: SiteMode;
+			registration_mode?: RegistrationMode;
+			linuxdo_enabled?: boolean;
+			require_invite_code?: boolean;
+			announcement?: string;
+		}>("/api/public/site-info")
 			.then((result) => {
 				setSiteMode(result.site_mode);
 				setRegistrationMode(result.registration_mode ?? "open");
@@ -168,13 +175,21 @@ const App = () => {
 		if (!adminToken) {
 			return (
 				<div class="min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased">
-					<LoginView notice={notice} onSubmit={handleAdminLogin} onNavigate={navigateTo} />
+					<LoginView
+						notice={notice}
+						onSubmit={handleAdminLogin}
+						onNavigate={navigateTo}
+					/>
 				</div>
 			);
 		}
 		return (
 			<div class="min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased">
-				<AdminApp token={adminToken} updateToken={updateAdminToken} onNavigate={navigateTo} />
+				<AdminApp
+					token={adminToken}
+					updateToken={updateAdminToken}
+					onNavigate={navigateTo}
+				/>
 			</div>
 		);
 	}
@@ -214,7 +229,16 @@ const App = () => {
 			// No token — redirect to login
 			history.replaceState(null, "", "/login");
 			setPath("/login");
-			return <PublicApp onUserLogin={handleUserLogin} onNavigate={navigateTo} siteMode={siteMode} linuxdoEnabled={linuxdoEnabled} registrationMode={registrationMode} requireInviteCode={requireInviteCode} />;
+			return (
+				<PublicApp
+					onUserLogin={handleUserLogin}
+					onNavigate={navigateTo}
+					siteMode={siteMode}
+					linuxdoEnabled={linuxdoEnabled}
+					registrationMode={registrationMode}
+					requireInviteCode={requireInviteCode}
+				/>
+			);
 		}
 		if (!userChecked) {
 			// Token exists but still verifying — show nothing to avoid flash
@@ -224,7 +248,16 @@ const App = () => {
 			// Token was invalid — redirect to login
 			history.replaceState(null, "", "/login");
 			setPath("/login");
-			return <PublicApp onUserLogin={handleUserLogin} onNavigate={navigateTo} siteMode={siteMode} linuxdoEnabled={linuxdoEnabled} registrationMode={registrationMode} requireInviteCode={requireInviteCode} />;
+			return (
+				<PublicApp
+					onUserLogin={handleUserLogin}
+					onNavigate={navigateTo}
+					siteMode={siteMode}
+					linuxdoEnabled={linuxdoEnabled}
+					registrationMode={registrationMode}
+					requireInviteCode={requireInviteCode}
+				/>
+			);
 		}
 		return (
 			<div class="min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased">
@@ -237,7 +270,12 @@ const App = () => {
 					onUserRefresh={handleUserRefresh}
 					siteMode={siteMode}
 				/>
-				{showAnnouncement && announcement && <AnnouncementModal text={announcement} onClose={handleDismissAnnouncement} />}
+				{showAnnouncement && announcement && (
+					<AnnouncementModal
+						text={announcement}
+						onClose={handleDismissAnnouncement}
+					/>
+				)}
 			</div>
 		);
 	}
@@ -252,25 +290,61 @@ const App = () => {
 
 	return (
 		<>
-			<PublicApp onUserLogin={handleUserLogin} onNavigate={navigateTo} siteMode={siteMode} linuxdoEnabled={linuxdoEnabled} registrationMode={registrationMode} requireInviteCode={requireInviteCode} />
-			{showAnnouncement && announcement && <AnnouncementModal text={announcement} onClose={handleDismissAnnouncement} />}
+			<PublicApp
+				onUserLogin={handleUserLogin}
+				onNavigate={navigateTo}
+				siteMode={siteMode}
+				linuxdoEnabled={linuxdoEnabled}
+				registrationMode={registrationMode}
+				requireInviteCode={requireInviteCode}
+			/>
+			{showAnnouncement && announcement && (
+				<AnnouncementModal
+					text={announcement}
+					onClose={handleDismissAnnouncement}
+				/>
+			)}
 		</>
 	);
 };
 
-const AnnouncementModal = ({ text, onClose }: { text: string; onClose: () => void }) => {
+const AnnouncementModal = ({
+	text,
+	onClose,
+}: {
+	text: string;
+	onClose: () => void;
+}) => {
 	return (
-		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+			onClick={(e) => {
+				if (e.target === e.currentTarget) onClose();
+			}}
+		>
 			<div class="mx-4 w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
 				<div class="mb-4 flex items-center gap-2">
 					<span class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-							<path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd" />
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							viewBox="0 0 20 20"
+							fill="currentColor"
+						>
+							<path
+								fill-rule="evenodd"
+								d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z"
+								clip-rule="evenodd"
+							/>
 						</svg>
 					</span>
-					<h3 class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900">站点公告</h3>
+					<h3 class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900">
+						站点公告
+					</h3>
 				</div>
-				<div class="mb-5 whitespace-pre-wrap text-sm leading-relaxed text-stone-700">{text}</div>
+				<div class="mb-5 whitespace-pre-wrap text-sm leading-relaxed text-stone-700">
+					{text}
+				</div>
 				<div class="flex justify-end">
 					<button
 						type="button"

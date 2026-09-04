@@ -3,8 +3,8 @@ import { safeJsonParse } from "../utils/json";
 import { nowIso } from "../utils/time";
 import { normalizeBaseUrl } from "../utils/url";
 import {
-	type ModelPricing,
 	extractModelPricings,
+	type ModelPricing,
 	modelsToJson,
 	normalizeModelsInput,
 } from "./channel-models";
@@ -109,7 +109,12 @@ export async function updateChannelTestResult(
 			});
 			const existingMap = new Map<
 				string,
-				{ input_price?: number; output_price?: number; shared?: boolean; enabled?: boolean }
+				{
+					input_price?: number;
+					output_price?: number;
+					shared?: boolean;
+					enabled?: boolean;
+				}
 			>();
 			for (const p of existingPricings) {
 				existingMap.set(p.id, {

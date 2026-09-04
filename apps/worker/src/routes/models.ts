@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
-import { extractModelPricings, extractModelIds, modelsToJson } from "../services/channel-models";
+import {
+	extractModelIds,
+	extractModelPricings,
+	modelsToJson,
+} from "../services/channel-models";
 import { listActiveChannels } from "../services/channel-repo";
 import { loadAllChannelAliasesGrouped } from "../services/model-aliases";
 import { jsonError } from "../utils/http";
@@ -43,10 +47,44 @@ type ModelResult = {
  */
 function computeEffectiveMapping(
 	channels: Array<{ id: string; name: string; models_json?: string | null }>,
-	aliasGroups: Map<string, Map<string, { aliases: string[]; alias_only: boolean }>>,
-	pricingMap: Map<string, Map<string, { input_price: number | null; output_price: number | null }>>,
-): Map<string, { realModelId: string | null; channels: Map<string, { id: string; name: string; input_price: number | null; output_price: number | null }> }> {
-	const effectiveMap = new Map<string, { realModelId: string | null; channels: Map<string, { id: string; name: string; input_price: number | null; output_price: number | null }> }>();
+	aliasGroups: Map<
+		string,
+		Map<string, { aliases: string[]; alias_only: boolean }>
+	>,
+	pricingMap: Map<
+		string,
+		Map<string, { input_price: number | null; output_price: number | null }>
+	>,
+): Map<
+	string,
+	{
+		realModelId: string | null;
+		channels: Map<
+			string,
+			{
+				id: string;
+				name: string;
+				input_price: number | null;
+				output_price: number | null;
+			}
+		>;
+	}
+> {
+	const effectiveMap = new Map<
+		string,
+		{
+			realModelId: string | null;
+			channels: Map<
+				string,
+				{
+					id: string;
+					name: string;
+					input_price: number | null;
+					output_price: number | null;
+				}
+			>;
+		}
+	>();
 
 	const getOrCreate = (name: string, realModelId: string | null) => {
 		let entry = effectiveMap.get(name);
@@ -99,12 +137,21 @@ models.get("/", async (c) => {
 	const channels = await listActiveChannels(c.env.DB);
 
 	// Build per-channel pricing maps
-	const pricingMap = new Map<string, Map<string, { input_price: number | null; output_price: number | null }>>();
+	const pricingMap = new Map<
+		string,
+		Map<string, { input_price: number | null; output_price: number | null }>
+	>();
 	for (const channel of channels) {
 		const pricings = extractModelPricings(channel);
-		const modelPriceMap = new Map<string, { input_price: number | null; output_price: number | null }>();
+		const modelPriceMap = new Map<
+			string,
+			{ input_price: number | null; output_price: number | null }
+		>();
 		for (const p of pricings) {
-			modelPriceMap.set(p.id, { input_price: p.input_price ?? null, output_price: p.output_price ?? null });
+			modelPriceMap.set(p.id, {
+				input_price: p.input_price ?? null,
+				output_price: p.output_price ?? null,
+			});
 		}
 		pricingMap.set(channel.id, modelPriceMap);
 	}
@@ -113,7 +160,11 @@ models.get("/", async (c) => {
 	const aliasGroups = await loadAllChannelAliasesGrouped(c.env.DB);
 
 	// Compute effective mapping
-	const effectiveMap = computeEffectiveMapping(channels, aliasGroups, pricingMap);
+	const effectiveMap = computeEffectiveMapping(
+		channels,
+		aliasGroups,
+		pricingMap,
+	);
 
 	// Aggregate usage stats from last 30 days
 	const usageAgg = await c.env.DB.prepare(
@@ -249,7 +300,12 @@ models.put("/prices/:modelId", async (c) => {
 
 	for (const item of body.prices) {
 		if (!item.channel_id || typeof item.channel_id !== "string") {
-			return jsonError(c, 400, "each price entry must have a channel_id", "invalid_body");
+			return jsonError(
+				c,
+				400,
+				"each price entry must have a channel_id",
+				"invalid_body",
+			);
 		}
 
 		const row = await db
@@ -258,7 +314,12 @@ models.put("/prices/:modelId", async (c) => {
 			.first<{ models_json: string | null }>();
 
 		if (!row) {
-			return jsonError(c, 404, `channel ${item.channel_id} not found`, "not_found");
+			return jsonError(
+				c,
+				404,
+				`channel ${item.channel_id} not found`,
+				"not_found",
+			);
 		}
 
 		const pricings = extractModelPricings({ models_json: row.models_json });
@@ -272,13 +333,19 @@ models.put("/prices/:modelId", async (c) => {
 			);
 		}
 
-		entry.input_price = item.input_price != null ? Number(item.input_price) : entry.input_price;
-		entry.output_price = item.output_price != null ? Number(item.output_price) : entry.output_price;
+		entry.input_price =
+			item.input_price != null ? Number(item.input_price) : entry.input_price;
+		entry.output_price =
+			item.output_price != null
+				? Number(item.output_price)
+				: entry.output_price;
 
 		const updatedJson = modelsToJson(pricings);
 		stmts.push(
 			db
-				.prepare("UPDATE channels SET models_json = ?, updated_at = ? WHERE id = ?")
+				.prepare(
+					"UPDATE channels SET models_json = ?, updated_at = ? WHERE id = ?",
+				)
 				.bind(updatedJson, now, item.channel_id),
 		);
 	}

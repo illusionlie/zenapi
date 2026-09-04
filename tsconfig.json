@@ -1,5 +1,5 @@
 {
-	"exclude": ["**/dist", "helloagents", "tests", "**/node_modules"],
+	"exclude": ["**/dist", "tests", "**/node_modules"],
 	"compilerOptions": {
 		"target": "ES2022",
 		"module": "ESNext",

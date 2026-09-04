@@ -34,9 +34,15 @@ export function extractHostname(url: string): string {
  * Checks if a channel hostname matches a site hostname (exact or subdomain).
  * e.g. "api.example.com" matches "example.com", "example.com" matches "example.com"
  */
-export function hostnameMatches(channelHostname: string, siteHostname: string): boolean {
+export function hostnameMatches(
+	channelHostname: string,
+	siteHostname: string,
+): boolean {
 	if (!channelHostname || !siteHostname) return false;
-	return channelHostname === siteHostname || channelHostname.endsWith(`.${siteHostname}`);
+	return (
+		channelHostname === siteHostname ||
+		channelHostname.endsWith(`.${siteHostname}`)
+	);
 }
 
 /**

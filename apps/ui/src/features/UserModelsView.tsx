@@ -63,43 +63,33 @@ export const UserModelsView = ({ models }: UserModelsViewProps) => {
 								</div>
 								{model.channels.length > 0 && (
 									<div class="rounded-lg bg-stone-50 p-2.5">
-												<p class="mb-1.5 text-xs font-medium uppercase tracking-widest text-stone-400">
-													渠道价格
-												</p>
-												<div class="space-y-1">
-													{model.channels.map((ch) => (
-														<div class="flex items-center justify-between text-xs">
-															<span class="truncate text-stone-600">
-																{ch.name}
-															</span>
-															<span class="shrink-0 pl-2 text-stone-500">
-																{ch.input_price != null ||
-																ch.output_price != null ? (
-																	<>
-																		<span class="text-emerald-600">
-																			{formatPrice(
-																				ch.input_price,
-																			)}
-																		</span>
-																		{" / "}
-																		<span class="text-blue-600">
-																			{formatPrice(
-																				ch.output_price,
-																			)}
-																		</span>
-																		<span class="ml-1 text-stone-400">
-																			/1M
-																		</span>
-																	</>
-																) : (
-																	<span class="text-stone-300">
-																		未设置
-																	</span>
-																)}
-															</span>
-														</div>
-													))}
+										<p class="mb-1.5 text-xs font-medium uppercase tracking-widest text-stone-400">
+											渠道价格
+										</p>
+										<div class="space-y-1">
+											{model.channels.map((ch) => (
+												<div class="flex items-center justify-between text-xs">
+													<span class="truncate text-stone-600">{ch.name}</span>
+													<span class="shrink-0 pl-2 text-stone-500">
+														{ch.input_price != null ||
+														ch.output_price != null ? (
+															<>
+																<span class="text-emerald-600">
+																	{formatPrice(ch.input_price)}
+																</span>
+																{" / "}
+																<span class="text-blue-600">
+																	{formatPrice(ch.output_price)}
+																</span>
+																<span class="ml-1 text-stone-400">/1M</span>
+															</>
+														) : (
+															<span class="text-stone-300">未设置</span>
+														)}
+													</span>
 												</div>
+											))}
+										</div>
 									</div>
 								)}
 							</div>

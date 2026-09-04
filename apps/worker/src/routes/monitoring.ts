@@ -14,9 +14,7 @@ const RANGE_CONFIG: Record<string, { ms: number; sqlSlice: number }> = {
 monitoring.get("/", async (c) => {
 	const range = c.req.query("range") ?? "7d";
 	const config = RANGE_CONFIG[range] ?? RANGE_CONFIG["7d"];
-	const since = new Date(Date.now() - config.ms)
-		.toISOString()
-		.slice(0, 19);
+	const since = new Date(Date.now() - config.ms).toISOString().slice(0, 19);
 	const slotExpr = `substr(created_at, 1, ${config.sqlSlice})`;
 
 	const channelRows = await c.env.DB.prepare(
@@ -96,12 +94,16 @@ monitoring.get("/", async (c) => {
 		.bind(recentSince)
 		.all();
 
-	const recentByChannel = new Map<string, { success_rate: number | null; avg_latency_ms: number }>();
+	const recentByChannel = new Map<
+		string,
+		{ success_rate: number | null; avg_latency_ms: number }
+	>();
 	for (const row of recentChannelRows.results ?? []) {
 		const total = Number(row.total_requests);
 		const success = Number(row.success_count);
 		recentByChannel.set(String(row.channel_id), {
-			success_rate: total > 0 ? Math.round((success / total) * 10000) / 100 : null,
+			success_rate:
+				total > 0 ? Math.round((success / total) * 10000) / 100 : null,
 			avg_latency_ms: Math.round(Number(row.avg_latency_ms)),
 		});
 	}
@@ -123,7 +125,8 @@ monitoring.get("/", async (c) => {
 			total_requests: total,
 			success_count: success,
 			error_count: Number(row.error_count),
-			success_rate: total > 0 ? Math.round((success / total) * 10000) / 100 : null,
+			success_rate:
+				total > 0 ? Math.round((success / total) * 10000) / 100 : null,
 			avg_latency_ms: Math.round(Number(row.avg_latency_ms)),
 			last_seen: row.last_seen ?? null,
 			recent_success_rate: recent?.success_rate ?? null,

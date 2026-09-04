@@ -1,17 +1,24 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { type TokenRecord, tokenAuth } from "../middleware/tokenAuth";
-import { type ChannelRecord, createWeightedOrder } from "../services/channels";
 import { resolveChannelRoute } from "../services/channel-route";
-import { loadChannelAliasesByAlias, loadChannelAliasOnlyMap } from "../services/model-aliases";
+import { type ChannelRecord, createWeightedOrder } from "../services/channels";
 import {
 	anthropicToOpenaiRequest,
 	createOpenaiToAnthropicStreamTransform,
 	openaiToAnthropicResponse,
 } from "../services/format-converter";
-import { recordUsage } from "../services/usage";
+import {
+	loadChannelAliasesByAlias,
+	loadChannelAliasOnlyMap,
+} from "../services/model-aliases";
 import { calculateCost, getModelPrice } from "../services/pricing";
-import { getChannelFeeEnabled, getSiteMode, getWithdrawalMode } from "../services/settings";
+import {
+	getChannelFeeEnabled,
+	getSiteMode,
+	getWithdrawalMode,
+} from "../services/settings";
+import { recordUsage } from "../services/usage";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
@@ -23,7 +30,11 @@ import {
 	parseUsageFromHeaders,
 	parseUsageFromSse,
 } from "../utils/usage";
-import { channelSupportsModel, channelSupportsSharedModel, filterAllowedChannels } from "./proxy";
+import {
+	channelSupportsModel,
+	channelSupportsSharedModel,
+	filterAllowedChannels,
+} from "./proxy";
 
 const anthropicProxy = new Hono<AppEnv>();
 
@@ -48,8 +59,12 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 	const isStream = parsedBody?.stream === true;
 
 	// Resolve per-channel aliases for this model name
-	const channelAliasHits = model ? await loadChannelAliasesByAlias(c.env.DB, model) : [];
-	const channelAliasHitMap = new Map(channelAliasHits.map((h) => [h.channel_id, h]));
+	const channelAliasHits = model
+		? await loadChannelAliasesByAlias(c.env.DB, model)
+		: [];
+	const channelAliasHitMap = new Map(
+		channelAliasHits.map((h) => [h.channel_id, h]),
+	);
 
 	// Load per-channel alias-only map
 	const perChannelAliasOnlyMap = await loadChannelAliasOnlyMap(c.env.DB);
@@ -68,7 +83,10 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 	const useSharedFilter = siteMode === "shared" && !!tokenRecord.user_id;
 
 	// Resolve channel/model routing syntax (uses original model name)
-	const { targetChannel, actualModel } = resolveChannelRoute(model, activeChannels);
+	const { targetChannel, actualModel } = resolveChannelRoute(
+		model,
+		activeChannels,
+	);
 	const effectiveModel = targetChannel ? actualModel : model;
 
 	// If channel routing matched, replace model in the request bodies
@@ -83,12 +101,19 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 
 	let candidates: ChannelRecord[];
 	if (targetChannel) {
-		if (useSharedFilter && !channelSupportsSharedModel(targetChannel, actualModel)) {
+		if (
+			useSharedFilter &&
+			!channelSupportsSharedModel(targetChannel, actualModel)
+		) {
 			return jsonError(c, 403, "model_not_shared", "model_not_shared");
 		}
 		candidates = [targetChannel];
 	} else {
-		const allowedChannels = filterAllowedChannels(activeChannels, tokenRecord, model);
+		const allowedChannels = filterAllowedChannels(
+			activeChannels,
+			tokenRecord,
+			model,
+		);
 		if (model) {
 			const supportsFn = useSharedFilter
 				? channelSupportsSharedModel
@@ -99,7 +124,7 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 				// Channel natively supports this model → include UNLESS alias_only
 				if (supportsFn(channel, model)) {
 					const aliasOnlyModels = perChannelAliasOnlyMap.get(channel.id);
-					return !(aliasOnlyModels?.has(model));
+					return !aliasOnlyModels?.has(model);
 				}
 				return false;
 			});
@@ -129,7 +154,12 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 	if (!isStream) {
 		candidates = candidates.filter((ch) => !ch.stream_only);
 		if (candidates.length === 0) {
-			return jsonError(c, 400, "stream_required", "所有可用渠道要求使用流式调用");
+			return jsonError(
+				c,
+				400,
+				"stream_required",
+				"所有可用渠道要求使用流式调用",
+			);
 		}
 	}
 
@@ -334,7 +364,10 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 	// Record usage
 	const channelForUsage = selectedChannel ?? lastChannel;
 	if (channelForUsage && lastResponse) {
-		const price = getModelPrice(channelForUsage.models_json, selectedModelName ?? "");
+		const price = getModelPrice(
+			channelForUsage.models_json,
+			selectedModelName ?? "",
+		);
 		let errorCode: number | null = null;
 		let errorMessage: string | null = null;
 		if (!lastResponse.ok) {
@@ -356,7 +389,12 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 				completionTokens: 0,
 			};
 			const cost = price
-				? calculateCost(price, normalized.promptTokens, normalized.completionTokens, normalized.totalTokens)
+				? calculateCost(
+						price,
+						normalized.promptTokens,
+						normalized.completionTokens,
+						normalized.totalTokens,
+					)
 				: 0;
 			await recordUsage(c.env.DB, {
 				tokenId: tokenRecord.id,
@@ -394,7 +432,11 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 				}
 			}
 			// Credit contributor balance
-			if (cost > 0 && channelForUsage.contributed_by && channelForUsage.charge_enabled === 1) {
+			if (
+				cost > 0 &&
+				channelForUsage.contributed_by &&
+				channelForUsage.charge_enabled === 1
+			) {
 				const feeEnabled = await getChannelFeeEnabled(c.env.DB);
 				if (feeEnabled) {
 					const now = new Date().toISOString();
@@ -402,9 +444,14 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 					if (tokenRecord.user_id) {
 						const consumer = await c.env.DB.prepare(
 							"SELECT balance, withdrawable_balance FROM users WHERE id = ?",
-						).bind(tokenRecord.user_id).first<{ balance: number; withdrawable_balance: number }>();
+						)
+							.bind(tokenRecord.user_id)
+							.first<{ balance: number; withdrawable_balance: number }>();
 						if (consumer) {
-							const giftedPortion = Math.max(0, (consumer.balance + cost) - consumer.withdrawable_balance);
+							const giftedPortion = Math.max(
+								0,
+								consumer.balance + cost - consumer.withdrawable_balance,
+							);
 							withdrawableCredit = Math.max(0, cost - giftedPortion);
 						}
 					}
@@ -431,7 +478,9 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 					// SSE parsing failed (stream interrupted, etc.) — still record with whatever we have
 					try {
 						await recordFn(headerUsage, null);
-					} catch { /* truly lost */ }
+					} catch {
+						/* truly lost */
+					}
 				});
 			if (executionCtx?.waitUntil) {
 				executionCtx.waitUntil(task);

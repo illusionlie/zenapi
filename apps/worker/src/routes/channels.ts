@@ -86,7 +86,12 @@ channels.get("/", async (c) => {
 				`SELECT channel_id, model_id, alias, alias_only FROM channel_model_aliases WHERE channel_id IN (${placeholders}) ORDER BY channel_id, model_id, alias`,
 			)
 				.bind(...batch)
-				.all<{ channel_id: string; model_id: string; alias: string; alias_only: number }>();
+				.all<{
+					channel_id: string;
+					model_id: string;
+					alias: string;
+					alias_only: number;
+				}>();
 
 			for (const row of aliasRows.results ?? []) {
 				if (!channelAliases[row.channel_id]) {
@@ -153,9 +158,11 @@ channels.post("/", async (c) => {
 
 	// Save per-channel model aliases if provided
 	if (body.model_aliases && typeof body.model_aliases === "object") {
-		const modelIds = (body.models ?? []).map((m: unknown) =>
-			typeof m === "string" ? m : (m as { id?: string })?.id ?? "",
-		).filter(Boolean);
+		const modelIds = (body.models ?? [])
+			.map((m: unknown) =>
+				typeof m === "string" ? m : ((m as { id?: string })?.id ?? ""),
+			)
+			.filter(Boolean);
 		for (const [modelId, config] of Object.entries(body.model_aliases)) {
 			if (!modelIds.includes(modelId)) continue;
 			await saveChannelAliases(
@@ -197,7 +204,9 @@ channels.patch("/:id", async (c) => {
 	const baseUrl =
 		apiFormat === "anthropic"
 			? normalizeBaseUrl(String(body.base_url ?? current.base_url))
-			: String(body.base_url ?? current.base_url).trim().replace(/\/+$/, "");
+			: String(body.base_url ?? current.base_url)
+					.trim()
+					.replace(/\/+$/, "");
 
 	await updateChannel(c.env.DB, id, {
 		name: body.name ?? current.name,
@@ -218,9 +227,11 @@ channels.patch("/:id", async (c) => {
 
 	// Save per-channel model aliases if provided
 	if (body.model_aliases && typeof body.model_aliases === "object") {
-		const modelIds = (Array.isArray(models) ? models : []).map((m: unknown) =>
-			typeof m === "string" ? m : (m as { id?: string })?.id ?? "",
-		).filter(Boolean);
+		const modelIds = (Array.isArray(models) ? models : [])
+			.map((m: unknown) =>
+				typeof m === "string" ? m : ((m as { id?: string })?.id ?? ""),
+			)
+			.filter(Boolean);
 		for (const [modelId, config] of Object.entries(body.model_aliases)) {
 			if (!modelIds.includes(modelId)) continue;
 			await saveChannelAliases(
@@ -243,6 +254,38 @@ channels.delete("/:id", async (c) => {
 	const id = c.req.param("id");
 	await deleteChannel(c.env.DB, id);
 	return c.json({ ok: true });
+});
+
+/**
+ * Fetches models from an upstream channel without persisting anything.
+ * Used by the channel form "拉取模型" button before the channel is saved.
+ */
+channels.post("/fetch_models", async (c) => {
+	const body = (await c.req.json().catch(() => null)) as ChannelPayload | null;
+	if (!body?.base_url) {
+		return jsonError(c, 400, "missing_fields", "missing_fields");
+	}
+
+	const apiFormat = (body.api_format ?? "openai") as ChannelApiFormat;
+	const baseUrl =
+		apiFormat === "anthropic"
+			? normalizeBaseUrl(String(body.base_url))
+			: String(body.base_url).trim().replace(/\/+$/, "");
+	const apiKey =
+		parseApiKeys(body.api_key ?? "")[0] ?? String(body.api_key ?? "");
+
+	const result = await fetchChannelModels(
+		baseUrl,
+		apiKey,
+		apiFormat,
+		body.custom_headers?.trim() || null,
+	);
+
+	if (!result.ok) {
+		return jsonError(c, 502, "channel_unreachable", "channel_unreachable");
+	}
+
+	return c.json({ ok: true, models: result.models, elapsed: result.elapsed });
 });
 
 /**
@@ -274,7 +317,8 @@ channels.post("/:id/test", async (c) => {
 
 	// Check if channel already has models filled in
 	const existingModels = safeJsonParse<unknown[]>(channel.models_json, []);
-	const channelHasModels = Array.isArray(existingModels) && existingModels.length > 0;
+	const channelHasModels =
+		Array.isArray(existingModels) && existingModels.length > 0;
 
 	// Only overwrite models_json when the test returned models AND channel has no existing models
 	const hasModels = result.models.length > 0;

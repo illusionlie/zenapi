@@ -50,7 +50,12 @@ userChannels.get("/", async (c) => {
 				`SELECT channel_id, model_id, alias, alias_only FROM channel_model_aliases WHERE channel_id IN (${placeholders}) ORDER BY channel_id, model_id, alias`,
 			)
 				.bind(...batch)
-				.all<{ channel_id: string; model_id: string; alias: string; alias_only: number }>();
+				.all<{
+					channel_id: string;
+					model_id: string;
+					alias: string;
+					alias_only: number;
+				}>();
 
 			for (const row of aliasRows.results ?? []) {
 				if (!channelAliases[row.channel_id]) {
@@ -106,7 +111,9 @@ userChannels.post("/", async (c) => {
 
 		const blocked = (blockedResult.results ?? []).find((row) =>
 			hostnameMatches(hostname, String(row.hostname)),
-		) as { id: string; site_id: string; hostname: string; site_name: string } | undefined;
+		) as
+			| { id: string; site_id: string; hostname: string; site_name: string }
+			| undefined;
 
 		if (blocked) {
 			// Record violation
@@ -127,7 +134,12 @@ userChannels.post("/", async (c) => {
 				)
 				.run();
 
-			return jsonError(c, 403, "hostname_blocked", "该 API 地址已被站点维护者封禁");
+			return jsonError(
+				c,
+				403,
+				"hostname_blocked",
+				"该 API 地址已被站点维护者封禁",
+			);
 		}
 
 		// Check if hostname matches an LDOH site → require pending approval (domain suffix match)
@@ -136,7 +148,9 @@ userChannels.post("/", async (c) => {
 		).all();
 
 		const matchedSite = (sitesResult.results ?? []).find((row) => {
-			const siteHostnames = String(row.api_base_hostname).split(",").map((h) => h.trim());
+			const siteHostnames = String(row.api_base_hostname)
+				.split(",")
+				.map((h) => h.trim());
 			return siteHostnames.some((h) => hostnameMatches(hostname, h));
 		});
 
@@ -178,9 +192,9 @@ userChannels.post("/", async (c) => {
 	// Save per-channel model aliases if provided
 	if (body.model_aliases && typeof body.model_aliases === "object") {
 		const modelIds = modelsJson
-			? (JSON.parse(modelsJson) as Array<{ id?: string } | string>).map(
-					(m) => (typeof m === "string" ? m : m?.id ?? ""),
-				).filter(Boolean)
+			? (JSON.parse(modelsJson) as Array<{ id?: string } | string>)
+					.map((m) => (typeof m === "string" ? m : (m?.id ?? "")))
+					.filter(Boolean)
 			: [];
 		for (const [modelId, config] of Object.entries(body.model_aliases)) {
 			if (!modelIds.includes(modelId)) continue;
@@ -197,7 +211,11 @@ userChannels.post("/", async (c) => {
 		}
 	}
 
-	return c.json({ id, status: channelStatus, message: channelStatus === "pending" ? "渠道已创建，等待审批" : undefined });
+	return c.json({
+		id,
+		status: channelStatus,
+		message: channelStatus === "pending" ? "渠道已创建，等待审批" : undefined,
+	});
 });
 
 /**
@@ -242,8 +260,16 @@ userChannels.patch("/:id", async (c) => {
 			body.api_key ? String(body.api_key).trim() : existing.api_key,
 			body.api_format ?? existing.api_format ?? "openai",
 			modelsJson,
-			body.charge_enabled !== undefined ? (body.charge_enabled ? 1 : 0) : (existing.charge_enabled ?? 0),
-			body.stream_only !== undefined ? (body.stream_only ? 1 : 0) : (existing.stream_only ?? 0),
+			body.charge_enabled !== undefined
+				? body.charge_enabled
+					? 1
+					: 0
+				: (existing.charge_enabled ?? 0),
+			body.stream_only !== undefined
+				? body.stream_only
+					? 1
+					: 0
+				: (existing.stream_only ?? 0),
 			now,
 			channelId,
 			userId,
@@ -253,9 +279,9 @@ userChannels.patch("/:id", async (c) => {
 	// Save per-channel model aliases if provided
 	if (body.model_aliases && typeof body.model_aliases === "object") {
 		const modelIds = modelsJson
-			? (JSON.parse(modelsJson) as Array<{ id?: string } | string>).map(
-					(m) => (typeof m === "string" ? m : m?.id ?? ""),
-				).filter(Boolean)
+			? (JSON.parse(modelsJson) as Array<{ id?: string } | string>)
+					.map((m) => (typeof m === "string" ? m : (m?.id ?? "")))
+					.filter(Boolean)
 			: [];
 		for (const [modelId, config] of Object.entries(body.model_aliases)) {
 			if (!modelIds.includes(modelId)) continue;

@@ -278,7 +278,9 @@ newapi.post("/", async (c) => {
 	}
 
 	const now = nowIso();
-	const baseUrl = normalizeBaseUrlInput(parsed.base_url) ?? String(parsed.base_url).trim().replace(/\/+$/, "");
+	const baseUrl =
+		normalizeBaseUrlInput(parsed.base_url) ??
+		String(parsed.base_url).trim().replace(/\/+$/, "");
 	await insertChannel(c.env.DB, {
 		id: existingId,
 		name: parsed.name,

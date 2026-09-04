@@ -17,10 +17,7 @@ const recharge = new Hono<AppEnv>();
 /**
  * Generates the epay sign: sort non-empty params by key, join as k=v&, append key, MD5.
  */
-function epaySign(
-	params: Record<string, string>,
-	key: string,
-): string {
+function epaySign(params: Record<string, string>, key: string): string {
 	const sorted = Object.keys(params)
 		.filter((k) => k !== "sign" && k !== "sign_type" && params[k] !== "")
 		.sort();
@@ -59,7 +56,12 @@ recharge.post("/create", userAuth, async (c) => {
 	const exchangeRate = await getLdcExchangeRate(c.env.DB);
 
 	if (!pid || !key) {
-		return jsonError(c, 500, "ldc_payment_not_configured", "ldc_payment_not_configured");
+		return jsonError(
+			c,
+			500,
+			"ldc_payment_not_configured",
+			"ldc_payment_not_configured",
+		);
 	}
 
 	const balanceAmount = Math.round(ldcAmount * exchangeRate * 100) / 100;
@@ -171,7 +173,12 @@ recharge.get("/notify", async (c) => {
 		"SELECT id, user_id, balance_amount, status FROM recharge_orders WHERE out_trade_no = ?",
 	)
 		.bind(outTradeNo)
-		.first<{ id: string; user_id: string; balance_amount: number; status: string }>();
+		.first<{
+			id: string;
+			user_id: string;
+			balance_amount: number;
+			status: string;
+		}>();
 
 	if (!order || order.status === "completed") {
 		return c.text("success");
@@ -213,7 +220,12 @@ recharge.get("/status/:id", userAuth, async (c) => {
 		"SELECT id, ldc_amount, balance_amount, status FROM recharge_orders WHERE id = ? AND user_id = ?",
 	)
 		.bind(orderId, userId)
-		.first<{ id: string; ldc_amount: number; balance_amount: number; status: string }>();
+		.first<{
+			id: string;
+			ldc_amount: number;
+			balance_amount: number;
+			status: string;
+		}>();
 
 	if (!order) {
 		return jsonError(c, 404, "order_not_found", "order_not_found");

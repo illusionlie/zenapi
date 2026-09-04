@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
+import { disableNonMaintainerChannels } from "../services/ldoh-blocking";
 import { getLdohCookie } from "../services/settings";
 import { jsonError } from "../utils/http";
 import { nowIso } from "../utils/time";
-import { disableNonMaintainerChannels } from "../services/ldoh-blocking";
 import { extractHostname } from "../utils/url";
 
 const ldoh = new Hono<AppEnv>();
@@ -41,7 +41,12 @@ type LdohApiSite = {
 ldoh.post("/sync", async (c) => {
 	const cookie = await getLdohCookie(c.env.DB);
 	if (!cookie) {
-		return jsonError(c, 400, "ldoh_cookie_not_set", "请先在设置中配置 LDOH Cookie");
+		return jsonError(
+			c,
+			400,
+			"ldoh_cookie_not_set",
+			"请先在设置中配置 LDOH Cookie",
+		);
 	}
 
 	let sites: LdohApiSite[];
@@ -50,12 +55,22 @@ ldoh.post("/sync", async (c) => {
 			headers: { Cookie: cookie },
 		});
 		if (!resp.ok) {
-			return jsonError(c, 502, "ldoh_fetch_failed", `LDOH API 返回 ${resp.status}`);
+			return jsonError(
+				c,
+				502,
+				"ldoh_fetch_failed",
+				`LDOH API 返回 ${resp.status}`,
+			);
 		}
-		const data = await resp.json() as { sites?: LdohApiSite[] };
+		const data = (await resp.json()) as { sites?: LdohApiSite[] };
 		sites = data.sites ?? [];
 	} catch (error) {
-		return jsonError(c, 502, "ldoh_fetch_error", `无法连接 LDOH: ${(error as Error).message}`);
+		return jsonError(
+			c,
+			502,
+			"ldoh_fetch_error",
+			`无法连接 LDOH: ${(error as Error).message}`,
+		);
 	}
 
 	const now = nowIso();
@@ -71,7 +86,9 @@ ldoh.post("/sync", async (c) => {
 		// Check if site already exists before upsert
 		const existingSite = await c.env.DB.prepare(
 			"SELECT id FROM ldoh_sites WHERE id = ?",
-		).bind(siteId).first();
+		)
+			.bind(siteId)
+			.first();
 		const isNewSite = !existingSite;
 
 		await c.env.DB.prepare(
@@ -103,7 +120,9 @@ ldoh.post("/sync", async (c) => {
 		if (isNewSite && hostname) {
 			await c.env.DB.prepare(
 				"INSERT INTO ldoh_blocked_urls (id, site_id, hostname, blocked_by, created_at) VALUES (?, ?, ?, 'system', ?)",
-			).bind(crypto.randomUUID(), siteId, hostname, now).run();
+			)
+				.bind(crypto.randomUUID(), siteId, hostname, now)
+				.run();
 			await disableNonMaintainerChannels(c.env.DB, siteId, hostname);
 		}
 
@@ -120,13 +139,7 @@ ldoh.post("/sync", async (c) => {
 				   approved = 1,
 				   source = 'ldoh'`,
 			)
-				.bind(
-					maintainerId,
-					siteId,
-					m.name || username,
-					username,
-					m.id || null,
-				)
+				.bind(maintainerId, siteId, m.name || username, username, m.id || null)
 				.run();
 
 			// Try to match user_id by linuxdo_username
@@ -147,7 +160,11 @@ ldoh.post("/sync", async (c) => {
 		}
 	}
 
-	return c.json({ ok: true, synced_sites: syncedSites, synced_maintainers: syncedMaintainers });
+	return c.json({
+		ok: true,
+		synced_sites: syncedSites,
+		synced_maintainers: syncedMaintainers,
+	});
 });
 
 /**
@@ -165,7 +182,9 @@ ldoh.post("/sites", async (c) => {
 		return jsonError(c, 400, "invalid_url", "无效的 URL");
 	}
 
-	const maintainerUsername = body.maintainerUsername ? String(body.maintainerUsername).trim() : null;
+	const maintainerUsername = body.maintainerUsername
+		? String(body.maintainerUsername).trim()
+		: null;
 	const siteName = body.name ? String(body.name).trim() : hostname;
 	const now = nowIso();
 
@@ -192,7 +211,9 @@ ldoh.post("/sites", async (c) => {
 		// Auto-block new sites only
 		await c.env.DB.prepare(
 			"INSERT INTO ldoh_blocked_urls (id, site_id, hostname, blocked_by, created_at) VALUES (?, ?, ?, 'system', ?)",
-		).bind(crypto.randomUUID(), siteId, hostname, now).run();
+		)
+			.bind(crypto.randomUUID(), siteId, hostname, now)
+			.run();
 		await disableNonMaintainerChannels(c.env.DB, siteId, hostname);
 	}
 
@@ -384,13 +405,16 @@ ldoh.patch("/sites/:id", async (c) => {
 
 	const existing = await c.env.DB.prepare(
 		"SELECT * FROM ldoh_sites WHERE id = ?",
-	).bind(id).first();
+	)
+		.bind(id)
+		.first();
 	if (!existing) {
 		return jsonError(c, 404, "site_not_found", "站点不存在");
 	}
 
 	const name = body.name != null ? String(body.name).trim() : null;
-	const description = body.description != null ? String(body.description).trim() : null;
+	const description =
+		body.description != null ? String(body.description).trim() : null;
 
 	// Support multi-URL: apiBaseUrls (newline-separated string or array) or legacy apiBaseUrl
 	const rawUrls = body.apiBaseUrls ?? body.apiBaseUrl ?? null;
@@ -399,7 +423,10 @@ ldoh.patch("/sites/:id", async (c) => {
 		if (Array.isArray(rawUrls)) {
 			urls = rawUrls.map((u: string) => String(u).trim()).filter(Boolean);
 		} else {
-			urls = String(rawUrls).split("\n").map((u) => u.trim()).filter(Boolean);
+			urls = String(rawUrls)
+				.split("\n")
+				.map((u) => u.trim())
+				.filter(Boolean);
 		}
 	}
 
@@ -434,7 +461,9 @@ ldoh.patch("/sites/:id", async (c) => {
 		binds.push(id);
 		await c.env.DB.prepare(
 			`UPDATE ldoh_sites SET ${sets.join(", ")} WHERE id = ?`,
-		).bind(...binds).run();
+		)
+			.bind(...binds)
+			.run();
 	}
 
 	// If hostnames changed, sync ldoh_blocked_urls
@@ -445,25 +474,33 @@ ldoh.patch("/sites/:id", async (c) => {
 			// Check if site is currently blocked
 			const blockedCount = await c.env.DB.prepare(
 				"SELECT COUNT(*) as cnt FROM ldoh_blocked_urls WHERE site_id = ?",
-			).bind(id).first<{ cnt: number }>();
+			)
+				.bind(id)
+				.first<{ cnt: number }>();
 
 			if (blockedCount && blockedCount.cnt > 0) {
 				// Delete old blocked records and insert new ones for each hostname
 				await c.env.DB.prepare(
 					"DELETE FROM ldoh_blocked_urls WHERE site_id = ?",
-				).bind(id).run();
+				)
+					.bind(id)
+					.run();
 				const now = nowIso();
 				for (const h of hostnames) {
 					await c.env.DB.prepare(
 						"INSERT INTO ldoh_blocked_urls (id, site_id, hostname, blocked_by, created_at) VALUES (?, ?, ?, 'admin', ?)",
-					).bind(crypto.randomUUID(), id, h, now).run();
+					)
+						.bind(crypto.randomUUID(), id, h, now)
+						.run();
 				}
 			}
 		}
 	}
 
 	// Handle maintainers
-	const maintainers = body.maintainers as { add?: string[]; remove?: string[] } | undefined;
+	const maintainers = body.maintainers as
+		| { add?: string[]; remove?: string[] }
+		| undefined;
 	if (maintainers?.add) {
 		for (const username of maintainers.add) {
 			const trimmed = parseLinuxDoUsername(String(username));
@@ -475,15 +512,21 @@ ldoh.patch("/sites/:id", async (c) => {
 				 ON CONFLICT(site_id, username) DO UPDATE SET
 				   approved = 1,
 				   source = 'manual'`,
-			).bind(maintainerId, id, trimmed, trimmed).run();
+			)
+				.bind(maintainerId, id, trimmed, trimmed)
+				.run();
 
 			const localUser = await c.env.DB.prepare(
 				"SELECT id FROM users WHERE linuxdo_username = ?",
-			).bind(trimmed).first<{ id: string }>();
+			)
+				.bind(trimmed)
+				.first<{ id: string }>();
 			if (localUser) {
 				await c.env.DB.prepare(
 					"UPDATE ldoh_site_maintainers SET user_id = ? WHERE site_id = ? AND username = ?",
-				).bind(localUser.id, id, trimmed).run();
+				)
+					.bind(localUser.id, id, trimmed)
+					.run();
 			}
 		}
 	}
@@ -491,7 +534,9 @@ ldoh.patch("/sites/:id", async (c) => {
 		for (const mid of maintainers.remove) {
 			await c.env.DB.prepare(
 				"DELETE FROM ldoh_site_maintainers WHERE id = ? AND site_id = ?",
-			).bind(mid, id).run();
+			)
+				.bind(mid, id)
+				.run();
 		}
 	}
 
@@ -510,7 +555,9 @@ ldoh.post("/sites/:id/maintainers", async (c) => {
 
 	const existing = await c.env.DB.prepare(
 		"SELECT id FROM ldoh_sites WHERE id = ?",
-	).bind(siteId).first();
+	)
+		.bind(siteId)
+		.first();
 	if (!existing) {
 		return jsonError(c, 404, "site_not_found", "站点不存在");
 	}
@@ -527,15 +574,21 @@ ldoh.post("/sites/:id/maintainers", async (c) => {
 		 ON CONFLICT(site_id, username) DO UPDATE SET
 		   approved = 1,
 		   source = 'manual'`,
-	).bind(maintainerId, siteId, username, username).run();
+	)
+		.bind(maintainerId, siteId, username, username)
+		.run();
 
 	const localUser = await c.env.DB.prepare(
 		"SELECT id FROM users WHERE linuxdo_username = ?",
-	).bind(username).first<{ id: string }>();
+	)
+		.bind(username)
+		.first<{ id: string }>();
 	if (localUser) {
 		await c.env.DB.prepare(
 			"UPDATE ldoh_site_maintainers SET user_id = ? WHERE site_id = ? AND username = ?",
-		).bind(localUser.id, siteId, username).run();
+		)
+			.bind(localUser.id, siteId, username)
+			.run();
 	}
 
 	return c.json({ ok: true });
@@ -547,9 +600,15 @@ ldoh.post("/sites/:id/maintainers", async (c) => {
 ldoh.delete("/sites/:id", async (c) => {
 	const id = c.req.param("id");
 
-	await c.env.DB.prepare("DELETE FROM ldoh_site_maintainers WHERE site_id = ?").bind(id).run();
-	await c.env.DB.prepare("DELETE FROM ldoh_blocked_urls WHERE site_id = ?").bind(id).run();
-	await c.env.DB.prepare("DELETE FROM ldoh_violations WHERE site_id = ?").bind(id).run();
+	await c.env.DB.prepare("DELETE FROM ldoh_site_maintainers WHERE site_id = ?")
+		.bind(id)
+		.run();
+	await c.env.DB.prepare("DELETE FROM ldoh_blocked_urls WHERE site_id = ?")
+		.bind(id)
+		.run();
+	await c.env.DB.prepare("DELETE FROM ldoh_violations WHERE site_id = ?")
+		.bind(id)
+		.run();
 	await c.env.DB.prepare("DELETE FROM ldoh_sites WHERE id = ?").bind(id).run();
 
 	return c.json({ ok: true });
@@ -567,11 +626,16 @@ ldoh.post("/block-all", async (c) => {
 
 	let blocked = 0;
 	for (const site of sites.results ?? []) {
-		const hostnames = String(site.api_base_hostname).split(",").map((h) => h.trim()).filter(Boolean);
+		const hostnames = String(site.api_base_hostname)
+			.split(",")
+			.map((h) => h.trim())
+			.filter(Boolean);
 		for (const h of hostnames) {
 			await c.env.DB.prepare(
 				"INSERT INTO ldoh_blocked_urls (id, site_id, hostname, blocked_by, created_at) VALUES (?, ?, ?, 'admin', ?)",
-			).bind(crypto.randomUUID(), site.id, h, now).run();
+			)
+				.bind(crypto.randomUUID(), site.id, h, now)
+				.run();
 		}
 		await disableNonMaintainerChannels(c.env.DB, String(site.id), hostnames);
 		blocked++;

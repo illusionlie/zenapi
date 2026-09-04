@@ -2,30 +2,38 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { type TokenRecord, tokenAuth } from "../middleware/tokenAuth";
 import {
+	extractModelIds,
+	extractSharedModelPricings,
+	extractSharedModels,
+} from "../services/channel-models";
+import { resolveChannelRoute } from "../services/channel-route";
+import {
 	type ChannelRecord,
 	createWeightedOrder,
 	extractModels,
 } from "../services/channels";
 import {
-	extractModelIds,
-	extractSharedModelPricings,
-	extractSharedModels,
-} from "../services/channel-models";
-import {
 	anthropicToOpenaiResponse,
 	createAnthropicToOpenaiStreamTransform,
 	openaiToAnthropicRequest,
 } from "../services/format-converter";
-import { recordUsage } from "../services/usage";
+import {
+	loadAllChannelAliasesGrouped,
+	loadChannelAliasesByAlias,
+	loadChannelAliasOnlyMap,
+} from "../services/model-aliases";
 import { calculateCost, getModelPrice } from "../services/pricing";
-import { getChannelFeeEnabled, getSiteMode, getWithdrawalMode } from "../services/settings";
+import {
+	getChannelFeeEnabled,
+	getSiteMode,
+	getWithdrawalMode,
+} from "../services/settings";
+import { recordUsage } from "../services/usage";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
-import { extractReasoningEffort } from "../utils/reasoning";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
+import { extractReasoningEffort } from "../utils/reasoning";
 import { isRetryableStatus, sleep } from "../utils/retry";
-import { resolveChannelRoute } from "../services/channel-route";
-import { loadChannelAliasesByAlias, loadChannelAliasOnlyMap, loadAllChannelAliasesGrouped } from "../services/model-aliases";
 import { cfSafeUrl, normalizeBaseUrl } from "../utils/url";
 import {
 	type NormalizedUsage,
@@ -222,7 +230,10 @@ proxy.get("/models", tokenAuth, async (c) => {
 		tokenRecord.allowed_channels,
 		null,
 	);
-	const isPerModelMap = rawAllowed !== null && !Array.isArray(rawAllowed) && typeof rawAllowed === "object";
+	const isPerModelMap =
+		rawAllowed !== null &&
+		!Array.isArray(rawAllowed) &&
+		typeof rawAllowed === "object";
 
 	// For legacy flat-array format, pre-filter channels once
 	const baseAllowed = isPerModelMap
@@ -236,7 +247,9 @@ proxy.get("/models", tokenAuth, async (c) => {
 	const channelModelIds = new Map<string, string[]>();
 	for (const ch of baseAllowed) {
 		const chModelIds = useSharedFilter
-			? extractSharedModelPricings(ch).filter((m) => m.enabled !== false).map((m) => m.id)
+			? extractSharedModelPricings(ch)
+					.filter((m) => m.enabled !== false)
+					.map((m) => m.id)
 			: extractModelIds(ch);
 		channelModelIds.set(ch.id, chModelIds);
 	}
@@ -246,7 +259,12 @@ proxy.get("/models", tokenAuth, async (c) => {
 
 	// Compute effective mapping
 	const now = Math.floor(Date.now() / 1000);
-	const modelData: Array<{ id: string; object: string; created: number; owned_by: string }> = [];
+	const modelData: Array<{
+		id: string;
+		object: string;
+		created: number;
+		owned_by: string;
+	}> = [];
 	const seen = new Set<string>();
 
 	for (const ch of baseAllowed) {
@@ -257,7 +275,8 @@ proxy.get("/models", tokenAuth, async (c) => {
 			// Per-model channel restriction: skip if this channel is not allowed for this model
 			if (isPerModelMap) {
 				const perModel = (rawAllowed as Record<string, string[]>)[modelId];
-				if (perModel && perModel.length > 0 && !perModel.includes(ch.id)) continue;
+				if (perModel && perModel.length > 0 && !perModel.includes(ch.id))
+					continue;
 			}
 
 			const aliasInfo = chAliases?.get(modelId);
@@ -266,7 +285,12 @@ proxy.get("/models", tokenAuth, async (c) => {
 			// Original name (unless alias_only)
 			if (!isAliasOnly && !seen.has(modelId)) {
 				seen.add(modelId);
-				modelData.push({ id: modelId, object: "model", created: now, owned_by: "system" });
+				modelData.push({
+					id: modelId,
+					object: "model",
+					created: now,
+					owned_by: "system",
+				});
 			}
 
 			// Alias names
@@ -274,7 +298,12 @@ proxy.get("/models", tokenAuth, async (c) => {
 				for (const alias of aliasInfo.aliases) {
 					if (!seen.has(alias)) {
 						seen.add(alias);
-						modelData.push({ id: alias, object: "model", created: now, owned_by: "system" });
+						modelData.push({
+							id: alias,
+							object: "model",
+							created: now,
+							owned_by: "system",
+						});
 					}
 				}
 			}
@@ -304,8 +333,12 @@ proxy.all("/*", tokenAuth, async (c) => {
 	const isStream = parsedBody?.stream === true;
 
 	// Resolve per-channel aliases for this model name
-	const channelAliasHits = model ? await loadChannelAliasesByAlias(c.env.DB, model) : [];
-	const channelAliasHitMap = new Map(channelAliasHits.map((h) => [h.channel_id, h]));
+	const channelAliasHits = model
+		? await loadChannelAliasesByAlias(c.env.DB, model)
+		: [];
+	const channelAliasHitMap = new Map(
+		channelAliasHits.map((h) => [h.channel_id, h]),
+	);
 
 	// Load per-channel alias-only map
 	const perChannelAliasOnlyMap = await loadChannelAliasOnlyMap(c.env.DB);
@@ -340,7 +373,10 @@ proxy.all("/*", tokenAuth, async (c) => {
 	const useSharedFilter = siteMode === "shared" && !!tokenRecord.user_id;
 
 	// Resolve channel/model routing syntax (uses original model name)
-	const { targetChannel, actualModel } = resolveChannelRoute(model, activeChannels);
+	const { targetChannel, actualModel } = resolveChannelRoute(
+		model,
+		activeChannels,
+	);
 	const effectiveModel = targetChannel ? actualModel : model;
 
 	// If channel routing matched, replace model in the request body
@@ -366,7 +402,11 @@ proxy.all("/*", tokenAuth, async (c) => {
 		}
 		candidates = [targetChannel];
 	} else {
-		const allowedChannels = filterAllowedChannels(activeChannels, tokenRecord, model);
+		const allowedChannels = filterAllowedChannels(
+			activeChannels,
+			tokenRecord,
+			model,
+		);
 		if (model) {
 			const supportsFn = useSharedFilter
 				? channelSupportsSharedModel
@@ -377,7 +417,7 @@ proxy.all("/*", tokenAuth, async (c) => {
 				// Channel natively supports this model → include UNLESS alias_only
 				if (supportsFn(channel, model)) {
 					const aliasOnlyModels = perChannelAliasOnlyMap.get(channel.id);
-					return !(aliasOnlyModels?.has(model));
+					return !aliasOnlyModels?.has(model);
 				}
 				return false;
 			});
@@ -412,7 +452,12 @@ proxy.all("/*", tokenAuth, async (c) => {
 			(ch) => (ch.api_format ?? "openai") !== "anthropic",
 		);
 		if (candidates.length === 0) {
-			return jsonError(c, 503, "no_available_channels", "no_available_channels");
+			return jsonError(
+				c,
+				503,
+				"no_available_channels",
+				"no_available_channels",
+			);
 		}
 	}
 
@@ -420,7 +465,12 @@ proxy.all("/*", tokenAuth, async (c) => {
 	if (!isStream) {
 		candidates = candidates.filter((ch) => !ch.stream_only);
 		if (candidates.length === 0) {
-			return jsonError(c, 400, "stream_required", "所有可用渠道要求使用流式调用");
+			return jsonError(
+				c,
+				400,
+				"stream_required",
+				"所有可用渠道要求使用流式调用",
+			);
 		}
 	}
 
@@ -495,7 +545,9 @@ proxy.all("/*", tokenAuth, async (c) => {
 						fallbackSubPath
 					) {
 						const strippedBase = normalizeBaseUrl(channel.base_url);
-						const fallbackTarget = cfSafeUrl(`${strippedBase}${fallbackSubPath}${querySuffix}`);
+						const fallbackTarget = cfSafeUrl(
+							`${strippedBase}${fallbackSubPath}${querySuffix}`,
+						);
 						const fallbackBody = mutatedStreamOptions
 							? originalRequestText
 							: channelRequestText;
@@ -567,7 +619,10 @@ proxy.all("/*", tokenAuth, async (c) => {
 
 	const channelForUsage = selectedChannel ?? lastChannel;
 	if (channelForUsage && lastResponse) {
-		const price = getModelPrice(channelForUsage.models_json, selectedModelName ?? "");
+		const price = getModelPrice(
+			channelForUsage.models_json,
+			selectedModelName ?? "",
+		);
 		let errorCode: number | null = null;
 		let errorMessage: string | null = null;
 		if (!lastResponse.ok) {
@@ -589,7 +644,12 @@ proxy.all("/*", tokenAuth, async (c) => {
 				completionTokens: 0,
 			};
 			const cost = price
-				? calculateCost(price, normalized.promptTokens, normalized.completionTokens, normalized.totalTokens)
+				? calculateCost(
+						price,
+						normalized.promptTokens,
+						normalized.completionTokens,
+						normalized.totalTokens,
+					)
 				: 0;
 			const resolvedFirstTokenLatencyMs =
 				firstTokenLatencyMs ?? (isStream ? null : latencyMs);
@@ -631,7 +691,11 @@ proxy.all("/*", tokenAuth, async (c) => {
 			// Credit contributor balance
 			// Only credit withdrawable_balance for the portion that came from the consumer's withdrawable balance,
 			// so gifted/free balance (default_balance, checkin rewards) cannot be laundered into withdrawable funds.
-			if (cost > 0 && channelForUsage.contributed_by && channelForUsage.charge_enabled === 1) {
+			if (
+				cost > 0 &&
+				channelForUsage.contributed_by &&
+				channelForUsage.charge_enabled === 1
+			) {
 				const feeEnabled = await getChannelFeeEnabled(c.env.DB);
 				if (feeEnabled) {
 					const now = new Date().toISOString();
@@ -640,12 +704,17 @@ proxy.all("/*", tokenAuth, async (c) => {
 					if (tokenRecord.user_id) {
 						const consumer = await c.env.DB.prepare(
 							"SELECT balance, withdrawable_balance FROM users WHERE id = ?",
-						).bind(tokenRecord.user_id).first<{ balance: number; withdrawable_balance: number }>();
+						)
+							.bind(tokenRecord.user_id)
+							.first<{ balance: number; withdrawable_balance: number }>();
 						if (consumer) {
 							// After deduction: balance is already reduced by cost
 							// Before deduction: old_balance = consumer.balance + cost
 							// Gifted portion = old_balance - withdrawable_balance = (consumer.balance + cost) - consumer.withdrawable_balance
-							const giftedPortion = Math.max(0, (consumer.balance + cost) - consumer.withdrawable_balance);
+							const giftedPortion = Math.max(
+								0,
+								consumer.balance + cost - consumer.withdrawable_balance,
+							);
 							// Amount consumed from withdrawable = cost - giftedPortion (clamped to [0, cost])
 							withdrawableCredit = Math.max(0, cost - giftedPortion);
 						}
@@ -714,7 +783,9 @@ proxy.all("/*", tokenAuth, async (c) => {
 					try {
 						logUsage("stream-fallback", immediateUsage, immediateSource);
 						await record(immediateUsage, null);
-					} catch { /* truly lost */ }
+					} catch {
+						/* truly lost */
+					}
 				});
 			if (executionCtx?.waitUntil) {
 				executionCtx.waitUntil(task);

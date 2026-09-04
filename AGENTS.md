@@ -1,0 +1,183 @@
+# AGENTS.md
+
+> 面向 AI 编程助手的项目规范。人类向文档见 [README.md](./README.md)；
+> 本文件只补充 agent 在代码库中作业所需的结构、约定与坑点，不重复 README 已有的 API / 部署细节。
+
+## 1. 项目简介
+
+ZenAPI —— 基于 Cloudflare Workers + D1 的轻量 AI API 网关，内置管理后台与多用户系统。
+支持 OpenAI (`/v1/*`) 与 Anthropic (`/anthropic/v1/*`) 双协议代理、格式互转、按权重负载均衡与故障重试。
+
+## 2. 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 运行时 | Cloudflare Workers |
+| 后端框架 | Hono（`strict: false`） |
+| 数据库 | Cloudflare D1（SQLite） |
+| 前端 | Hono JSX (`hono/jsx/dom`) + Vite + Tailwind v4 |
+| 包管理 | Bun 1.3.9（workspaces: `apps/*`） |
+| 代码规范 | Biome 2.x（tab 缩进、双引号） |
+| 测试 | Vitest |
+| CI/CD | GitHub Actions |
+
+## 3. 仓库布局
+
+```
+apps/worker/                # Hono 后端
+  src/
+    index.ts                # 入口：全局中间件 + 路由挂载 + SPA 静态回退
+    env.ts                  # Bindings / Variables / AppEnv 类型
+    routes/                 # 按领域拆分的路由模块（见 §6）
+    middleware/             # adminAuth / newApiAuth / tokenAuth / userAuth
+    services/               # 业务逻辑
+    utils/                  # 工具函数（含 url 规范化等）
+    db/schema.sql           # D1 全表 schema
+  migrations/               # D1 迁移文件
+  wrangler.toml             # Cloudflare 配置
+apps/ui/                    # 管理台 / 用户端前端
+  src/
+    App.tsx                 # 顶层路由分发（按站点模式选 Admin/User/Public）
+    AdminApp.tsx            # 管理后台主组件
+    UserApp.tsx             # 用户端主组件
+    PublicApp.tsx           # 公开页主组件
+    core/                   # api / constants / types / utils
+    features/               # 各功能视图（AdminApp/UserApp 各自的 View）
+  dist/                     # 构建产物（由 Worker Static Assets 托管，勿手动改）
+tests/                      # Vitest 单测（如 worker/url.test.ts）
+```
+
+## 4. 开发命令
+
+| 命令 | 说明 |
+|------|------|
+| `bun install` | 安装依赖 |
+| `bun run dev:worker` | 启动后端（默认 8787） |
+| `bun run dev:ui` | 启动前端（默认 4173，Vite proxy 转发至后端） |
+| `bun run test` | 运行 Vitest |
+| `bun run typecheck` | `tsc --noEmit` |
+| `bun run lint` / `format` / `check` | Biome 检查 / 格式化 / 综合修复 |
+
+首次本地启动需先迁移：`bun run --filter api-worker db:migrate`。
+首次访问管理台输入的密码会写入 `settings` 表作为管理员密码（**不**来自环境变量）。
+
+## 5. 代码规范
+
+- **命名**：变量 `camelCase`，文件 `kebab-case`，组件文件 `PascalCase.tsx`。
+- **格式**：Biome —— tab 缩进、双引号、`organizeImports: on`。提交前跑 `bun run check`。
+- **TS**：`strict: true`，`moduleResolution: Bundler`，前端 `jsxImportSource: hono/jsx/dom`。
+- **Git**：trunk-based，Conventional Commits。
+- **错误处理**：错误码 `ERR_{模块}_{含义}`，日志 `info/warn/error`。
+- **测试**：核心逻辑须有单测，置于 `tests/`，文件名 `*.test.ts`。
+
+## 6. 路由 / 模块速查表
+
+挂载点见 `apps/worker/src/index.ts`。鉴权放行规则：`/api/auth/login`、`/api/channel*`、`/api/user*`、`/api/group*`、`/api/public*`、`/api/u/*`、`/api/recharge*`、`/api/monitoring*` 不走 `adminAuth`。
+
+| 挂载路径 | 路由文件 | 职责 |
+|----------|----------|------|
+| `/api/auth` | `routes/auth.ts` | 管理员登录 / 登出（密码存 `settings`，会话 hash 存 `admin_sessions`） |
+| `/api/channels` | `routes/channels.ts` | 渠道 CRUD、连通性测试（`/v1/models`）、模型拉取 |
+| `/api/models` | `routes/models.ts` | 模型广场聚合（仅启用渠道） |
+| `/api/model-aliases` | `routes/model-aliases.ts` | 模型别名映射 |
+| `/api/tokens` | `routes/tokens.ts` | API 令牌 CRUD、配额、`/reveal` 二次查看明文 |
+| `/api/usage` | `routes/usage.ts` | 使用日志查询与保留清理 |
+| `/api/dashboard` | `routes/dashboard.ts` | 聚合统计 |
+| `/api/monitoring` | `routes/monitoring.ts` | 渠道健康 / 成功率 / 延迟（15m/1h/1d/7d/30d） |
+| `/api/settings` | `routes/settings.ts` | 系统键值配置 |
+| `/api/invite-codes` | `routes/invite-codes.ts` | 邀请码 |
+| `/api/ldoh` | `routes/ldoh.ts` | LDOH 站点管理 |
+| `/api/public` | `routes/public.ts` | 站点信息 / 公开模型（受站点模式控制） |
+| `/api/channel` | `routes/newapiChannels.ts` | New API 兼容渠道（含 tag 批量、fetch_models） |
+| `/api/user` | `routes/newapiUsers.ts` | New API 兼容用户 |
+| `/api/group` | `routes/newapiGroups.ts` | New API 兼容分组（从 `group_name` 解析，空取 `default`） |
+| `/api/playground` | `routes/playground.ts` | 对话测试（不记用量、不扣费） |
+| `/api/users` | `routes/admin-users.ts` | 用户管理 CRUD |
+| `/api/u/auth` | `routes/user-auth.ts` | 用户注册 / 登录 / 登出 / me |
+| `/api/u` | `routes/user-api.ts` | 用户仪表盘 / 模型 / 令牌 / 日志 |
+| `/api/u/channels` | `routes/user-channels.ts` | 共享模式渠道贡献 |
+| `/api/u/ldoh` | `routes/ldoh-user.ts` | 用户侧 LDOH |
+| `/api/recharge` | `routes/recharge.ts` | 充值订单 |
+| `/api/u/withdrawal` | `routes/withdrawal.ts` | 提现订单 |
+| `/v1` | `routes/proxy.ts` | OpenAI 兼容代理（见 §8） |
+| `/anthropic/v1` | `routes/anthropic-proxy.ts` | Anthropic Messages 代理（含格式互转） |
+
+## 7. 鉴权中间件
+
+| 中间件 | 用于 | 凭据 |
+|--------|------|------|
+| `adminAuth` | `/api/*`（除放行清单） | session token / `x-admin-token` / `x-api-key` |
+| `newApiAuth` | `/api/channel`、`/api/user`、`/api/group` | `Authorization: Bearer {管理员密码}`，支持 `New-Api-User` 头 |
+| `tokenAuth` | `/v1/*`、`/anthropic/v1/*` | `Authorization: Bearer {api_token}` |
+| `userAuth` | `/api/u/*` | 用户 session token |
+
+## 8. 代理关键行为（改 `proxy.ts` 前必读）
+
+- 按渠道**权重随机**排序选择，失败（5xx / 429）按 `PROXY_RETRY_ROUNDS` 轮询重试，间隔 `PROXY_RETRY_DELAY_MS`。
+- 单渠道多 API Key：随机打乱顺序，首个 Key 失败自动换下一个 Key，全部 Key 失败才换渠道。
+- 流式请求自动注入 `stream_options.include_usage = true`，并从 SSE / 响应头 / 非 JSON 体解析 usage。
+- `/v1/chat/completions` 上游返回 400/404 时回退到 `/v1/responses` 重试一次。
+- `base_url` 入库前规范化为无尾斜杠；空值返回空串避免崩溃。
+- usage 记录：输入/输出 tokens、首 token 延迟、流式标记、推理强度（取自请求体 `reasoning` / `reasoning_effort`）。
+- **禁用的模型不参与路由匹配**，也不出现在 `/v1/models`。
+
+## 9. 静态资源 / SPA 回退
+
+`index.ts` 的 `notFound` 处理：非 API/V1/Anthropic 路径交由 `ASSETS.fetch`；HTML 请求且无扩展名时回退到 `/index.html`。因此 `apps/ui/dist` 必须存在（`.gitkeep` 占位以通过 wrangler assets 检查）。
+
+## 10. 数据库（D1）
+
+`apps/worker/src/db/schema.sql` 定义全部表。核心域：
+
+- **代理**：`channels`、`tokens`、`usage_logs`、`model_aliases`、`channel_model_aliases`
+- **会话/设置**：`admin_sessions`、`settings`
+- **用户体系**：`users`、`user_sessions`、`user_checkins`、`invite_codes`
+- **资金**：`recharge_orders`、`withdrawal_orders`
+- **LDOH**：`ldoh_sites`、`ldoh_site_maintainers`、`ldoh_blocked_urls`、`ldoh_violations`
+
+迁移位于 `apps/worker/migrations/`，按文件名顺序执行。
+
+## 11. 环境变量（`env.ts` Bindings）
+
+| 变量 | 说明 |
+|------|------|
+| `DB` | D1 绑定（wrangler 注入） |
+| `CORS_ORIGIN` | `/api/*` 允许来源，`*` 或逗号分隔列表 |
+| `PROXY_RETRY_ROUNDS` | 代理重试轮数（默认 2） |
+| `PROXY_RETRY_DELAY_MS` | 重试间隔毫秒（默认 200） |
+| `LINUXDO_CLIENT_ID` / `LINUXDO_CLIENT_SECRET` | LinuxDO OAuth（如启用） |
+
+管理员密码、站点模式、会话时长、日志保留天数等**业务配置存 `settings` 表**，经管理台「系统设置」修改，非环境变量。
+
+## 12. 部署
+
+GitHub Actions 工作流「Deploy SPA CF Workers[Worker一体化部署]」，区分 `init`（首次：建库 + 迁移 + 部署）与 `update`（按变更范围选 frontend/backend/both）。Secrets、触发参数与完整流程见 [README.md](./README.md#github-actions-自动部署)。
+
+## 13. 给 agent 的作业准则
+
+1. 改路由前先看 `index.ts` 的挂载点与鉴权放行清单，避免漏挂或破坏鉴权边界。
+2. 新增表必须同时加 `schema.sql` 与编号迁移文件。
+3. 改前端入口结构时同步更新本文件 §3；`App.tsx` 是模式分发入口，勿直接堆业务。
+4. 提交前必跑 `bun run check && bun run typecheck && bun run test`。
+5. 本文件是 agent 规范的**唯一事实来源**；如与 README 冲突，以代码与本文件为准并提 issue 修正 README。
+<!-- TRELLIS:START -->
+# Trellis Instructions
+
+These instructions are for AI assistants working in this project.
+
+This project is managed by Trellis. The working knowledge you need lives under `.trellis/`:
+
+- `.trellis/workflow.md` — development phases, when to create tasks, skill routing
+- `.trellis/spec/` — package- and layer-scoped coding guidelines (read before writing code in a given layer)
+- `.trellis/workspace/` — per-developer journals and session traces
+- `.trellis/tasks/` — active and archived tasks (PRDs, research, jsonl context)
+
+If a Trellis command is available on your platform (e.g. `/trellis:finish-work`, `/trellis:continue`), prefer it over manual steps. Not every platform exposes every command.
+
+If you're using Codex or another agent-capable tool, additional project-scoped helpers may live in:
+- `.agents/skills/` — reusable Trellis skills
+- `.codex/agents/` — optional custom subagents
+
+Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
+
+<!-- TRELLIS:END -->

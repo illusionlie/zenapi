@@ -64,7 +64,11 @@ export const AppLayout = ({
 					)}
 				</svg>
 			</button>
-			<button type="button" class="font-['Space_Grotesk'] text-sm font-semibold tracking-tight text-stone-900" onClick={() => onNavigate("/")}>
+			<button
+				type="button"
+				class="font-['Space_Grotesk'] text-sm font-semibold tracking-tight text-stone-900"
+				onClick={() => onNavigate("/")}
+			>
 				ZenAPI
 			</button>
 			<div class="w-10" />
@@ -84,7 +88,11 @@ export const AppLayout = ({
 				/>
 				<aside class="absolute left-0 top-0 h-full w-[280px] border-r border-stone-200 bg-white px-5 py-8 shadow-xl">
 					<div class="mb-8 flex flex-col gap-1.5">
-						<button type="button" class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900 text-left" onClick={() => onNavigate("/")}>
+						<button
+							type="button"
+							class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900 text-left"
+							onClick={() => onNavigate("/")}
+						>
 							ZenAPI
 						</button>
 						<span class="text-xs uppercase tracking-widest text-stone-500">
@@ -125,7 +133,11 @@ export const AppLayout = ({
 		{/* Desktop sidebar */}
 		<aside class="hidden border-b border-stone-200 bg-white px-5 py-8 lg:sticky lg:top-0 lg:block lg:h-screen lg:border-b-0 lg:border-r">
 			<div class="mb-8 flex flex-col gap-1.5">
-				<button type="button" class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900 text-left" onClick={() => onNavigate("/")}>
+				<button
+					type="button"
+					class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900 text-left"
+					onClick={() => onNavigate("/")}
+				>
 					ZenAPI
 				</button>
 				<span class="text-xs uppercase tracking-widest text-stone-500">
@@ -176,9 +188,7 @@ export const AppLayout = ({
 					{notice}
 				</div>
 			)}
-			<div class="flex-1 min-h-0 overflow-y-auto pb-8">
-				{children}
-			</div>
+			<div class="flex-1 min-h-0 overflow-y-auto pb-8">{children}</div>
 		</main>
 	</div>
 );

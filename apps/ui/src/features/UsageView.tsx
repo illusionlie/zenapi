@@ -151,13 +151,13 @@ export const UsageView = ({ usage, onRefresh }: UsageViewProps) => {
 											{log.channel_name ?? log.channel_id ?? "-"}
 										</td>
 										<td class="border-b border-stone-200 px-3 py-2.5 text-left text-sm text-stone-700">
-										{log.token_name ?? log.token_id ?? "-"}
-									</td>
-									<td class="border-b border-stone-200 px-3 py-2.5 text-left text-sm text-stone-700">
-										{log.user_name ?? "-"}
-									</td>
-									<td class="border-b border-stone-200 px-3 py-2.5 text-left text-sm text-stone-700">
-										{formatTokens(log.prompt_tokens)}
+											{log.token_name ?? log.token_id ?? "-"}
+										</td>
+										<td class="border-b border-stone-200 px-3 py-2.5 text-left text-sm text-stone-700">
+											{log.user_name ?? "-"}
+										</td>
+										<td class="border-b border-stone-200 px-3 py-2.5 text-left text-sm text-stone-700">
+											{formatTokens(log.prompt_tokens)}
 										</td>
 										<td class="border-b border-stone-200 px-3 py-2.5 text-left text-sm text-stone-700">
 											{formatTokens(log.completion_tokens)}

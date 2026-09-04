@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "hono/jsx/dom";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "hono/jsx/dom";
 import { apiBase } from "../core/constants";
 
 type ChatMessage = {
@@ -38,7 +44,10 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 	// Close dropdown on outside click
 	useEffect(() => {
 		const handleClickOutside = (e: MouseEvent) => {
-			if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+			if (
+				modelDropdownRef.current &&
+				!modelDropdownRef.current.contains(e.target as Node)
+			) {
 				setModelDropdownOpen(false);
 			}
 		};
@@ -114,7 +123,9 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 			});
 
 			if (!res.ok) {
-				const errBody = await res.json().catch(() => null) as { error?: string } | null;
+				const errBody = (await res.json().catch(() => null)) as {
+					error?: string;
+				} | null;
 				throw new Error(errBody?.error ?? `HTTP ${res.status}`);
 			}
 
@@ -212,7 +223,9 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 							class="h-9 w-56 rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm text-stone-700 placeholder:text-stone-400 outline-none transition-colors focus:border-stone-400"
 							type="text"
 							placeholder="搜索模型..."
-							value={isModelDropdownOpen ? modelSearch : (selectedModel || modelSearch)}
+							value={
+								isModelDropdownOpen ? modelSearch : selectedModel || modelSearch
+							}
 							onFocus={() => {
 								setModelDropdownOpen(true);
 								setModelSearch("");
@@ -234,7 +247,9 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 											key={m}
 											type="button"
 											class={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-stone-100 ${
-												m === selectedModel ? "bg-stone-50 font-medium text-stone-900" : "text-stone-700"
+												m === selectedModel
+													? "bg-stone-50 font-medium text-stone-900"
+													: "text-stone-700"
 											}`}
 											onClick={() => {
 												setSelectedModel(m);
@@ -264,9 +279,7 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 				<div class="flex-1 overflow-y-auto p-5">
 					{messages.length === 0 && !streamingContent && (
 						<div class="flex h-full min-h-[200px] items-center justify-center">
-							<p class="text-sm text-stone-400">
-								选择模型并发送消息开始对话
-							</p>
+							<p class="text-sm text-stone-400">选择模型并发送消息开始对话</p>
 						</div>
 					)}
 
@@ -304,8 +317,12 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 								<div class="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-400">
 									<span class="inline-flex gap-1">
 										<span class="animate-bounce">·</span>
-										<span class="animate-bounce" style="animation-delay: 0.1s">·</span>
-										<span class="animate-bounce" style="animation-delay: 0.2s">·</span>
+										<span class="animate-bounce" style="animation-delay: 0.1s">
+											·
+										</span>
+										<span class="animate-bounce" style="animation-delay: 0.2s">
+											·
+										</span>
 									</span>
 								</div>
 							</div>
@@ -341,11 +358,7 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 							rows={2}
 							placeholder="输入消息... (Ctrl+Enter 发送)"
 							value={input}
-							onInput={(e) =>
-								setInput(
-									(e.target as HTMLTextAreaElement).value,
-								)
-							}
+							onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
 							onKeyDown={handleKeyDown}
 							disabled={isLoading}
 						/>

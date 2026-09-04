@@ -1,15 +1,34 @@
 import { useCallback, useState } from "hono/jsx/dom";
-import type { LdohSite, LdohSiteMaintainer, LdohViolation } from "../core/types";
+import type {
+	LdohSite,
+	LdohSiteMaintainer,
+	LdohViolation,
+} from "../core/types";
 
 type LdohViewProps = {
 	sites: LdohSite[];
 	violations: LdohViolation[];
 	pendingMaintainers: LdohSiteMaintainer[];
-	pendingChannels: Array<{ id: string; name: string; base_url: string; status: string; user_name?: string; site_name?: string; contribution_note?: string | null }>;
+	pendingChannels: Array<{
+		id: string;
+		name: string;
+		base_url: string;
+		status: string;
+		user_name?: string;
+		site_name?: string;
+		contribution_note?: string | null;
+	}>;
 	onSync: () => Promise<void>;
 	onBlockAll: () => Promise<void>;
-	onAddSite: (apiBaseUrl: string, maintainerUsername: string, name: string) => Promise<void>;
-	onEditSite: (id: string, data: { name?: string; description?: string; apiBaseUrls?: string }) => Promise<void>;
+	onAddSite: (
+		apiBaseUrl: string,
+		maintainerUsername: string,
+		name: string,
+	) => Promise<void>;
+	onEditSite: (
+		id: string,
+		data: { name?: string; description?: string; apiBaseUrls?: string },
+	) => Promise<void>;
 	onDeleteSite: (id: string) => Promise<void>;
 	onAddMaintainer: (siteId: string, username: string) => Promise<void>;
 	onRemoveMaintainer: (maintainerId: string) => Promise<void>;
@@ -43,7 +62,11 @@ export const LdohView = ({
 	const [addName, setAddName] = useState("");
 	const [addNotice, setAddNotice] = useState("");
 	const [editingSite, setEditingSite] = useState<LdohSite | null>(null);
-	const [editForm, setEditForm] = useState({ name: "", description: "", apiBaseUrls: "" });
+	const [editForm, setEditForm] = useState({
+		name: "",
+		description: "",
+		apiBaseUrls: "",
+	});
 	const [newMaintainer, setNewMaintainer] = useState("");
 
 	const handleSync = useCallback(async () => {
@@ -81,21 +104,27 @@ export const LdohView = ({
 		setEditForm({
 			name: site.name,
 			description: site.description ?? "",
-			apiBaseUrls: (site.api_base_url ?? "").split("\n").filter(Boolean).join("\n"),
+			apiBaseUrls: (site.api_base_url ?? "")
+				.split("\n")
+				.filter(Boolean)
+				.join("\n"),
 		});
 		setNewMaintainer("");
 	}, []);
 
-	const handleEditSubmit = useCallback(async (e: Event) => {
-		e.preventDefault();
-		if (!editingSite) return;
-		await onEditSite(editingSite.id, {
-			name: editForm.name.trim(),
-			description: editForm.description.trim(),
-			apiBaseUrls: editForm.apiBaseUrls.trim(),
-		});
-		setEditingSite(null);
-	}, [editingSite, editForm, onEditSite]);
+	const handleEditSubmit = useCallback(
+		async (e: Event) => {
+			e.preventDefault();
+			if (!editingSite) return;
+			await onEditSite(editingSite.id, {
+				name: editForm.name.trim(),
+				description: editForm.description.trim(),
+				apiBaseUrls: editForm.apiBaseUrls.trim(),
+			});
+			setEditingSite(null);
+		},
+		[editingSite, editForm, onEditSite],
+	);
 
 	const handleAddMaintainerInModal = useCallback(async () => {
 		if (!editingSite || !newMaintainer.trim()) return;
@@ -103,18 +132,29 @@ export const LdohView = ({
 		setNewMaintainer("");
 	}, [editingSite, newMaintainer, onAddMaintainer]);
 
-	const handleRemoveMaintainerInModal = useCallback(async (maintainerId: string) => {
-		await onRemoveMaintainer(maintainerId);
-	}, [onRemoveMaintainer]);
+	const handleRemoveMaintainerInModal = useCallback(
+		async (maintainerId: string) => {
+			await onRemoveMaintainer(maintainerId);
+		},
+		[onRemoveMaintainer],
+	);
 
-	const handleDelete = useCallback(async (id: string) => {
-		if (!window.confirm("确定要删除该站点吗？关联的维护者、封禁和违规记录将一并删除。")) return;
-		await onDeleteSite(id);
-	}, [onDeleteSite]);
+	const handleDelete = useCallback(
+		async (id: string) => {
+			if (
+				!window.confirm(
+					"确定要删除该站点吗？关联的维护者、封禁和违规记录将一并删除。",
+				)
+			)
+				return;
+			await onDeleteSite(id);
+		},
+		[onDeleteSite],
+	);
 
 	// Refresh editingSite from sites list after maintainer changes
 	const currentEditingSite = editingSite
-		? sites.find((s) => s.id === editingSite.id) ?? editingSite
+		? (sites.find((s) => s.id === editingSite.id) ?? editingSite)
 		: null;
 
 	return (
@@ -167,7 +207,9 @@ export const LdohView = ({
 						type="text"
 						placeholder="维护者 LinuxDO 用户名"
 						value={addUsername}
-						onInput={(e) => setAddUsername((e.target as HTMLInputElement).value)}
+						onInput={(e) =>
+							setAddUsername((e.target as HTMLInputElement).value)
+						}
 						class="w-48 rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-stone-400 focus:outline-none"
 					/>
 					<input
@@ -194,104 +236,116 @@ export const LdohView = ({
 
 			{/* Pending maintainers */}
 			{pendingMaintainers.length > 0 && (
-			<div class="rounded-2xl border border-amber-200 bg-white p-5 shadow-lg">
-				<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-					待审批维护者
-				</h3>
-				<div class="overflow-x-auto">
-					<table class="w-full text-left text-sm">
-						<thead>
-							<tr class="border-b border-stone-100 text-xs uppercase tracking-widest text-stone-400">
-								<th class="pb-2 pr-4 font-medium">用户名</th>
-								<th class="pb-2 pr-4 font-medium">名称</th>
-								<th class="pb-2 pr-4 font-medium">来源</th>
-								<th class="pb-2 font-medium">操作</th>
-							</tr>
-						</thead>
-						<tbody>
-							{pendingMaintainers.map((m) => (
-								<tr key={m.id} class="border-b border-stone-50">
-									<td class="py-2 pr-4 font-['Space_Grotesk'] text-stone-700">{m.username}</td>
-									<td class="py-2 pr-4 text-stone-600">{m.name}</td>
-									<td class="py-2 pr-4">
-										<span class={`rounded-full px-2 py-0.5 text-xs ${m.source === "ldoh" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"}`}>
-											{m.source === "ldoh" ? "LDOH" : "手动"}
-										</span>
-									</td>
-									<td class="py-2">
-										<div class="flex gap-2">
-											<button
-												type="button"
-												class="text-xs text-emerald-600 hover:text-emerald-700"
-												onClick={() => onApproveMaintainer(m.id)}
-											>
-												批准
-											</button>
-											<button
-												type="button"
-												class="text-xs text-red-500 hover:text-red-600"
-												onClick={() => onRejectMaintainer(m.id)}
-											>
-												拒绝
-											</button>
-										</div>
-									</td>
+				<div class="rounded-2xl border border-amber-200 bg-white p-5 shadow-lg">
+					<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+						待审批维护者
+					</h3>
+					<div class="overflow-x-auto">
+						<table class="w-full text-left text-sm">
+							<thead>
+								<tr class="border-b border-stone-100 text-xs uppercase tracking-widest text-stone-400">
+									<th class="pb-2 pr-4 font-medium">用户名</th>
+									<th class="pb-2 pr-4 font-medium">名称</th>
+									<th class="pb-2 pr-4 font-medium">来源</th>
+									<th class="pb-2 font-medium">操作</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{pendingMaintainers.map((m) => (
+									<tr key={m.id} class="border-b border-stone-50">
+										<td class="py-2 pr-4 font-['Space_Grotesk'] text-stone-700">
+											{m.username}
+										</td>
+										<td class="py-2 pr-4 text-stone-600">{m.name}</td>
+										<td class="py-2 pr-4">
+											<span
+												class={`rounded-full px-2 py-0.5 text-xs ${m.source === "ldoh" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"}`}
+											>
+												{m.source === "ldoh" ? "LDOH" : "手动"}
+											</span>
+										</td>
+										<td class="py-2">
+											<div class="flex gap-2">
+												<button
+													type="button"
+													class="text-xs text-emerald-600 hover:text-emerald-700"
+													onClick={() => onApproveMaintainer(m.id)}
+												>
+													批准
+												</button>
+												<button
+													type="button"
+													class="text-xs text-red-500 hover:text-red-600"
+													onClick={() => onRejectMaintainer(m.id)}
+												>
+													拒绝
+												</button>
+											</div>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
 				</div>
-			</div>
 			)}
 
 			{/* Pending channels */}
 			{pendingChannels.length > 0 && (
-			<div class="rounded-2xl border border-amber-200 bg-white p-5 shadow-lg">
-				<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-					待审批渠道
-				</h3>
-				<div class="overflow-x-auto">
-					<table class="w-full text-left text-sm">
-						<thead>
-							<tr class="border-b border-stone-100 text-xs uppercase tracking-widest text-stone-400">
-								<th class="pb-2 pr-4 font-medium">名称</th>
-								<th class="pb-2 pr-4 font-medium">URL</th>
-								<th class="pb-2 pr-4 font-medium">提交者</th>
-								<th class="pb-2 pr-4 font-medium">说明</th>
-								<th class="pb-2 font-medium">操作</th>
-							</tr>
-						</thead>
-						<tbody>
-							{pendingChannels.map((ch) => (
-								<tr key={ch.id} class="border-b border-stone-50">
-									<td class="py-2 pr-4 font-medium text-stone-700">{ch.name}</td>
-									<td class="py-2 pr-4 text-xs text-stone-500 max-w-[200px] truncate">{ch.base_url}</td>
-									<td class="py-2 pr-4 text-stone-600">{ch.user_name ?? "-"}</td>
-									<td class="py-2 pr-4 text-xs text-stone-500 max-w-[200px]">{ch.contribution_note || "-"}</td>
-									<td class="py-2">
-										<div class="flex gap-2">
-											<button
-												type="button"
-												class="text-xs text-emerald-600 hover:text-emerald-700"
-												onClick={() => onApproveChannel(ch.id)}
-											>
-												批准
-											</button>
-											<button
-												type="button"
-												class="text-xs text-red-500 hover:text-red-600"
-												onClick={() => onRejectChannel(ch.id)}
-											>
-												拒绝
-											</button>
-										</div>
-									</td>
+				<div class="rounded-2xl border border-amber-200 bg-white p-5 shadow-lg">
+					<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+						待审批渠道
+					</h3>
+					<div class="overflow-x-auto">
+						<table class="w-full text-left text-sm">
+							<thead>
+								<tr class="border-b border-stone-100 text-xs uppercase tracking-widest text-stone-400">
+									<th class="pb-2 pr-4 font-medium">名称</th>
+									<th class="pb-2 pr-4 font-medium">URL</th>
+									<th class="pb-2 pr-4 font-medium">提交者</th>
+									<th class="pb-2 pr-4 font-medium">说明</th>
+									<th class="pb-2 font-medium">操作</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{pendingChannels.map((ch) => (
+									<tr key={ch.id} class="border-b border-stone-50">
+										<td class="py-2 pr-4 font-medium text-stone-700">
+											{ch.name}
+										</td>
+										<td class="py-2 pr-4 text-xs text-stone-500 max-w-[200px] truncate">
+											{ch.base_url}
+										</td>
+										<td class="py-2 pr-4 text-stone-600">
+											{ch.user_name ?? "-"}
+										</td>
+										<td class="py-2 pr-4 text-xs text-stone-500 max-w-[200px]">
+											{ch.contribution_note || "-"}
+										</td>
+										<td class="py-2">
+											<div class="flex gap-2">
+												<button
+													type="button"
+													class="text-xs text-emerald-600 hover:text-emerald-700"
+													onClick={() => onApproveChannel(ch.id)}
+												>
+													批准
+												</button>
+												<button
+													type="button"
+													class="text-xs text-red-500 hover:text-red-600"
+													onClick={() => onRejectChannel(ch.id)}
+												>
+													拒绝
+												</button>
+											</div>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
 				</div>
-			</div>
 			)}
 
 			{/* Sites list */}
@@ -327,9 +381,13 @@ export const LdohView = ({
 											</div>
 										</td>
 										<td class="py-2.5 pr-4 text-xs text-stone-500 max-w-[200px]">
-											{String(site.api_base_hostname ?? "").split(",").map((h, i) => (
-												<div key={i} class="truncate">{h.trim()}</div>
-											))}
+											{String(site.api_base_hostname ?? "")
+												.split(",")
+												.map((h, i) => (
+													<div key={i} class="truncate">
+														{h.trim()}
+													</div>
+												))}
 										</td>
 										<td class="py-2.5 pr-4">
 											{(site.maintainers ?? []).map((m) => (
@@ -341,7 +399,8 @@ export const LdohView = ({
 															: "bg-amber-50 text-amber-600"
 													}`}
 												>
-													{m.username}{m.approved ? "" : " (待审)"}
+													{m.username}
+													{m.approved ? "" : " (待审)"}
 												</span>
 											))}
 										</td>
@@ -388,35 +447,41 @@ export const LdohView = ({
 
 			{/* Violations */}
 			{violations.length > 0 && (
-			<div class="rounded-2xl border border-red-200 bg-white p-5 shadow-lg">
-				<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-					违规记录
-				</h3>
-				<div class="overflow-x-auto">
-					<table class="w-full text-left text-sm">
-						<thead>
-							<tr class="border-b border-stone-100 text-xs uppercase tracking-widest text-stone-400">
-								<th class="pb-2 pr-4 font-medium">用户</th>
-								<th class="pb-2 pr-4 font-medium">LinuxDO</th>
-								<th class="pb-2 pr-4 font-medium">尝试 URL</th>
-								<th class="pb-2 pr-4 font-medium">匹配站点</th>
-								<th class="pb-2 font-medium">时间</th>
-							</tr>
-						</thead>
-						<tbody>
-							{violations.map((v) => (
-								<tr key={v.id} class="border-b border-stone-50">
-									<td class="py-2 pr-4 text-stone-700">{v.user_name}</td>
-									<td class="py-2 pr-4 text-stone-500">{v.linuxdo_username ?? "-"}</td>
-									<td class="py-2 pr-4 text-xs text-stone-500 max-w-[200px] truncate">{v.attempted_base_url}</td>
-									<td class="py-2 pr-4 text-stone-600">{v.site_name}</td>
-									<td class="py-2 text-xs text-stone-400">{v.created_at?.slice(0, 16)}</td>
+				<div class="rounded-2xl border border-red-200 bg-white p-5 shadow-lg">
+					<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+						违规记录
+					</h3>
+					<div class="overflow-x-auto">
+						<table class="w-full text-left text-sm">
+							<thead>
+								<tr class="border-b border-stone-100 text-xs uppercase tracking-widest text-stone-400">
+									<th class="pb-2 pr-4 font-medium">用户</th>
+									<th class="pb-2 pr-4 font-medium">LinuxDO</th>
+									<th class="pb-2 pr-4 font-medium">尝试 URL</th>
+									<th class="pb-2 pr-4 font-medium">匹配站点</th>
+									<th class="pb-2 font-medium">时间</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{violations.map((v) => (
+									<tr key={v.id} class="border-b border-stone-50">
+										<td class="py-2 pr-4 text-stone-700">{v.user_name}</td>
+										<td class="py-2 pr-4 text-stone-500">
+											{v.linuxdo_username ?? "-"}
+										</td>
+										<td class="py-2 pr-4 text-xs text-stone-500 max-w-[200px] truncate">
+											{v.attempted_base_url}
+										</td>
+										<td class="py-2 pr-4 text-stone-600">{v.site_name}</td>
+										<td class="py-2 text-xs text-stone-400">
+											{v.created_at?.slice(0, 16)}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
 				</div>
-			</div>
 			)}
 
 			{/* Edit site modal */}
@@ -460,7 +525,8 @@ export const LdohView = ({
 									onInput={(e) =>
 										setEditForm((p) => ({
 											...p,
-											description: (e.currentTarget as HTMLTextAreaElement)?.value ?? "",
+											description:
+												(e.currentTarget as HTMLTextAreaElement)?.value ?? "",
 										}))
 									}
 								/>
@@ -477,7 +543,8 @@ export const LdohView = ({
 									onInput={(e) =>
 										setEditForm((p) => ({
 											...p,
-											apiBaseUrls: (e.currentTarget as HTMLTextAreaElement)?.value ?? "",
+											apiBaseUrls:
+												(e.currentTarget as HTMLTextAreaElement)?.value ?? "",
 										}))
 									}
 								/>
@@ -490,15 +557,21 @@ export const LdohView = ({
 								</label>
 								<div class="space-y-2">
 									{(currentEditingSite.maintainers ?? []).map((m) => (
-										<div key={m.id} class="flex items-center justify-between rounded-lg border border-stone-100 px-3 py-2">
+										<div
+											key={m.id}
+											class="flex items-center justify-between rounded-lg border border-stone-100 px-3 py-2"
+										>
 											<div class="flex items-center gap-2">
 												<span class="text-sm text-stone-700">{m.username}</span>
-												<span class={`rounded-full px-2 py-0.5 text-xs ${
-													m.approved
-														? "bg-emerald-50 text-emerald-600"
-														: "bg-amber-50 text-amber-600"
-												}`}>
-													{m.source === "ldoh" ? "LDOH" : "手动"}{m.approved ? "" : " (待审)"}
+												<span
+													class={`rounded-full px-2 py-0.5 text-xs ${
+														m.approved
+															? "bg-emerald-50 text-emerald-600"
+															: "bg-amber-50 text-amber-600"
+													}`}
+												>
+													{m.source === "ldoh" ? "LDOH" : "手动"}
+													{m.approved ? "" : " (待审)"}
 												</span>
 											</div>
 											<button
@@ -518,7 +591,9 @@ export const LdohView = ({
 											type="text"
 											placeholder="LinuxDO 用户名或主页链接"
 											value={newMaintainer}
-											onInput={(e) => setNewMaintainer((e.target as HTMLInputElement).value)}
+											onInput={(e) =>
+												setNewMaintainer((e.target as HTMLInputElement).value)
+											}
 											class="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-stone-400 focus:outline-none"
 										/>
 										<button

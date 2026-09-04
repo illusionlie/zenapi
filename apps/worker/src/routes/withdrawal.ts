@@ -57,7 +57,12 @@ withdrawal.post("/create", userAuth, async (c) => {
 	}
 
 	if (amount > freshUser.withdrawable_balance) {
-		return jsonError(c, 400, "insufficient_withdrawable", "insufficient_withdrawable");
+		return jsonError(
+			c,
+			400,
+			"insufficient_withdrawable",
+			"insufficient_withdrawable",
+		);
 	}
 	if (amount > freshUser.balance) {
 		return jsonError(c, 400, "insufficient_balance", "insufficient_balance");
@@ -70,7 +75,12 @@ withdrawal.post("/create", userAuth, async (c) => {
 	const feeRate = await getWithdrawalFeeRate(c.env.DB);
 
 	if (!pid || !key) {
-		return jsonError(c, 500, "ldc_payment_not_configured", "ldc_payment_not_configured");
+		return jsonError(
+			c,
+			500,
+			"ldc_payment_not_configured",
+			"ldc_payment_not_configured",
+		);
 	}
 
 	// Calculate LDC amounts
@@ -103,7 +113,19 @@ withdrawal.post("/create", userAuth, async (c) => {
 	await c.env.DB.prepare(
 		"INSERT INTO withdrawal_orders (id, user_id, out_trade_no, balance_amount, ldc_amount, fee_amount, fee_rate, linuxdo_id, linuxdo_username, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
 	)
-		.bind(id, userId, outTradeNo, amount, netLdc, feeAmount, feeRate, user.linuxdo_id, user.linuxdo_username, nowStr, nowStr)
+		.bind(
+			id,
+			userId,
+			outTradeNo,
+			amount,
+			netLdc,
+			feeAmount,
+			feeRate,
+			user.linuxdo_id,
+			user.linuxdo_username,
+			nowStr,
+			nowStr,
+		)
 		.run();
 
 	// Call distribute API

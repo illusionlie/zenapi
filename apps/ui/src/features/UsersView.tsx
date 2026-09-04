@@ -114,9 +114,7 @@ export const UsersView = ({
 						<tbody>
 							{users.map((user) => (
 								<tr class="border-b border-stone-50">
-									<td class="py-2.5 pr-4 text-stone-700">
-										{user.email}
-									</td>
+									<td class="py-2.5 pr-4 text-stone-700">{user.email}</td>
 									<td class="py-2.5 pr-4 font-medium text-stone-700">
 										{user.name}
 									</td>
@@ -142,9 +140,7 @@ export const UsersView = ({
 													: "bg-red-50 text-red-600"
 											}`}
 										>
-											{user.status === "active"
-												? "启用"
-												: "停用"}
+											{user.status === "active" ? "启用" : "停用"}
 										</span>
 									</td>
 									<td class="py-2.5 pr-4 text-xs text-stone-500">
@@ -165,23 +161,16 @@ export const UsersView = ({
 												onClick={() =>
 													onUpdate(user.id, {
 														status:
-															user.status ===
-															"active"
-																? "disabled"
-																: "active",
+															user.status === "active" ? "disabled" : "active",
 													})
 												}
 											>
-												{user.status === "active"
-													? "停用"
-													: "启用"}
+												{user.status === "active" ? "停用" : "启用"}
 											</button>
 											<button
 												type="button"
 												class="text-xs text-red-500 hover:text-red-600"
-												onClick={() =>
-													onDelete(user.id)
-												}
+												onClick={() => onDelete(user.id)}
 											>
 												删除
 											</button>
@@ -219,10 +208,7 @@ export const UsersView = ({
 									onInput={(e) =>
 										setCreateForm((p) => ({
 											...p,
-											email:
-												(
-													e.currentTarget as HTMLInputElement
-												)?.value ?? "",
+											email: (e.currentTarget as HTMLInputElement)?.value ?? "",
 										}))
 									}
 								/>
@@ -239,10 +225,7 @@ export const UsersView = ({
 									onInput={(e) =>
 										setCreateForm((p) => ({
 											...p,
-											name:
-												(
-													e.currentTarget as HTMLInputElement
-												)?.value ?? "",
+											name: (e.currentTarget as HTMLInputElement)?.value ?? "",
 										}))
 									}
 								/>
@@ -260,9 +243,7 @@ export const UsersView = ({
 										setCreateForm((p) => ({
 											...p,
 											password:
-												(
-													e.currentTarget as HTMLInputElement
-												)?.value ?? "",
+												(e.currentTarget as HTMLInputElement)?.value ?? "",
 										}))
 									}
 								/>
@@ -280,9 +261,7 @@ export const UsersView = ({
 										setCreateForm((p) => ({
 											...p,
 											balance:
-												(
-													e.currentTarget as HTMLInputElement
-												)?.value ?? "0",
+												(e.currentTarget as HTMLInputElement)?.value ?? "0",
 										}))
 									}
 								/>
@@ -335,10 +314,7 @@ export const UsersView = ({
 									onInput={(e) =>
 										setEditForm((p) => ({
 											...p,
-											name:
-												(
-													e.currentTarget as HTMLInputElement
-												)?.value ?? "",
+											name: (e.currentTarget as HTMLInputElement)?.value ?? "",
 										}))
 									}
 								/>
@@ -356,9 +332,7 @@ export const UsersView = ({
 										setEditForm((p) => ({
 											...p,
 											balance:
-												(
-													e.currentTarget as HTMLInputElement
-												)?.value ?? "",
+												(e.currentTarget as HTMLInputElement)?.value ?? "",
 										}))
 									}
 								/>
@@ -374,9 +348,7 @@ export const UsersView = ({
 										setEditForm((p) => ({
 											...p,
 											status:
-												(
-													e.currentTarget as HTMLSelectElement
-												)?.value ?? "",
+												(e.currentTarget as HTMLSelectElement)?.value ?? "",
 										}))
 									}
 								>
@@ -396,9 +368,7 @@ export const UsersView = ({
 										setEditForm((p) => ({
 											...p,
 											password:
-												(
-													e.currentTarget as HTMLInputElement
-												)?.value ?? "",
+												(e.currentTarget as HTMLInputElement)?.value ?? "",
 										}))
 									}
 								/>

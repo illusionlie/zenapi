@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from "hono/jsx/dom";
 import { apiBase } from "../core/constants";
-import type { MonitoringChannelData, MonitoringData, MonitoringDailyTrend, MonitoringErrorDetail, MonitoringSlotModel } from "../core/types";
+import type {
+	MonitoringChannelData,
+	MonitoringDailyTrend,
+	MonitoringData,
+	MonitoringErrorDetail,
+	MonitoringSlotModel,
+} from "../core/types";
 
 type MonitoringViewProps = {
 	monitoring: MonitoringData | null;
@@ -105,14 +111,22 @@ type ChannelBarProps = {
 	token: string;
 };
 
-const ChannelBar = ({ channel, slots, range, trendMap, token }: ChannelBarProps) => {
+const ChannelBar = ({
+	channel,
+	slots,
+	range,
+	trendMap,
+	token,
+}: ChannelBarProps) => {
 	const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 	const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 	const [slotModels, setSlotModels] = useState<MonitoringSlotModel[]>([]);
 	const [errorDetails, setErrorDetails] = useState<MonitoringErrorDetail[]>([]);
 	const [loadingDetails, setLoadingDetails] = useState(false);
 
-	const hoveredTrend = hoveredSlot ? trendMap.get(`${channel.channel_id}|${hoveredSlot}`) : null;
+	const hoveredTrend = hoveredSlot
+		? trendMap.get(`${channel.channel_id}|${hoveredSlot}`)
+		: null;
 
 	const handleSlotClick = async (slot: string) => {
 		const trend = trendMap.get(`${channel.channel_id}|${slot}`);
@@ -128,14 +142,19 @@ const ChannelBar = ({ channel, slots, range, trendMap, token }: ChannelBarProps)
 		setSelectedSlot(slot);
 		setLoadingDetails(true);
 		try {
-			const headers: Record<string, string> = { "Content-Type": "application/json" };
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+			};
 			if (token) headers.Authorization = `Bearer ${token}`;
 			const res = await fetch(
 				`${apiBase}/api/monitoring/slot-details?slot=${encodeURIComponent(slot)}&channel_id=${encodeURIComponent(String(channel.channel_id))}&range=${range}`,
 				{ headers },
 			);
 			if (res.ok) {
-				const data = (await res.json()) as { models: MonitoringSlotModel[]; errors: MonitoringErrorDetail[] };
+				const data = (await res.json()) as {
+					models: MonitoringSlotModel[];
+					errors: MonitoringErrorDetail[];
+				};
 				setSlotModels(data.models);
 				setErrorDetails(data.errors);
 			}
@@ -157,7 +176,9 @@ const ChannelBar = ({ channel, slots, range, trendMap, token }: ChannelBarProps)
 			{/* Header row */}
 			<div class="mb-3 flex flex-wrap items-center justify-between gap-2">
 				<div class="flex items-center gap-2.5">
-					<span class={`inline-block h-2.5 w-2.5 rounded-full ${statusDot(channel.success_rate)}`} />
+					<span
+						class={`inline-block h-2.5 w-2.5 rounded-full ${statusDot(channel.success_rate)}`}
+					/>
 					<span class="font-medium text-stone-900">{channel.channel_name}</span>
 					<span class="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500">
 						{channel.api_format}
@@ -172,7 +193,9 @@ const ChannelBar = ({ channel, slots, range, trendMap, token }: ChannelBarProps)
 					<span class={`font-medium ${rateColor(channel.success_rate)}`}>
 						{channel.success_rate !== null ? `${channel.success_rate}%` : "-"}
 					</span>
-					<span>{channel.total_requests > 0 ? `${channel.avg_latency_ms}ms` : "-"}</span>
+					<span>
+						{channel.total_requests > 0 ? `${channel.avg_latency_ms}ms` : "-"}
+					</span>
 					<span class={`font-medium ${rateColor(channel.success_rate)}`}>
 						{statusLabel(channel.success_rate)}
 					</span>
@@ -211,11 +234,16 @@ const ChannelBar = ({ channel, slots, range, trendMap, token }: ChannelBarProps)
 			{/* Hover tooltip */}
 			{hoveredSlot && (
 				<div class="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600">
-					<span class="font-medium text-stone-800">{formatSlotLabel(hoveredSlot, range)}</span>
+					<span class="font-medium text-stone-800">
+						{formatSlotLabel(hoveredSlot, range)}
+					</span>
 					{hoveredTrend ? (
 						<span>
-							{" "}&mdash; {hoveredTrend.requests} 请求, 成功率{" "}
-							<span class={`font-medium ${rateColor(hoveredTrend.success_rate)}`}>
+							{" "}
+							&mdash; {hoveredTrend.requests} 请求, 成功率{" "}
+							<span
+								class={`font-medium ${rateColor(hoveredTrend.success_rate)}`}
+							>
 								{hoveredTrend.success_rate}%
 							</span>
 							, 延迟 {hoveredTrend.avg_latency_ms}ms
@@ -264,10 +292,20 @@ const ChannelBar = ({ channel, slots, range, trendMap, token }: ChannelBarProps)
 										{slotModels.map((m) => (
 											<tr key={m.model} class="border-b border-stone-100">
 												<td class="py-1 font-mono text-stone-700">{m.model}</td>
-												<td class="py-1 text-right text-stone-600">{m.requests}</td>
-												<td class="py-1 text-right text-green-600">{m.success}</td>
-												<td class={`py-1 text-right ${m.errors > 0 ? "text-red-600 font-medium" : "text-stone-400"}`}>{m.errors}</td>
-												<td class="py-1 text-right text-stone-500">{m.avg_latency_ms}ms</td>
+												<td class="py-1 text-right text-stone-600">
+													{m.requests}
+												</td>
+												<td class="py-1 text-right text-green-600">
+													{m.success}
+												</td>
+												<td
+													class={`py-1 text-right ${m.errors > 0 ? "text-red-600 font-medium" : "text-stone-400"}`}
+												>
+													{m.errors}
+												</td>
+												<td class="py-1 text-right text-stone-500">
+													{m.avg_latency_ms}ms
+												</td>
 											</tr>
 										))}
 									</tbody>
@@ -282,18 +320,27 @@ const ChannelBar = ({ channel, slots, range, trendMap, token }: ChannelBarProps)
 									</div>
 									<div class="max-h-60 space-y-2 overflow-y-auto">
 										{errorDetails.map((err) => (
-											<div key={err.id} class="rounded bg-white p-2 text-xs shadow-sm">
+											<div
+												key={err.id}
+												class="rounded bg-white p-2 text-xs shadow-sm"
+											>
 												<div class="flex items-center gap-2">
 													{err.error_code && (
-														<span class="font-mono font-medium text-red-600">{err.error_code}</span>
+														<span class="font-mono font-medium text-red-600">
+															{err.error_code}
+														</span>
 													)}
 													{err.model && (
 														<span class="text-stone-600">{err.model}</span>
 													)}
 													{err.latency_ms != null && (
-														<span class="text-stone-400">{err.latency_ms}ms</span>
+														<span class="text-stone-400">
+															{err.latency_ms}ms
+														</span>
 													)}
-													<span class="ml-auto text-stone-400">{err.created_at}</span>
+													<span class="ml-auto text-stone-400">
+														{err.created_at}
+													</span>
 												</div>
 												{err.error_message && (
 													<pre class="mt-1 max-h-20 overflow-auto whitespace-pre-wrap break-all rounded bg-red-50 p-1 text-xs text-red-700">
@@ -375,7 +422,12 @@ export const MonitoringView = ({
 	const recent = monitoring.recentStatus;
 
 	// Overall status based on last 15 minutes
-	const overallStatus = recent.success_rate >= 99 ? "所有系统正常运行" : recent.success_rate >= 95 ? "部分系统降级" : "系统异常";
+	const overallStatus =
+		recent.success_rate >= 99
+			? "所有系统正常运行"
+			: recent.success_rate >= 95
+				? "部分系统降级"
+				: "系统异常";
 
 	return (
 		<div class="space-y-5">
@@ -400,19 +452,24 @@ export const MonitoringView = ({
 			</div>
 
 			{/* Overall status banner (always based on last 15 minutes) */}
-			<div class={`flex items-center gap-3 rounded-2xl border p-5 shadow-lg ${
-				recent.success_rate >= 99
-					? "border-green-200 bg-green-50"
-					: recent.success_rate >= 95
-						? "border-yellow-200 bg-yellow-50"
-						: "border-red-200 bg-red-50"
-			}`}>
-				<span class={`inline-block h-3 w-3 rounded-full ${statusDot(recent.success_rate)}`} />
+			<div
+				class={`flex items-center gap-3 rounded-2xl border p-5 shadow-lg ${
+					recent.success_rate >= 99
+						? "border-green-200 bg-green-50"
+						: recent.success_rate >= 95
+							? "border-yellow-200 bg-yellow-50"
+							: "border-red-200 bg-red-50"
+				}`}
+			>
+				<span
+					class={`inline-block h-3 w-3 rounded-full ${statusDot(recent.success_rate)}`}
+				/>
 				<span class={`text-lg font-semibold ${rateColor(recent.success_rate)}`}>
 					{overallStatus}
 				</span>
 				<span class="ml-auto text-sm text-stone-500">
-					近 15 分钟: {recent.total_requests} 请求 &middot; {recent.success_rate}% 成功率 &middot; {recent.avg_latency_ms}ms 延迟
+					近 15 分钟: {recent.total_requests} 请求 &middot;{" "}
+					{recent.success_rate}% 成功率 &middot; {recent.avg_latency_ms}ms 延迟
 				</span>
 			</div>
 
@@ -422,7 +479,9 @@ export const MonitoringView = ({
 					<span class="rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-500">
 						整体成功率
 					</span>
-					<div class={`text-2xl font-semibold ${rateColor(summary.success_rate)}`}>
+					<div
+						class={`text-2xl font-semibold ${rateColor(summary.success_rate)}`}
+					>
 						{summary.success_rate}%
 					</div>
 					<span class="font-['Space_Grotesk'] text-xs text-stone-500">
@@ -436,7 +495,8 @@ export const MonitoringView = ({
 					<div class="text-2xl font-semibold text-stone-900">
 						{summary.active_channels}
 						<span class="text-base font-normal text-stone-400">
-							{" "}/ {summary.total_channels}
+							{" "}
+							/ {summary.total_channels}
 						</span>
 					</div>
 					<span class="font-['Space_Grotesk'] text-xs text-stone-500">
@@ -471,13 +531,16 @@ export const MonitoringView = ({
 			{/* Legend */}
 			<div class="flex flex-wrap items-center gap-4 px-1 text-xs text-stone-400">
 				<div class="flex items-center gap-1.5">
-					<span class="inline-block h-3 w-3 rounded-sm bg-green-500" /> 正常 (&ge;99%)
+					<span class="inline-block h-3 w-3 rounded-sm bg-green-500" /> 正常
+					(&ge;99%)
 				</div>
 				<div class="flex items-center gap-1.5">
-					<span class="inline-block h-3 w-3 rounded-sm bg-yellow-500" /> 降级 (&ge;95%)
+					<span class="inline-block h-3 w-3 rounded-sm bg-yellow-500" /> 降级
+					(&ge;95%)
 				</div>
 				<div class="flex items-center gap-1.5">
-					<span class="inline-block h-3 w-3 rounded-sm bg-red-500" /> 异常 (&lt;95%)
+					<span class="inline-block h-3 w-3 rounded-sm bg-red-500" /> 异常
+					(&lt;95%)
 				</div>
 				<div class="flex items-center gap-1.5">
 					<span class="inline-block h-3 w-3 rounded-sm bg-stone-200" /> 无数据

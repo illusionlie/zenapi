@@ -1,9 +1,4 @@
-import {
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-} from "hono/jsx/dom";
+import { useCallback, useEffect, useMemo, useState } from "hono/jsx/dom";
 import { createApiFetch } from "./core/api";
 import {
 	initialChannelForm,
@@ -27,22 +22,22 @@ import type {
 	SiteMode,
 	TabId,
 	Token,
-	User,
 	UsageLog,
+	User,
 } from "./core/types";
-import type { ModelAliasesMap } from "./UserApp";
 import { toggleStatus } from "./core/utils";
 import { AppLayout } from "./features/AppLayout";
 import { ChannelsView } from "./features/ChannelsView";
 import { DashboardView } from "./features/DashboardView";
+import { LdohView } from "./features/LdohView";
 import { ModelsView } from "./features/ModelsView";
 import { MonitoringView } from "./features/MonitoringView";
+import { PlaygroundView } from "./features/PlaygroundView";
 import { SettingsView } from "./features/SettingsView";
 import { TokensView } from "./features/TokensView";
 import { UsageView } from "./features/UsageView";
 import { UsersView } from "./features/UsersView";
-import { PlaygroundView } from "./features/PlaygroundView";
-import { LdohView } from "./features/LdohView";
+import type { ModelAliasesMap } from "./UserApp";
 
 type AdminAppProps = {
 	token: string;
@@ -101,16 +96,38 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		...initialChannelForm,
 	}));
 	const [isChannelModalOpen, setChannelModalOpen] = useState(false);
-	const [channelModelAliases, setChannelModelAliases] = useState<Record<string, ModelAliasesMap>>({});
-	const [channelAliasState, setChannelAliasState] = useState<ModelAliasesMap>({});
+	const [channelModelAliases, setChannelModelAliases] = useState<
+		Record<string, ModelAliasesMap>
+	>({});
+	const [channelAliasState, setChannelAliasState] = useState<ModelAliasesMap>(
+		{},
+	);
+	const [fetchingModels, setFetchingModels] = useState(false);
+	const [fetchedModels, setFetchedModels] = useState<string[] | null>(null);
+	const [fetchedSearch, setFetchedSearch] = useState("");
+	const [selectedFetched, setSelectedFetched] = useState<Set<string>>(
+		() => new Set<string>(),
+	);
 	const [isTokenModalOpen, setTokenModalOpen] = useState(false);
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [users, setUsers] = useState<User[]>([]);
 	const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
 	const [ldohSites, setLdohSites] = useState<LdohSite[]>([]);
 	const [ldohViolations, setLdohViolations] = useState<LdohViolation[]>([]);
-	const [ldohPendingMaintainers, setLdohPendingMaintainers] = useState<LdohSiteMaintainer[]>([]);
-	const [ldohPendingChannels, setLdohPendingChannels] = useState<Array<{ id: string; name: string; base_url: string; status: string; user_name?: string; site_name?: string; contribution_note?: string | null }>>([]);
+	const [ldohPendingMaintainers, setLdohPendingMaintainers] = useState<
+		LdohSiteMaintainer[]
+	>([]);
+	const [ldohPendingChannels, setLdohPendingChannels] = useState<
+		Array<{
+			id: string;
+			name: string;
+			base_url: string;
+			status: string;
+			user_name?: string;
+			site_name?: string;
+			contribution_note?: string | null;
+		}>
+	>([]);
 
 	const apiFetch = useMemo(
 		() => createApiFetch(token, () => updateToken(null)),
@@ -130,7 +147,10 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	}, [apiFetch]);
 
 	const loadChannels = useCallback(async () => {
-		const result = await apiFetch<{ channels: Channel[]; channel_aliases?: Record<string, ModelAliasesMap> }>("/api/channels");
+		const result = await apiFetch<{
+			channels: Channel[];
+			channel_aliases?: Record<string, ModelAliasesMap>;
+		}>("/api/channels");
 		setData((prev) => ({ ...prev, channels: result.channels }));
 		setChannelModelAliases(result.channel_aliases ?? {});
 	}, [apiFetch]);
@@ -146,9 +166,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	}, [apiFetch]);
 
 	const loadUsage = useCallback(async () => {
-		const result = await apiFetch<{ logs: UsageLog[] }>(
-			"/api/usage?limit=200",
-		);
+		const result = await apiFetch<{ logs: UsageLog[] }>("/api/usage?limit=200");
 		setData((prev) => ({ ...prev, usage: result.logs }));
 	}, [apiFetch]);
 
@@ -164,8 +182,12 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			checkin_reward: String(settings.checkin_reward ?? 0.5),
 			require_invite_code: settings.require_invite_code ? "true" : "false",
 			channel_fee_enabled: settings.channel_fee_enabled ? "true" : "false",
-			channel_review_enabled: settings.channel_review_enabled ? "true" : "false",
-			user_channel_selection_enabled: settings.user_channel_selection_enabled ? "true" : "false",
+			channel_review_enabled: settings.channel_review_enabled
+				? "true"
+				: "false",
+			user_channel_selection_enabled: settings.user_channel_selection_enabled
+				? "true"
+				: "false",
 			default_balance: String(settings.default_balance ?? 0),
 			withdrawal_enabled: settings.withdrawal_enabled ? "true" : "false",
 			withdrawal_fee_rate: String(settings.withdrawal_fee_rate ?? 0),
@@ -173,13 +195,16 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			ldc_payment_enabled: settings.ldc_payment_enabled ? "true" : "false",
 			ldc_epay_pid: settings.ldc_epay_pid ?? "",
 			ldc_epay_key: settings.ldc_epay_key ?? "",
-			ldc_epay_gateway: settings.ldc_epay_gateway ?? "https://credit.linux.do/epay",
+			ldc_epay_gateway:
+				settings.ldc_epay_gateway ?? "https://credit.linux.do/epay",
 			ldc_exchange_rate: String(settings.ldc_exchange_rate ?? 0.1),
 			ldoh_cookie: settings.ldoh_cookie ?? "",
 			announcement: settings.announcement ?? "",
 		});
 		if (settings.require_invite_code) {
-			const result = await apiFetch<{ codes: InviteCode[] }>("/api/invite-codes");
+			const result = await apiFetch<{ codes: InviteCode[] }>(
+				"/api/invite-codes",
+			);
 			setInviteCodes(result.codes);
 		}
 	}, [apiFetch]);
@@ -190,10 +215,14 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	}, [apiFetch]);
 
 	const loadLdoh = useCallback(async () => {
-		const sitesResult = await apiFetch<{ sites: LdohSite[] }>("/api/ldoh/sites");
+		const sitesResult = await apiFetch<{ sites: LdohSite[] }>(
+			"/api/ldoh/sites",
+		);
 		setLdohSites(sitesResult.sites);
 
-		const violationsResult = await apiFetch<{ violations: LdohViolation[] }>("/api/ldoh/violations");
+		const violationsResult = await apiFetch<{ violations: LdohViolation[] }>(
+			"/api/ldoh/violations",
+		);
 		setLdohViolations(violationsResult.violations);
 
 		// Extract pending maintainers from sites
@@ -208,12 +237,25 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		setLdohPendingMaintainers(pending);
 
 		// Fetch pending channels
-		const channelsResult = await apiFetch<{ channels: Channel[] }>("/api/channels");
+		const channelsResult = await apiFetch<{ channels: Channel[] }>(
+			"/api/channels",
+		);
 		const usersResult = await apiFetch<{ users: User[] }>("/api/users");
-		const userMap = new Map((usersResult.users ?? []).map((u) => [u.id, u.name]));
+		const userMap = new Map(
+			(usersResult.users ?? []).map((u) => [u.id, u.name]),
+		);
 		const pendingChs = (channelsResult.channels ?? [])
 			.filter((ch) => ch.status === "pending")
-			.map((ch) => ({ id: ch.id, name: ch.name, base_url: ch.base_url, status: ch.status, user_name: ch.contributed_by ? userMap.get(ch.contributed_by) ?? ch.contributed_by : undefined, contribution_note: ch.contribution_note }));
+			.map((ch) => ({
+				id: ch.id,
+				name: ch.name,
+				base_url: ch.base_url,
+				status: ch.status,
+				user_name: ch.contributed_by
+					? (userMap.get(ch.contributed_by) ?? ch.contributed_by)
+					: undefined,
+				contribution_note: ch.contribution_note,
+			}));
 		setLdohPendingChannels(pendingChs);
 	}, [apiFetch]);
 
@@ -224,14 +266,19 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			try {
 				if (tabId === "dashboard") await loadDashboard();
 				if (tabId === "monitoring") await loadMonitoring();
-				if (tabId === "channels") { await loadChannels(); await loadSettings(); }
+				if (tabId === "channels") {
+					await loadChannels();
+					await loadSettings();
+				}
 				if (tabId === "models") await loadModels();
 				if (tabId === "tokens") await loadTokens();
 				if (tabId === "usage") await loadUsage();
 				if (tabId === "settings") await loadSettings();
 				if (tabId === "users") await loadUsers();
 				if (tabId === "ldoh") await loadLdoh();
-				if (tabId === "playground") { /* no data to preload */ }
+				if (tabId === "playground") {
+					/* no data to preload */
+				}
 			} catch (error) {
 				setNotice((error as Error).message);
 			} finally {
@@ -264,18 +311,14 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		return () => window.removeEventListener("popstate", handlePopState);
 	}, []);
 
-
 	const handleLogout = useCallback(async () => {
 		await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => null);
 		updateToken(null);
 	}, [apiFetch, updateToken]);
 
-	const handleChannelFormChange = useCallback(
-		(patch: Partial<ChannelForm>) => {
-			setChannelForm((prev) => ({ ...prev, ...patch }));
-		},
-		[],
-	);
+	const handleChannelFormChange = useCallback((patch: Partial<ChannelForm>) => {
+		setChannelForm((prev) => ({ ...prev, ...patch }));
+	}, []);
 
 	const handleSettingsFormChange = useCallback(
 		(patch: Partial<SettingsForm>) => {
@@ -340,70 +383,76 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		setNotice("");
 	}, []);
 
-	const startChannelEdit = useCallback((channel: Channel) => {
-		setEditingChannel(channel);
-		let modelsList = "";
-		const modelIds: string[] = [];
-		if (channel.models_json) {
-			try {
-				const parsed = JSON.parse(channel.models_json);
-				const arr = Array.isArray(parsed)
-					? parsed
-					: Array.isArray(parsed?.data)
-						? parsed.data
-						: [];
-				modelsList = arr
-					.map((m: unknown) => {
-						if (typeof m === "string") { modelIds.push(m); return m; }
-						const obj = m as {
-							id?: string;
-							input_price?: number;
-							output_price?: number;
-							shared?: boolean;
-							enabled?: boolean;
-						};
-						const id = obj?.id ?? "";
-						if (!id) return "";
-						modelIds.push(id);
-						const ip = obj?.input_price;
-						const op = obj?.output_price;
-						const sh = obj?.shared;
-						const en = obj?.enabled;
-						if (ip != null || op != null || sh != null || en != null) {
-							return `${id}|${ip ?? ""}|${op ?? ""}|${sh ? "1" : "0"}|${en === false ? "0" : "1"}`;
-						}
-						return id;
-					})
-					.filter(Boolean)
-					.join("\n");
-			} catch {
-				/* ignore */
+	const startChannelEdit = useCallback(
+		(channel: Channel) => {
+			setEditingChannel(channel);
+			let modelsList = "";
+			const modelIds: string[] = [];
+			if (channel.models_json) {
+				try {
+					const parsed = JSON.parse(channel.models_json);
+					const arr = Array.isArray(parsed)
+						? parsed
+						: Array.isArray(parsed?.data)
+							? parsed.data
+							: [];
+					modelsList = arr
+						.map((m: unknown) => {
+							if (typeof m === "string") {
+								modelIds.push(m);
+								return m;
+							}
+							const obj = m as {
+								id?: string;
+								input_price?: number;
+								output_price?: number;
+								shared?: boolean;
+								enabled?: boolean;
+							};
+							const id = obj?.id ?? "";
+							if (!id) return "";
+							modelIds.push(id);
+							const ip = obj?.input_price;
+							const op = obj?.output_price;
+							const sh = obj?.shared;
+							const en = obj?.enabled;
+							if (ip != null || op != null || sh != null || en != null) {
+								return `${id}|${ip ?? ""}|${op ?? ""}|${sh ? "1" : "0"}|${en === false ? "0" : "1"}`;
+							}
+							return id;
+						})
+						.filter(Boolean)
+						.join("\n");
+				} catch {
+					/* ignore */
+				}
 			}
-		}
-		setChannelForm({
-			name: channel.name ?? "",
-			base_url: channel.base_url ?? "",
-			api_key: channel.api_key ?? "",
-			weight: channel.weight ?? 1,
-			api_format: channel.api_format ?? "openai",
-			custom_headers: channel.custom_headers_json ?? "",
-			models: modelsList,
-		});
-		// Initialize alias state from per-channel alias map for this channel's models
-		const perChannelMap = channelModelAliases[channel.id] ?? {};
-		const initial: ModelAliasesMap = {};
-		for (const mid of modelIds) {
-			if (perChannelMap[mid]) {
-				initial[mid] = {
-					aliases: [...perChannelMap[mid].aliases],
-					alias_only: perChannelMap[mid].alias_only,
-				};
+			setChannelForm({
+				name: channel.name ?? "",
+				base_url: channel.base_url ?? "",
+				api_key: channel.api_key ?? "",
+				weight: channel.weight ?? 1,
+				api_format: channel.api_format ?? "openai",
+				custom_headers: channel.custom_headers_json ?? "",
+				models: modelsList,
+			});
+			// Initialize alias state from per-channel alias map for this channel's models
+			const perChannelMap = channelModelAliases[channel.id] ?? {};
+			const initial: ModelAliasesMap = {};
+			for (const mid of modelIds) {
+				if (perChannelMap[mid]) {
+					initial[mid] = {
+						aliases: [...perChannelMap[mid].aliases],
+						alias_only: perChannelMap[mid].alias_only,
+					};
+				}
 			}
-		}
-		setChannelAliasState(initial);
-		setChannelModalOpen(true);
-		setNotice("");
-	}, [channelModelAliases]);
+			setChannelAliasState(initial);
+			setChannelModalOpen(true);
+			setNotice("");
+		},
+		[channelModelAliases],
+	);
 
 	const closeTokenModal = useCallback(() => setTokenModalOpen(false), []);
 
@@ -452,7 +501,10 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					});
 				// Build model_aliases payload from alias state
 				const modelIds = modelsArray.map((m) => m.id);
-				const aliasPayload: Record<string, { aliases: string[]; alias_only: boolean }> = {};
+				const aliasPayload: Record<
+					string,
+					{ aliases: string[]; alias_only: boolean }
+				> = {};
 				for (const mid of modelIds) {
 					if (channelAliasState[mid]) {
 						aliasPayload[mid] = channelAliasState[mid];
@@ -466,7 +518,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					api_format: channelForm.api_format,
 					custom_headers: channelForm.custom_headers.trim() || undefined,
 					models: modelsArray.length > 0 ? modelsArray : undefined,
-					model_aliases: Object.keys(aliasPayload).length > 0 ? aliasPayload : undefined,
+					model_aliases:
+						Object.keys(aliasPayload).length > 0 ? aliasPayload : undefined,
 				};
 				if (editingChannel) {
 					await apiFetch(`/api/channels/${editingChannel.id}`, {
@@ -534,72 +587,110 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		await loadLdoh();
 	}, [apiFetch, loadLdoh]);
 
-	const handleLdohApproveMaintainer = useCallback(async (id: string) => {
-		await apiFetch(`/api/ldoh/maintainers/${id}/approve`, { method: "POST" });
-		await loadLdoh();
-		setNotice("维护者已批准");
-	}, [apiFetch, loadLdoh]);
+	const handleLdohApproveMaintainer = useCallback(
+		async (id: string) => {
+			await apiFetch(`/api/ldoh/maintainers/${id}/approve`, { method: "POST" });
+			await loadLdoh();
+			setNotice("维护者已批准");
+		},
+		[apiFetch, loadLdoh],
+	);
 
-	const handleLdohRejectMaintainer = useCallback(async (id: string) => {
-		await apiFetch(`/api/ldoh/maintainers/${id}`, { method: "DELETE" });
-		await loadLdoh();
-		setNotice("维护者已移除");
-	}, [apiFetch, loadLdoh]);
+	const handleLdohRejectMaintainer = useCallback(
+		async (id: string) => {
+			await apiFetch(`/api/ldoh/maintainers/${id}`, { method: "DELETE" });
+			await loadLdoh();
+			setNotice("维护者已移除");
+		},
+		[apiFetch, loadLdoh],
+	);
 
-	const handleLdohApproveChannel = useCallback(async (id: string) => {
-		await apiFetch(`/api/ldoh/channels/${id}/approve`, { method: "POST" });
-		await loadLdoh();
-		setNotice("渠道已批准");
-	}, [apiFetch, loadLdoh]);
+	const handleLdohApproveChannel = useCallback(
+		async (id: string) => {
+			await apiFetch(`/api/ldoh/channels/${id}/approve`, { method: "POST" });
+			await loadLdoh();
+			setNotice("渠道已批准");
+		},
+		[apiFetch, loadLdoh],
+	);
 
-	const handleLdohRejectChannel = useCallback(async (id: string) => {
-		await apiFetch(`/api/ldoh/channels/${id}/reject`, { method: "POST" });
-		await loadLdoh();
-		setNotice("渠道已拒绝");
-	}, [apiFetch, loadLdoh]);
+	const handleLdohRejectChannel = useCallback(
+		async (id: string) => {
+			await apiFetch(`/api/ldoh/channels/${id}/reject`, { method: "POST" });
+			await loadLdoh();
+			setNotice("渠道已拒绝");
+		},
+		[apiFetch, loadLdoh],
+	);
 
-	const handleLdohAddSite = useCallback(async (apiBaseUrl: string, maintainerUsername: string, name: string) => {
-		await apiFetch("/api/ldoh/sites", {
-			method: "POST",
-			body: JSON.stringify({ apiBaseUrl, maintainerUsername: maintainerUsername || undefined, name: name || undefined }),
-		});
-		await loadLdoh();
-		setNotice("站点已添加");
-	}, [apiFetch, loadLdoh]);
+	const handleLdohAddSite = useCallback(
+		async (apiBaseUrl: string, maintainerUsername: string, name: string) => {
+			await apiFetch("/api/ldoh/sites", {
+				method: "POST",
+				body: JSON.stringify({
+					apiBaseUrl,
+					maintainerUsername: maintainerUsername || undefined,
+					name: name || undefined,
+				}),
+			});
+			await loadLdoh();
+			setNotice("站点已添加");
+		},
+		[apiFetch, loadLdoh],
+	);
 
 	const handleLdohBlockAll = useCallback(async () => {
-		const result = await apiFetch<{ blocked: number }>("/api/ldoh/block-all", { method: "POST" });
+		const result = await apiFetch<{ blocked: number }>("/api/ldoh/block-all", {
+			method: "POST",
+		});
 		await loadLdoh();
 		setNotice(`已封禁 ${result.blocked} 个站点`);
 	}, [apiFetch, loadLdoh]);
 
-	const handleLdohEditSite = useCallback(async (id: string, data: { name?: string; description?: string; apiBaseUrls?: string }) => {
-		await apiFetch(`/api/ldoh/sites/${id}`, {
-			method: "PATCH",
-			body: JSON.stringify(data),
-		});
-		await loadLdoh();
-		setNotice("站点已更新");
-	}, [apiFetch, loadLdoh]);
+	const handleLdohEditSite = useCallback(
+		async (
+			id: string,
+			data: { name?: string; description?: string; apiBaseUrls?: string },
+		) => {
+			await apiFetch(`/api/ldoh/sites/${id}`, {
+				method: "PATCH",
+				body: JSON.stringify(data),
+			});
+			await loadLdoh();
+			setNotice("站点已更新");
+		},
+		[apiFetch, loadLdoh],
+	);
 
-	const handleLdohDeleteSite = useCallback(async (id: string) => {
-		await apiFetch(`/api/ldoh/sites/${id}`, { method: "DELETE" });
-		await loadLdoh();
-		setNotice("站点已删除");
-	}, [apiFetch, loadLdoh]);
+	const handleLdohDeleteSite = useCallback(
+		async (id: string) => {
+			await apiFetch(`/api/ldoh/sites/${id}`, { method: "DELETE" });
+			await loadLdoh();
+			setNotice("站点已删除");
+		},
+		[apiFetch, loadLdoh],
+	);
 
-	const handleLdohAddMaintainer = useCallback(async (siteId: string, username: string) => {
-		await apiFetch(`/api/ldoh/sites/${siteId}/maintainers`, {
-			method: "POST",
-			body: JSON.stringify({ username }),
-		});
-		await loadLdoh();
-	}, [apiFetch, loadLdoh]);
+	const handleLdohAddMaintainer = useCallback(
+		async (siteId: string, username: string) => {
+			await apiFetch(`/api/ldoh/sites/${siteId}/maintainers`, {
+				method: "POST",
+				body: JSON.stringify({ username }),
+			});
+			await loadLdoh();
+		},
+		[apiFetch, loadLdoh],
+	);
 
-	const handleLdohRemoveMaintainer = useCallback(async (maintainerId: string) => {
-		await apiFetch(`/api/ldoh/maintainers/${maintainerId}`, { method: "DELETE" });
-		await loadLdoh();
-	}, [apiFetch, loadLdoh]);
+	const handleLdohRemoveMaintainer = useCallback(
+		async (maintainerId: string) => {
+			await apiFetch(`/api/ldoh/maintainers/${maintainerId}`, {
+				method: "DELETE",
+			});
+			await loadLdoh();
+		},
+		[apiFetch, loadLdoh],
+	);
 
 	const handleSettingsSubmit = useCallback(
 		async (event: Event) => {
@@ -615,7 +706,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				require_invite_code: settingsForm.require_invite_code === "true",
 				channel_fee_enabled: settingsForm.channel_fee_enabled === "true",
 				channel_review_enabled: settingsForm.channel_review_enabled === "true",
-				user_channel_selection_enabled: settingsForm.user_channel_selection_enabled === "true",
+				user_channel_selection_enabled:
+					settingsForm.user_channel_selection_enabled === "true",
 				default_balance: Number(settingsForm.default_balance),
 				withdrawal_enabled: settingsForm.withdrawal_enabled === "true",
 				withdrawal_fee_rate: Number(settingsForm.withdrawal_fee_rate),
@@ -646,6 +738,90 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		},
 		[apiFetch, loadSettings, settingsForm],
 	);
+
+	const handleFetchModels = useCallback(async () => {
+		if (!channelForm.base_url.trim()) {
+			setNotice("请先填写 Base URL");
+			return;
+		}
+		setFetchingModels(true);
+		try {
+			const result = await apiFetch<{
+				ok: boolean;
+				models: string[];
+			}>("/api/channels/fetch_models", {
+				method: "POST",
+				body: JSON.stringify({
+					base_url: channelForm.base_url.trim(),
+					api_key: channelForm.api_key.trim(),
+					api_format: channelForm.api_format,
+					custom_headers: channelForm.custom_headers.trim() || undefined,
+				}),
+			});
+			setFetchedModels(result.models);
+			setSelectedFetched(new Set(result.models));
+			setFetchedSearch("");
+		} catch (error) {
+			setNotice((error as Error).message);
+		} finally {
+			setFetchingModels(false);
+		}
+	}, [apiFetch, channelForm]);
+
+	const toggleFetchedModel = useCallback((modelId: string) => {
+		setSelectedFetched((prev) => {
+			const next = new Set(prev);
+			if (next.has(modelId)) next.delete(modelId);
+			else next.add(modelId);
+			return next;
+		});
+	}, []);
+
+	const toggleAllFetched = useCallback((visible: string[], select: boolean) => {
+		setSelectedFetched((prev) => {
+			const next = new Set(prev);
+			for (const id of visible) {
+				if (select) next.add(id);
+				else next.delete(id);
+			}
+			return next;
+		});
+	}, []);
+
+	const confirmFetchedModels = useCallback(() => {
+		if (!fetchedModels) return;
+		const existingIds = new Set(
+			channelForm.models
+				.split("\n")
+				.map((line) => line.split("|")[0]?.trim() ?? "")
+				.filter(Boolean),
+		);
+		const additions: string[] = [];
+		for (const id of fetchedModels) {
+			if (selectedFetched.has(id) && !existingIds.has(id)) {
+				additions.push(id);
+			}
+		}
+		if (additions.length === 0) {
+			setFetchedModels(null);
+			setNotice("没有新模型可加入（已存在或未选择）");
+			return;
+		}
+		const prefix =
+			channelForm.models.length > 0 && !channelForm.models.endsWith("\n")
+				? "\n"
+				: "";
+		setChannelForm((prev) => ({
+			...prev,
+			models: prev.models + prefix + additions.join("\n"),
+		}));
+		setFetchedModels(null);
+		setNotice(`已加入 ${additions.length} 个模型`);
+	}, [channelForm.models, fetchedModels, selectedFetched]);
+
+	const cancelFetchedModels = useCallback(() => {
+		setFetchedModels(null);
+	}, []);
 
 	const handleChannelTest = useCallback(
 		async (id: string) => {
@@ -758,7 +934,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					method: "POST",
 					body: JSON.stringify({ count, max_uses: maxUses, prefix }),
 				});
-				const result = await apiFetch<{ codes: InviteCode[] }>("/api/invite-codes");
+				const result = await apiFetch<{ codes: InviteCode[] }>(
+					"/api/invite-codes",
+				);
 				setInviteCodes(result.codes);
 				setNotice("邀请码已生成");
 			} catch (error) {
@@ -772,7 +950,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		async (id: string) => {
 			try {
 				await apiFetch(`/api/invite-codes/${id}`, { method: "DELETE" });
-				const result = await apiFetch<{ codes: InviteCode[] }>("/api/invite-codes");
+				const result = await apiFetch<{ codes: InviteCode[] }>(
+					"/api/invite-codes",
+				);
 				setInviteCodes(result.codes);
 				setNotice("邀请码已删除");
 			} catch (error) {
@@ -809,11 +989,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	}, [loadUsage]);
 
 	const handleAliasSave = useCallback(
-		async (
-			modelId: string,
-			aliases: string[],
-			aliasOnly?: boolean,
-		) => {
+		async (modelId: string, aliases: string[], aliasOnly?: boolean) => {
 			try {
 				await apiFetch(`/api/model-aliases/${encodeURIComponent(modelId)}`, {
 					method: "PUT",
@@ -831,7 +1007,11 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	const handlePriceSave = useCallback(
 		async (
 			modelId: string,
-			prices: Array<{ channel_id: string; input_price: number; output_price: number }>,
+			prices: Array<{
+				channel_id: string;
+				input_price: number;
+				output_price: number;
+			}>,
 		) => {
 			try {
 				await apiFetch(`/api/models/prices/${encodeURIComponent(modelId)}`, {
@@ -847,12 +1027,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		[apiFetch, loadModels],
 	);
 
-	const handleMonitoringLoaded = useCallback(
-		(monitoring: MonitoringData) => {
-			setData((prev) => ({ ...prev, monitoring }));
-		},
-		[],
-	);
+	const handleMonitoringLoaded = useCallback((monitoring: MonitoringData) => {
+		setData((prev) => ({ ...prev, monitoring }));
+	}, []);
 
 	const handleUserCreate = useCallback(
 		async (userData: {
@@ -992,11 +1169,27 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					onPageSizeChange={handleChannelPageSizeChange}
 					onSearchChange={handleChannelSearchChange}
 					onFormChange={handleChannelFormChange}
+					fetchingModels={fetchingModels}
+					fetchedModels={fetchedModels}
+					fetchedSearch={fetchedSearch}
+					selectedFetched={selectedFetched}
+					onFetchModels={handleFetchModels}
+					onConfirmFetched={confirmFetchedModels}
+					onCancelFetched={cancelFetchedModels}
+					onFetchedSearchChange={setFetchedSearch}
+					onToggleFetched={toggleFetchedModel}
+					onToggleAllFetched={toggleAllFetched}
 				/>
 			);
 		}
 		if (activeTab === "models") {
-			return <ModelsView models={data.models} onAliasSave={handleAliasSave} onPriceSave={handlePriceSave} />;
+			return (
+				<ModelsView
+					models={data.models}
+					onAliasSave={handleAliasSave}
+					onPriceSave={handlePriceSave}
+				/>
+			);
 		}
 		if (activeTab === "tokens") {
 			return (
@@ -1019,9 +1212,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			);
 		}
 		if (activeTab === "usage") {
-			return (
-				<UsageView usage={data.usage} onRefresh={handleUsageRefresh} />
-			);
+			return <UsageView usage={data.usage} onRefresh={handleUsageRefresh} />;
 		}
 		if (activeTab === "settings") {
 			return (
@@ -1091,9 +1282,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			onLogout={handleLogout}
 			onNavigate={onNavigate}
 		>
-			<div key={activeTab}>
-				{renderContent()}
-			</div>
+			<div key={activeTab}>{renderContent()}</div>
 		</AppLayout>
 	);
 };

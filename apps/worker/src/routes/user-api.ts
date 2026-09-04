@@ -2,10 +2,23 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import type { UserRecord } from "../middleware/userAuth";
 import { userAuth } from "../middleware/userAuth";
-import { extractModelPricings, extractModelIds, extractSharedModelPricings } from "../services/channel-models";
+import {
+	extractModelIds,
+	extractModelPricings,
+	extractSharedModelPricings,
+} from "../services/channel-models";
 import { listActiveChannels } from "../services/channel-repo";
 import { loadAllChannelAliasesGrouped } from "../services/model-aliases";
-import { getCheckinReward, getChannelReviewEnabled, getLdcExchangeRate, getLdcPaymentEnabled, getSiteMode, getUserChannelSelectionEnabled, getWithdrawalEnabled, getWithdrawalFeeRate } from "../services/settings";
+import {
+	getChannelReviewEnabled,
+	getCheckinReward,
+	getLdcExchangeRate,
+	getLdcPaymentEnabled,
+	getSiteMode,
+	getUserChannelSelectionEnabled,
+	getWithdrawalEnabled,
+	getWithdrawalFeeRate,
+} from "../services/settings";
 import { generateToken, sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
 import { nowIso } from "../utils/time";
@@ -48,20 +61,34 @@ userApi.get("/models", async (c) => {
 	const aliasGroups = await loadAllChannelAliasesGrouped(c.env.DB);
 
 	// Compute effective mapping
-	type ChannelEntry = { id: string; name: string; input_price: number | null; output_price: number | null };
-	const effectiveMap = new Map<string, { channels: Map<string, ChannelEntry> }>();
+	type ChannelEntry = {
+		id: string;
+		name: string;
+		input_price: number | null;
+		output_price: number | null;
+	};
+	const effectiveMap = new Map<
+		string,
+		{ channels: Map<string, ChannelEntry> }
+	>();
 
 	for (const channel of channels) {
-		const pricings = siteMode === "shared"
-			? extractSharedModelPricings(channel)
-			: extractModelPricings(channel);
+		const pricings =
+			siteMode === "shared"
+				? extractSharedModelPricings(channel)
+				: extractModelPricings(channel);
 		const modelIds = pricings.map((p) => p.id);
 		const chAliases = aliasGroups.get(channel.id);
 
 		for (const p of pricings) {
 			const aliasInfo = chAliases?.get(p.id);
 			const isAliasOnly = aliasInfo?.alias_only ?? false;
-			const chInfo: ChannelEntry = { id: channel.id, name: channel.name, input_price: p.input_price ?? null, output_price: p.output_price ?? null };
+			const chInfo: ChannelEntry = {
+				id: channel.id,
+				name: channel.name,
+				input_price: p.input_price ?? null,
+				output_price: p.output_price ?? null,
+			};
 
 			// Original name (unless alias_only)
 			if (!isAliasOnly) {
@@ -89,7 +116,10 @@ userApi.get("/models", async (c) => {
 
 	const models: Array<{ id: string; channels: ChannelEntry[] }> = [];
 	for (const [callableName, entry] of effectiveMap) {
-		models.push({ id: callableName, channels: Array.from(entry.channels.values()) });
+		models.push({
+			id: callableName,
+			channels: Array.from(entry.channels.values()),
+		});
 	}
 
 	return c.json({ models, site_mode: siteMode });
@@ -119,10 +149,21 @@ userApi.post("/tokens", async (c) => {
 	}
 
 	let allowedChannels: string | null = null;
-	if (body.allowed_channels && typeof body.allowed_channels === "object" && !Array.isArray(body.allowed_channels)) {
-		const channelSelectionEnabled = await getUserChannelSelectionEnabled(c.env.DB);
+	if (
+		body.allowed_channels &&
+		typeof body.allowed_channels === "object" &&
+		!Array.isArray(body.allowed_channels)
+	) {
+		const channelSelectionEnabled = await getUserChannelSelectionEnabled(
+			c.env.DB,
+		);
 		if (!channelSelectionEnabled) {
-			return jsonError(c, 403, "channel_selection_disabled", "channel_selection_disabled");
+			return jsonError(
+				c,
+				403,
+				"channel_selection_disabled",
+				"channel_selection_disabled",
+			);
 		}
 		// Validate: Record<string, string[]>
 		const map = body.allowed_channels as Record<string, unknown>;
@@ -146,7 +187,20 @@ userApi.post("/tokens", async (c) => {
 	await c.env.DB.prepare(
 		"INSERT INTO tokens (id, name, key_hash, key_prefix, token_plain, quota_total, quota_used, status, allowed_channels, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	)
-		.bind(id, body.name, tokenHash, keyPrefix, rawToken, null, 0, "active", allowedChannels, userId, now, now)
+		.bind(
+			id,
+			body.name,
+			tokenHash,
+			keyPrefix,
+			rawToken,
+			null,
+			0,
+			"active",
+			allowedChannels,
+			userId,
+			now,
+			now,
+		)
 		.run();
 
 	return c.json({ id, token: rawToken });
@@ -173,25 +227,41 @@ userApi.patch("/tokens/:id", async (c) => {
 		return jsonError(c, 404, "token_not_found", "token_not_found");
 	}
 
-	const newName = typeof body.name === "string" && body.name.trim() ? body.name.trim() : existing.name;
+	const newName =
+		typeof body.name === "string" && body.name.trim()
+			? body.name.trim()
+			: existing.name;
 
 	let newAllowedChannels: string | null = existing.allowed_channels;
 	if (body.allowed_channels !== undefined) {
 		if (body.allowed_channels === null) {
 			newAllowedChannels = null;
-		} else if (typeof body.allowed_channels === "object" && !Array.isArray(body.allowed_channels)) {
-			const channelSelectionEnabled = await getUserChannelSelectionEnabled(c.env.DB);
+		} else if (
+			typeof body.allowed_channels === "object" &&
+			!Array.isArray(body.allowed_channels)
+		) {
+			const channelSelectionEnabled = await getUserChannelSelectionEnabled(
+				c.env.DB,
+			);
 			if (!channelSelectionEnabled) {
-				return jsonError(c, 403, "channel_selection_disabled", "channel_selection_disabled");
+				return jsonError(
+					c,
+					403,
+					"channel_selection_disabled",
+					"channel_selection_disabled",
+				);
 			}
 			const map = body.allowed_channels as Record<string, unknown>;
 			const cleaned: Record<string, string[]> = {};
 			for (const [modelId, chIds] of Object.entries(map)) {
 				if (Array.isArray(chIds) && chIds.length > 0) {
-					cleaned[modelId] = chIds.filter((v: unknown) => typeof v === "string");
+					cleaned[modelId] = chIds.filter(
+						(v: unknown) => typeof v === "string",
+					);
 				}
 			}
-			newAllowedChannels = Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
+			newAllowedChannels =
+				Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
 		}
 	}
 
@@ -329,7 +399,11 @@ userApi.get("/dashboard", async (c) => {
 		WHERE t.user_id = ?`,
 	)
 		.bind(userId)
-		.first<{ total_requests: number; total_tokens: number; total_cost: number }>();
+		.first<{
+			total_requests: number;
+			total_tokens: number;
+			total_cost: number;
+		}>();
 
 	const recentUsage = await c.env.DB.prepare(
 		`SELECT
@@ -352,7 +426,9 @@ userApi.get("/dashboard", async (c) => {
 	const ldcExchangeRate = await getLdcExchangeRate(c.env.DB);
 	const withdrawalEnabled = await getWithdrawalEnabled(c.env.DB);
 	const withdrawalFeeRate = await getWithdrawalFeeRate(c.env.DB);
-	const userChannelSelectionEnabled = await getUserChannelSelectionEnabled(c.env.DB);
+	const userChannelSelectionEnabled = await getUserChannelSelectionEnabled(
+		c.env.DB,
+	);
 	const channelReviewEnabled = await getChannelReviewEnabled(c.env.DB);
 	const todayStr = new Date().toISOString().slice(0, 10);
 	const checkinRow = await c.env.DB.prepare(
@@ -392,9 +468,14 @@ userApi.get("/dashboard", async (c) => {
 			ORDER BY total_requests DESC`,
 		).all();
 
-		const contributorIds = (contribRows.results ?? []).map((r) => String(r.user_id));
+		const contributorIds = (contribRows.results ?? []).map((r) =>
+			String(r.user_id),
+		);
 
-		let channelDetailMap = new Map<string, Array<{ name: string; requests: number; total_tokens: number }>>();
+		const channelDetailMap = new Map<
+			string,
+			Array<{ name: string; requests: number; total_tokens: number }>
+		>();
 		if (contributorIds.length > 0) {
 			const channelRows = await c.env.DB.prepare(
 				`SELECT
@@ -424,7 +505,9 @@ userApi.get("/dashboard", async (c) => {
 		contributions = (contribRows.results ?? []).map((row) => ({
 			user_name: String(row.user_name),
 			linuxdo_id: row.linuxdo_id ? String(row.linuxdo_id) : null,
-			linuxdo_username: row.linuxdo_username ? String(row.linuxdo_username) : null,
+			linuxdo_username: row.linuxdo_username
+				? String(row.linuxdo_username)
+				: null,
 			tip_url: row.tip_url ? String(row.tip_url) : null,
 			channel_count: Number(row.channel_count),
 			channels: channelDetailMap.get(String(row.user_id)) ?? [],

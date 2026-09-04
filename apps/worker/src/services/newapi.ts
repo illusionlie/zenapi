@@ -7,9 +7,14 @@ import {
 import { toInternalStatus, toNewApiStatus } from "./channel-status";
 import type { ChannelRow } from "./channel-types";
 
-export { extractModelIds, modelsToJson, normalizeModelsInput };
-export { toInternalStatus, toNewApiStatus };
 export type { ChannelRow };
+export {
+	extractModelIds,
+	modelsToJson,
+	normalizeModelsInput,
+	toInternalStatus,
+	toNewApiStatus,
+};
 
 export type NewApiChannel = {
 	id: string;

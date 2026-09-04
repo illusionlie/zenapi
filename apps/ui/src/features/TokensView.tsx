@@ -94,7 +94,10 @@ export const TokensView = ({
 										</div>
 										<div class="min-w-0">
 											{tokenItem.user_name ? (
-												<span class="truncate block text-sm text-stone-700" title={tokenItem.user_email ?? ""}>
+												<span
+													class="truncate block text-sm text-stone-700"
+													title={tokenItem.user_email ?? ""}
+												>
 													{tokenItem.user_name}
 												</span>
 											) : (

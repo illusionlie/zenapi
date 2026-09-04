@@ -116,7 +116,11 @@ const VALID_SITE_MODES: SiteMode[] = ["personal", "service", "shared"];
 
 const REGISTRATION_MODE_KEY = "registration_mode";
 export type RegistrationMode = "open" | "linuxdo_only" | "closed";
-const VALID_REGISTRATION_MODES: RegistrationMode[] = ["open", "linuxdo_only", "closed"];
+const VALID_REGISTRATION_MODES: RegistrationMode[] = [
+	"open",
+	"linuxdo_only",
+	"closed",
+];
 
 /**
  * Returns the site mode setting.
@@ -145,7 +149,9 @@ export async function setSiteMode(
 /**
  * Returns the registration mode setting.
  */
-export async function getRegistrationMode(db: D1Database): Promise<RegistrationMode> {
+export async function getRegistrationMode(
+	db: D1Database,
+): Promise<RegistrationMode> {
 	const value = await readSetting(db, REGISTRATION_MODE_KEY);
 	if (value && VALID_REGISTRATION_MODES.includes(value as RegistrationMode)) {
 		return value as RegistrationMode;
@@ -391,7 +397,9 @@ const USER_CHANNEL_SELECTION_ENABLED_KEY = "user_channel_selection_enabled";
 /**
  * Returns whether user channel selection is enabled.
  */
-export async function getUserChannelSelectionEnabled(db: D1Database): Promise<boolean> {
+export async function getUserChannelSelectionEnabled(
+	db: D1Database,
+): Promise<boolean> {
 	const value = await readSetting(db, USER_CHANNEL_SELECTION_ENABLED_KEY);
 	return value === "true";
 }
@@ -403,7 +411,11 @@ export async function setUserChannelSelectionEnabled(
 	db: D1Database,
 	enabled: boolean,
 ): Promise<void> {
-	await upsertSetting(db, USER_CHANNEL_SELECTION_ENABLED_KEY, enabled ? "true" : "false");
+	await upsertSetting(
+		db,
+		USER_CHANNEL_SELECTION_ENABLED_KEY,
+		enabled ? "true" : "false",
+	);
 }
 
 // Withdrawal mode: "lenient" = consumption deducts welfare first; "strict" = consumption always reduces withdrawable
@@ -413,7 +425,9 @@ export type WithdrawalMode = "lenient" | "strict";
 /**
  * Returns the withdrawal mode.
  */
-export async function getWithdrawalMode(db: D1Database): Promise<WithdrawalMode> {
+export async function getWithdrawalMode(
+	db: D1Database,
+): Promise<WithdrawalMode> {
 	const value = await readSetting(db, WITHDRAWAL_MODE_KEY);
 	if (value === "strict") return "strict";
 	return "lenient";
@@ -435,7 +449,9 @@ const CHANNEL_REVIEW_ENABLED_KEY = "channel_review_enabled";
 /**
  * Returns whether channel contribution review is enabled.
  */
-export async function getChannelReviewEnabled(db: D1Database): Promise<boolean> {
+export async function getChannelReviewEnabled(
+	db: D1Database,
+): Promise<boolean> {
 	const value = await readSetting(db, CHANNEL_REVIEW_ENABLED_KEY);
 	return value === "true";
 }
@@ -447,7 +463,11 @@ export async function setChannelReviewEnabled(
 	db: D1Database,
 	enabled: boolean,
 ): Promise<void> {
-	await upsertSetting(db, CHANNEL_REVIEW_ENABLED_KEY, enabled ? "true" : "false");
+	await upsertSetting(
+		db,
+		CHANNEL_REVIEW_ENABLED_KEY,
+		enabled ? "true" : "false",
+	);
 }
 
 // LDOH cookie for syncing public sites
