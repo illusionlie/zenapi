@@ -1,10 +1,5 @@
 import { useCallback, useMemo, useState } from "hono/jsx/dom";
-import type {
-	Channel,
-	ChannelApiFormat,
-	ChannelForm,
-	SiteMode,
-} from "../core/types";
+import type { Channel, ChannelApiFormat, ChannelForm } from "../core/types";
 import { buildPageItems } from "../core/utils";
 import type { ModelAliasConfig, ModelAliasesMap } from "../UserApp";
 
@@ -12,25 +7,30 @@ type ParsedModel = {
 	id: string;
 	input_price: string;
 	output_price: string;
-	shared: boolean;
 	enabled: boolean;
 };
 
-function parseModelLines(text: string, defaultShared = false): ParsedModel[] {
+/**
+ * Parses the per-line model format `id|input|output|enabled`.
+ * Legacy 5-segment lines (`id|input|output|<obsolete>|enabled`) are
+ * tolerated: the removed flag at index 3 is ignored and enabled is read
+ * from index 4.
+ */
+function parseModelLines(text: string): ParsedModel[] {
 	return text
 		.split("\n")
 		.map((line) => line.trim())
 		.filter(Boolean)
 		.map((line) => {
 			const parts = line.split("|");
-			const hasExplicitShared = parts.length > 3 && parts[3].trim() !== "";
-			const hasExplicitEnabled = parts.length > 4 && parts[4].trim() !== "";
+			const enabledRaw = parts.length > 4 ? parts[4] : parts[3];
+			const hasExplicitEnabled =
+				enabledRaw !== undefined && enabledRaw.trim() !== "";
 			return {
 				id: parts[0].trim(),
 				input_price: parts[1]?.trim() ?? "",
 				output_price: parts[2]?.trim() ?? "",
-				shared: hasExplicitShared ? parts[3].trim() === "1" : defaultShared,
-				enabled: hasExplicitEnabled ? parts[4].trim() !== "0" : true,
+				enabled: hasExplicitEnabled ? enabledRaw.trim() !== "0" : true,
 			};
 		});
 }
@@ -38,14 +38,8 @@ function parseModelLines(text: string, defaultShared = false): ParsedModel[] {
 function rebuildModelsText(models: ParsedModel[]): string {
 	return models
 		.map((m) => {
-			if (
-				m.input_price ||
-				m.output_price ||
-				m.shared === true ||
-				m.shared === false ||
-				m.enabled === false
-			) {
-				return `${m.id}|${m.input_price}|${m.output_price}|${m.shared ? "1" : "0"}|${m.enabled ? "1" : "0"}`;
+			if (m.input_price || m.output_price || m.enabled === false) {
+				return `${m.id}|${m.input_price}|${m.output_price}|${m.enabled ? "1" : "0"}`;
 			}
 			return m.id;
 		})
@@ -54,22 +48,15 @@ function rebuildModelsText(models: ParsedModel[]): string {
 
 type ModelPricingEditorProps = {
 	models: string;
-	siteMode: SiteMode;
 	onModelsChange: (value: string) => void;
 };
 
 const ModelPricingEditor = ({
 	models,
-	siteMode,
 	onModelsChange,
 }: ModelPricingEditorProps) => {
-	const defaultShared = siteMode === "shared";
-	const parsed = parseModelLines(models, defaultShared);
+	const parsed = parseModelLines(models);
 	if (parsed.length === 0) return null;
-
-	const sharedCount = parsed.filter((m) => m.shared).length;
-	const allShared = sharedCount === parsed.length;
-	const noneShared = sharedCount === 0;
 
 	const enabledCount = parsed.filter((m) => m.enabled).length;
 	const allEnabled = enabledCount === parsed.length;
@@ -85,20 +72,9 @@ const ModelPricingEditor = ({
 		onModelsChange(rebuildModelsText(updated));
 	};
 
-	const updateShared = (index: number, value: boolean) => {
-		const updated = [...parsed];
-		updated[index] = { ...updated[index], shared: value };
-		onModelsChange(rebuildModelsText(updated));
-	};
-
 	const updateEnabled = (index: number, value: boolean) => {
 		const updated = [...parsed];
 		updated[index] = { ...updated[index], enabled: value };
-		onModelsChange(rebuildModelsText(updated));
-	};
-
-	const toggleAll = (value: boolean) => {
-		const updated = parsed.map((m) => ({ ...m, shared: value }));
 		onModelsChange(rebuildModelsText(updated));
 	};
 
@@ -111,7 +87,7 @@ const ModelPricingEditor = ({
 		<div class="mt-3 rounded-lg border border-stone-200 bg-stone-50 p-3">
 			<div class="mb-2 flex items-center justify-between flex-wrap gap-2">
 				<p class="text-xs font-medium uppercase tracking-widest text-stone-400">
-					模型定价 & 共享设置
+					模型定价
 				</p>
 				<div class="flex items-center gap-1.5 flex-wrap">
 					<span class="text-xs text-stone-400">
@@ -141,34 +117,6 @@ const ModelPricingEditor = ({
 					>
 						全部禁用
 					</button>
-					<span class="text-xs text-stone-300">|</span>
-					<span class="text-xs text-stone-400">
-						{sharedCount}/{parsed.length} 共享
-					</span>
-					<button
-						type="button"
-						class={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors ${
-							allShared
-								? "bg-stone-200 text-stone-500"
-								: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-						}`}
-						onClick={() => toggleAll(true)}
-						disabled={allShared}
-					>
-						全部共享
-					</button>
-					<button
-						type="button"
-						class={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors ${
-							noneShared
-								? "bg-stone-200 text-stone-500"
-								: "bg-stone-100 text-stone-600 hover:bg-stone-200"
-						}`}
-						onClick={() => toggleAll(false)}
-						disabled={noneShared}
-					>
-						全部取消
-					</button>
 				</div>
 			</div>
 			<div class="space-y-2">
@@ -188,17 +136,6 @@ const ModelPricingEditor = ({
 								onClick={() => updateEnabled(i, !m.enabled)}
 							>
 								{m.enabled ? "启用" : "禁用"}
-							</button>
-							<button
-								type="button"
-								class={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors ${
-									m.shared
-										? "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-										: "border-stone-200 bg-white text-stone-400 hover:bg-stone-100 hover:text-stone-600"
-								}`}
-								onClick={() => updateShared(i, !m.shared)}
-							>
-								{m.shared ? "共享" : "私有"}
 							</button>
 							<span
 								class={`min-w-0 truncate text-xs font-medium ${m.enabled ? "text-stone-700" : "text-stone-400 line-through"}`}
@@ -257,7 +194,6 @@ type ChannelsViewProps = {
 	channelSearch: string;
 	editingChannel: Channel | null;
 	isChannelModalOpen: boolean;
-	siteMode: SiteMode;
 	channelAliasState: ModelAliasesMap;
 	onChannelAliasStateChange: (state: ModelAliasesMap) => void;
 	onCreate: () => void;
@@ -316,7 +252,6 @@ export const ChannelsView = ({
 	channelSearch,
 	editingChannel,
 	isChannelModalOpen,
-	siteMode,
 	channelAliasState,
 	onChannelAliasStateChange,
 	onCreate,
@@ -989,7 +924,6 @@ export const ChannelsView = ({
 								)}
 								<ModelPricingEditor
 									models={channelForm.models}
-									siteMode={siteMode}
 									onModelsChange={(value) => onFormChange({ models: value })}
 								/>
 								{/* Per-model alias editor */}

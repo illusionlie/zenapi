@@ -2,7 +2,7 @@ import "./styles.css";
 import { render, useCallback, useEffect, useState } from "hono/jsx/dom";
 import { AdminApp } from "./AdminApp";
 import { createApiFetch } from "./core/api";
-import type { RegistrationMode, SiteMode, User } from "./core/types";
+import type { RegistrationMode, User } from "./core/types";
 import { LoginView } from "./features/LoginView";
 import { PublicApp } from "./PublicApp";
 import { UserApp } from "./UserApp";
@@ -27,7 +27,7 @@ const App = () => {
 	);
 	const [userRecord, setUserRecord] = useState<User | null>(null);
 	const [userChecked, setUserChecked] = useState(false);
-	const [siteMode, setSiteMode] = useState<SiteMode | null>(null);
+	const [siteInfoLoaded, setSiteInfoLoaded] = useState(false);
 	const [registrationMode, setRegistrationMode] =
 		useState<RegistrationMode>("open");
 	const [linuxdoEnabled, setLinuxdoEnabled] = useState(false);
@@ -59,18 +59,16 @@ const App = () => {
 		}
 	}, []);
 
-	// Fetch site mode on mount
+	// Fetch public site info on mount (registration mode, LinuxDO, announcement…)
 	useEffect(() => {
 		const api = createApiFetch(null, () => {});
 		api<{
-			site_mode: SiteMode;
 			registration_mode?: RegistrationMode;
 			linuxdo_enabled?: boolean;
 			require_invite_code?: boolean;
 			announcement?: string;
 		}>("/api/public/site-info")
 			.then((result) => {
-				setSiteMode(result.site_mode);
 				setRegistrationMode(result.registration_mode ?? "open");
 				setLinuxdoEnabled(result.linuxdo_enabled ?? false);
 				setRequireInviteCode(result.require_invite_code ?? false);
@@ -83,7 +81,8 @@ const App = () => {
 					}
 				}
 			})
-			.catch(() => setSiteMode("personal"));
+			.catch(() => {})
+			.finally(() => setSiteInfoLoaded(true));
 	}, []);
 
 	// Load user record when user token is available
@@ -170,7 +169,7 @@ const App = () => {
 		[updateAdminToken],
 	);
 
-	// Admin routes — always accessible, no need to wait for siteMode/userCheck
+	// Admin routes — always accessible, no need to wait for siteInfo/userCheck
 	if (path.startsWith("/admin")) {
 		if (!adminToken) {
 			return (
@@ -194,15 +193,8 @@ const App = () => {
 		);
 	}
 
-	// Wait for siteMode before any routing decisions
-	if (siteMode === null) {
-		return null;
-	}
-
-	// Personal mode: redirect all non-admin paths to admin
-	if (siteMode === "personal") {
-		history.replaceState(null, "", "/admin");
-		setPath("/admin");
+	// Wait for site info (registration mode etc.) to avoid login form flicker
+	if (!siteInfoLoaded) {
 		return null;
 	}
 
@@ -233,7 +225,6 @@ const App = () => {
 				<PublicApp
 					onUserLogin={handleUserLogin}
 					onNavigate={navigateTo}
-					siteMode={siteMode}
 					linuxdoEnabled={linuxdoEnabled}
 					registrationMode={registrationMode}
 					requireInviteCode={requireInviteCode}
@@ -252,7 +243,6 @@ const App = () => {
 				<PublicApp
 					onUserLogin={handleUserLogin}
 					onNavigate={navigateTo}
-					siteMode={siteMode}
 					linuxdoEnabled={linuxdoEnabled}
 					registrationMode={registrationMode}
 					requireInviteCode={requireInviteCode}
@@ -268,7 +258,6 @@ const App = () => {
 					onNavigate={navigateTo}
 					linuxdoEnabled={linuxdoEnabled}
 					onUserRefresh={handleUserRefresh}
-					siteMode={siteMode}
 				/>
 				{showAnnouncement && announcement && (
 					<AnnouncementModal
@@ -293,7 +282,6 @@ const App = () => {
 			<PublicApp
 				onUserLogin={handleUserLogin}
 				onNavigate={navigateTo}
-				siteMode={siteMode}
 				linuxdoEnabled={linuxdoEnabled}
 				registrationMode={registrationMode}
 				requireInviteCode={requireInviteCode}

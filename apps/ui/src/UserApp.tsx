@@ -10,7 +10,6 @@ import { userTabs } from "./core/constants";
 import type {
 	MonitoringData,
 	PublicModelItem,
-	SiteMode,
 	Token,
 	UsageLog,
 	User,
@@ -18,25 +17,10 @@ import type {
 	UserTabId,
 } from "./core/types";
 import { MonitoringView } from "./features/MonitoringView";
-import { UserChannelsView } from "./features/UserChannelsView";
 import { UserDashboard } from "./features/UserDashboard";
 import { UserModelsView } from "./features/UserModelsView";
 import { UserTokensView } from "./features/UserTokensView";
 import { UserUsageView } from "./features/UserUsageView";
-
-type ChannelItem = {
-	id: string;
-	name: string;
-	base_url: string;
-	api_key?: string;
-	models_json?: string;
-	api_format: string;
-	status: string;
-	charge_enabled?: number;
-	stream_only?: number;
-	contribution_note?: string;
-	created_at: string;
-};
 
 export type ModelAliasConfig = {
 	aliases: string[];
@@ -52,7 +36,6 @@ type UserAppProps = {
 	onNavigate: (path: string) => void;
 	linuxdoEnabled: boolean;
 	onUserRefresh: () => void;
-	siteMode: SiteMode;
 };
 
 const normalizePath = (path: string) => {
@@ -66,7 +49,6 @@ const userTabToPath: Record<UserTabId, string> = {
 	models: "/user/models",
 	tokens: "/user/tokens",
 	usage: "/user/usage",
-	channels: "/user/channels",
 };
 
 const userPathToTab: Record<string, UserTabId> = {
@@ -75,7 +57,6 @@ const userPathToTab: Record<string, UserTabId> = {
 	"/user/models": "models",
 	"/user/tokens": "tokens",
 	"/user/usage": "usage",
-	"/user/channels": "channels",
 };
 
 export const UserApp = ({
@@ -85,7 +66,6 @@ export const UserApp = ({
 	onNavigate,
 	linuxdoEnabled,
 	onUserRefresh,
-	siteMode,
 }: UserAppProps) => {
 	const [activeTab, setActiveTab] = useState<UserTabId>(() => {
 		const normalized = normalizePath(window.location.pathname);
@@ -97,10 +77,6 @@ export const UserApp = ({
 		null,
 	);
 	const [models, setModels] = useState<PublicModelItem[]>([]);
-	const [channels, setChannels] = useState<ChannelItem[]>([]);
-	const [channelAliases, setChannelAliases] = useState<
-		Record<string, ModelAliasesMap>
-	>({});
 	const [tokens, setTokens] = useState<Token[]>([]);
 	const [usage, setUsage] = useState<UsageLog[]>([]);
 	const [monitoring, setMonitoring] = useState<MonitoringData | null>(null);
@@ -145,10 +121,9 @@ export const UserApp = ({
 	}, [apiFetch]);
 
 	const loadModels = useCallback(async () => {
-		const result = await apiFetch<{
-			models: PublicModelItem[];
-			site_mode: SiteMode;
-		}>("/api/u/models");
+		const result = await apiFetch<{ models: PublicModelItem[] }>(
+			"/api/u/models",
+		);
 		setModels(result.models);
 	}, [apiFetch]);
 
@@ -162,15 +137,6 @@ export const UserApp = ({
 			"/api/u/usage?limit=200",
 		);
 		setUsage(result.logs);
-	}, [apiFetch]);
-
-	const loadChannels = useCallback(async () => {
-		const result = await apiFetch<{
-			channels: ChannelItem[];
-			channel_aliases?: Record<string, ModelAliasesMap>;
-		}>("/api/u/channels");
-		setChannels(result.channels);
-		setChannelAliases(result.channel_aliases ?? {});
 	}, [apiFetch]);
 
 	const loadMonitoring = useCallback(async () => {
@@ -197,7 +163,6 @@ export const UserApp = ({
 					await loadModels();
 				}
 				if (tabId === "usage") await loadUsage();
-				if (tabId === "channels") await loadChannels();
 				loadedTabs.current!.add(tabId);
 			} catch (error) {
 				setNotice((error as Error).message);
@@ -205,14 +170,7 @@ export const UserApp = ({
 				setLoading(false);
 			}
 		},
-		[
-			loadDashboard,
-			loadMonitoring,
-			loadModels,
-			loadTokens,
-			loadUsage,
-			loadChannels,
-		],
+		[loadDashboard, loadMonitoring, loadModels, loadTokens, loadUsage],
 	);
 
 	useEffect(() => {
@@ -254,34 +212,14 @@ export const UserApp = ({
 	}, [apiFetch, onUserRefresh]);
 
 	const handleTokenCreate = useCallback(
-		async (name: string, allowedChannels?: Record<string, string[]>) => {
+		async (name: string) => {
 			try {
-				const body: Record<string, unknown> = { name };
-				if (allowedChannels && Object.keys(allowedChannels).length > 0) {
-					body.allowed_channels = allowedChannels;
-				}
 				const result = await apiFetch<{ token: string }>("/api/u/tokens", {
 					method: "POST",
-					body: JSON.stringify(body),
+					body: JSON.stringify({ name }),
 				});
 				setNotice(`新令牌: ${result.token}`);
 				await loadTokens();
-			} catch (error) {
-				setNotice((error as Error).message);
-			}
-		},
-		[apiFetch, loadTokens],
-	);
-
-	const handleTokenUpdate = useCallback(
-		async (id: string, allowedChannels: Record<string, string[]> | null) => {
-			try {
-				await apiFetch(`/api/u/tokens/${id}`, {
-					method: "PATCH",
-					body: JSON.stringify({ allowed_channels: allowedChannels }),
-				});
-				await loadTokens();
-				setNotice("令牌已更新");
 			} catch (error) {
 				setNotice((error as Error).message);
 			}
@@ -330,16 +268,9 @@ export const UserApp = ({
 		[],
 	);
 
-	const visibleTabs = useMemo(() => {
-		if (siteMode !== "shared") {
-			return userTabs.filter((t) => t.id !== "channels");
-		}
-		return userTabs;
-	}, [siteMode]);
-
 	const activeLabel = useMemo(
-		() => visibleTabs.find((tab) => tab.id === activeTab)?.label ?? "用户面板",
-		[activeTab, visibleTabs],
+		() => userTabs.find((tab) => tab.id === activeTab)?.label ?? "用户面板",
+		[activeTab],
 	);
 
 	const renderContent = () => {
@@ -380,30 +311,13 @@ export const UserApp = ({
 				<UserTokensView
 					tokens={tokens}
 					onCreate={handleTokenCreate}
-					onUpdate={handleTokenUpdate}
 					onDelete={handleTokenDelete}
 					onReveal={handleTokenReveal}
-					models={models}
-					channelSelectionEnabled={
-						dashboardData?.user_channel_selection_enabled
-					}
 				/>
 			);
 		}
 		if (activeTab === "usage") {
 			return <UserUsageView usage={usage} />;
-		}
-		if (activeTab === "channels") {
-			return (
-				<UserChannelsView
-					token={token}
-					updateToken={updateToken}
-					channels={channels}
-					channelAliases={channelAliases}
-					onRefresh={loadChannels}
-					channelReviewEnabled={dashboardData?.channel_review_enabled ?? false}
-				/>
-			);
 		}
 		return null;
 	};
@@ -476,7 +390,7 @@ export const UserApp = ({
 							</span>
 						</div>
 						<nav class="flex flex-col gap-2.5">
-							{visibleTabs.map((tab) => (
+							{userTabs.map((tab) => (
 								<button
 									class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-all ${
 										activeTab === tab.id
@@ -521,7 +435,7 @@ export const UserApp = ({
 					</span>
 				</div>
 				<nav class="flex flex-col gap-2.5">
-					{visibleTabs.map((tab) => (
+					{userTabs.map((tab) => (
 						<button
 							class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-all ${
 								activeTab === tab.id

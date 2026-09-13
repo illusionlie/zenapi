@@ -12,7 +12,6 @@ const normalizePath = (path: string) => {
 type PublicAppProps = {
 	onUserLogin: (token: string) => void;
 	onNavigate: (path: string) => void;
-	siteMode: "personal" | "service" | "shared";
 	linuxdoEnabled: boolean;
 	registrationMode: RegistrationMode;
 	requireInviteCode: boolean;
@@ -21,7 +20,6 @@ type PublicAppProps = {
 export const PublicApp = ({
 	onUserLogin,
 	onNavigate,
-	siteMode,
 	linuxdoEnabled,
 	registrationMode,
 	requireInviteCode,
@@ -152,7 +150,6 @@ export const PublicApp = ({
 				</nav>
 				<UserRegisterView
 					notice={notice}
-					siteMode={siteMode}
 					onSubmit={handleRegister}
 					onGoLogin={() => navigate("login")}
 					onNavigate={onNavigate}

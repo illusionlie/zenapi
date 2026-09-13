@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from "hono/jsx/dom";
-import type {
-	InviteCode,
-	RegistrationMode,
-	SettingsForm,
-	SiteMode,
-} from "../core/types";
+import type { InviteCode, RegistrationMode, SettingsForm } from "../core/types";
 
 type SettingsViewProps = {
 	settingsForm: SettingsForm;
@@ -20,20 +15,6 @@ type SettingsViewProps = {
 	onDeleteCode: (id: string) => Promise<void>;
 	onExportCodes: () => Promise<void>;
 };
-
-const siteModeOptions: { value: SiteMode; label: string; desc: string }[] = [
-	{ value: "personal", label: "自用模式", desc: "个人使用，模型广场不公开" },
-	{
-		value: "service",
-		label: "服务模式",
-		desc: "向用户提供 API 服务，用户有余额，公开模型及价格",
-	},
-	{
-		value: "shared",
-		label: "共享模式",
-		desc: "多人共享渠道资源，共同使用，公开模型广场",
-	},
-];
 
 const registrationModeOptions: {
 	value: RegistrationMode;
@@ -166,437 +147,208 @@ export const SettingsView = ({
 					<div class="lg:col-span-2">
 						<label
 							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-							for="site-mode"
+							for="registration-mode"
 						>
-							站点模式
+							注册模式
 						</label>
 						<select
 							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-							id="site-mode"
-							name="site_mode"
-							value={settingsForm.site_mode}
+							id="registration-mode"
+							name="registration_mode"
+							value={settingsForm.registration_mode}
 							onChange={(event) => {
 								const target = event.currentTarget as HTMLSelectElement | null;
 								onFormChange({
-									site_mode: (target?.value ?? "personal") as SiteMode,
+									registration_mode: (target?.value ??
+										"open") as RegistrationMode,
 								});
 							}}
 						>
-							{siteModeOptions.map((opt) => (
+							{registrationModeOptions.map((opt) => (
 								<option
 									key={opt.value}
 									value={opt.value}
-									selected={settingsForm.site_mode === opt.value}
+									selected={settingsForm.registration_mode === opt.value}
 								>
 									{opt.label} — {opt.desc}
 								</option>
 							))}
 						</select>
 					</div>
-					{settingsForm.site_mode !== "personal" && (
-						<>
-							<div class="lg:col-span-2">
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="registration-mode"
-								>
-									注册模式
-								</label>
-								<select
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="registration-mode"
-									name="registration_mode"
-									value={settingsForm.registration_mode}
-									onChange={(event) => {
-										const target =
-											event.currentTarget as HTMLSelectElement | null;
-										onFormChange({
-											registration_mode: (target?.value ??
-												"open") as RegistrationMode,
-										});
-									}}
-								>
-									{registrationModeOptions.map((opt) => (
-										<option
-											key={opt.value}
-											value={opt.value}
-											selected={settingsForm.registration_mode === opt.value}
-										>
-											{opt.label} — {opt.desc}
-										</option>
-									))}
-								</select>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="checkin-reward"
-								>
-									签到奖励额度
-								</label>
-								<input
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="checkin-reward"
-									name="checkin_reward"
-									type="number"
-									min="0.01"
-									step="0.01"
-									value={settingsForm.checkin_reward}
-									onInput={(event) => {
-										const target =
-											event.currentTarget as HTMLInputElement | null;
-										onFormChange({
-											checkin_reward: target?.value ?? "",
-										});
-									}}
-								/>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="default-balance"
-								>
-									新用户初始额度
-								</label>
-								<input
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="default-balance"
-									name="default_balance"
-									type="number"
-									min="0"
-									step="0.01"
-									value={settingsForm.default_balance}
-									onInput={(event) => {
-										const target =
-											event.currentTarget as HTMLInputElement | null;
-										onFormChange({
-											default_balance: target?.value ?? "",
-										});
-									}}
-								/>
-							</div>
-							<div class="flex items-end">
-								<label class="flex items-center gap-2 text-sm text-stone-700">
-									<input
-										type="checkbox"
-										class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-										checked={settingsForm.require_invite_code === "true"}
-										onChange={(event) => {
-											const target =
-												event.currentTarget as HTMLInputElement | null;
-											onFormChange({
-												require_invite_code: target?.checked ? "true" : "false",
-											});
-										}}
-									/>
-									需要邀请码注册
-								</label>
-							</div>
-						</>
-					)}
-					{settingsForm.site_mode === "shared" && (
-						<div class="lg:col-span-2 border-t border-stone-100 pt-4 mt-1">
-							<label class="flex items-center gap-2 text-sm text-stone-700">
-								<input
-									type="checkbox"
-									class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-									checked={settingsForm.channel_fee_enabled === "true"}
-									onChange={(event) => {
-										const target =
-											event.currentTarget as HTMLInputElement | null;
-										onFormChange({
-											channel_fee_enabled: target?.checked ? "true" : "false",
-										});
-									}}
-								/>
-								启用渠道贡献者收费
-							</label>
-							<p class="mt-1 ml-6 text-xs text-stone-500">
-								开启后，贡献渠道的用户可以设置收费，其他用户调用时产生的费用将进入贡献者余额
-							</p>
-						</div>
-					)}
-					{settingsForm.site_mode === "shared" && (
-						<div class="lg:col-span-2">
-							<label class="flex items-center gap-2 text-sm text-stone-700">
-								<input
-									type="checkbox"
-									class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-									checked={
-										settingsForm.user_channel_selection_enabled === "true"
-									}
-									onChange={(event) => {
-										const target =
-											event.currentTarget as HTMLInputElement | null;
-										onFormChange({
-											user_channel_selection_enabled: target?.checked
-												? "true"
-												: "false",
-										});
-									}}
-								/>
-								允许用户选择渠道
-							</label>
-							<p class="mt-1 ml-6 text-xs text-stone-500">
-								开启后，用户创建令牌时可以选择限定使用哪些渠道
-							</p>
-						</div>
-					)}
-					{settingsForm.site_mode === "shared" && (
-						<div class="lg:col-span-2">
-							<label class="flex items-center gap-2 text-sm text-stone-700">
-								<input
-									type="checkbox"
-									class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-									checked={settingsForm.channel_review_enabled === "true"}
-									onChange={(event) => {
-										const target =
-											event.currentTarget as HTMLInputElement | null;
-										onFormChange({
-											channel_review_enabled: target?.checked
-												? "true"
-												: "false",
-										});
-									}}
-								/>
-								用户贡献渠道需审核
-							</label>
-							<p class="mt-1 ml-6 text-xs text-stone-500">
-								开启后，用户贡献的所有渠道都需要管理员审核后才能启用
-							</p>
-						</div>
-					)}
-					{settingsForm.site_mode === "shared" && (
-						<div class="lg:col-span-2 border-t border-stone-100 pt-4 mt-1">
-							<label
-								class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-								for="ldoh-cookie"
-							>
-								LDOH Cookie（公益站同步）
-							</label>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="checkin-reward"
+						>
+							签到奖励额度
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="checkin-reward"
+							name="checkin_reward"
+							type="number"
+							min="0.01"
+							step="0.01"
+							value={settingsForm.checkin_reward}
+							onInput={(event) => {
+								const target = event.currentTarget as HTMLInputElement | null;
+								onFormChange({
+									checkin_reward: target?.value ?? "",
+								});
+							}}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="default-balance"
+						>
+							新用户初始额度
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="default-balance"
+							name="default_balance"
+							type="number"
+							min="0"
+							step="0.01"
+							value={settingsForm.default_balance}
+							onInput={(event) => {
+								const target = event.currentTarget as HTMLInputElement | null;
+								onFormChange({
+									default_balance: target?.value ?? "",
+								});
+							}}
+						/>
+					</div>
+					<div class="flex items-end">
+						<label class="flex items-center gap-2 text-sm text-stone-700">
 							<input
-								class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-								id="ldoh-cookie"
-								name="ldoh_cookie"
-								type="password"
-								placeholder="留空则不启用公益站同步"
-								value={settingsForm.ldoh_cookie}
-								onInput={(event) => {
+								type="checkbox"
+								class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
+								checked={settingsForm.require_invite_code === "true"}
+								onChange={(event) => {
 									const target = event.currentTarget as HTMLInputElement | null;
 									onFormChange({
-										ldoh_cookie: target?.value ?? "",
+										require_invite_code: target?.checked ? "true" : "false",
 									});
 								}}
 							/>
-							<p class="mt-1 text-xs text-stone-500">
-								用于从 ldoh.105117.xyz
-								同步公益站列表，在公益站管理页面可触发同步
-							</p>
-						</div>
-					)}
-					{settingsForm.site_mode !== "personal" && (
-						<div class="lg:col-span-2 border-t border-stone-100 pt-4 mt-1">
-							<label class="flex items-center gap-2 text-sm text-stone-700">
+							需要邀请码注册
+						</label>
+					</div>
+					<div class="lg:col-span-2 border-t border-stone-100 pt-4 mt-1">
+						<h4 class="mb-3 text-sm font-semibold text-stone-700">
+							LDC 支付设置
+						</h4>
+						<label class="flex items-center gap-2 text-sm text-stone-700">
+							<input
+								type="checkbox"
+								class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
+								checked={settingsForm.ldc_payment_enabled === "true"}
+								onChange={(event) => {
+									const target = event.currentTarget as HTMLInputElement | null;
+									onFormChange({
+										ldc_payment_enabled: target?.checked ? "true" : "false",
+									});
+								}}
+							/>
+							启用 LDC 支付充值
+						</label>
+					</div>
+					{settingsForm.ldc_payment_enabled === "true" && (
+						<>
+							<div>
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									for="ldc-epay-pid"
+								>
+									商户 PID
+								</label>
 								<input
-									type="checkbox"
-									class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-									checked={settingsForm.withdrawal_enabled === "true"}
-									onChange={(event) => {
+									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+									id="ldc-epay-pid"
+									name="ldc_epay_pid"
+									type="text"
+									value={settingsForm.ldc_epay_pid}
+									onInput={(event) => {
 										const target =
 											event.currentTarget as HTMLInputElement | null;
 										onFormChange({
-											withdrawal_enabled: target?.checked ? "true" : "false",
+											ldc_epay_pid: target?.value ?? "",
 										});
 									}}
 								/>
-								启用余额提现
-							</label>
-							<p class="mt-1 ml-6 text-xs text-stone-500">
-								允许用户将可提现余额（渠道收益和充值所得）兑换为 LDC 积分
-							</p>
-						</div>
-					)}
-					{settingsForm.site_mode !== "personal" &&
-						settingsForm.withdrawal_enabled === "true" && (
-							<>
-								<div>
-									<label
-										class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-										for="withdrawal-fee-rate"
-									>
-										提现手续费率 (%)
-									</label>
-									<input
-										class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-										id="withdrawal-fee-rate"
-										name="withdrawal_fee_rate"
-										type="number"
-										min="0"
-										max="100"
-										step="0.1"
-										value={settingsForm.withdrawal_fee_rate}
-										onInput={(event) => {
-											const target =
-												event.currentTarget as HTMLInputElement | null;
-											onFormChange({
-												withdrawal_fee_rate: target?.value ?? "",
-											});
-										}}
-									/>
-								</div>
-								<div>
-									<label
-										class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-										for="withdrawal-mode"
-									>
-										提现模式
-									</label>
-									<select
-										class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-										id="withdrawal-mode"
-										name="withdrawal_mode"
-										value={settingsForm.withdrawal_mode}
-										onChange={(event) => {
-											const target =
-												event.currentTarget as HTMLSelectElement | null;
-											onFormChange({
-												withdrawal_mode: target?.value ?? "lenient",
-											});
-										}}
-									>
-										<option
-											value="lenient"
-											selected={settingsForm.withdrawal_mode === "lenient"}
-										>
-											宽松 — 消费优先扣除福利额度
-										</option>
-										<option
-											value="strict"
-											selected={settingsForm.withdrawal_mode === "strict"}
-										>
-											严格 — 消费同时扣减可提现额度
-										</option>
-									</select>
-								</div>
-							</>
-						)}
-					{settingsForm.site_mode !== "personal" && (
-						<>
-							<div class="lg:col-span-2 border-t border-stone-100 pt-4 mt-1">
-								<h4 class="mb-3 text-sm font-semibold text-stone-700">
-									LDC 支付设置
-								</h4>
-								<label class="flex items-center gap-2 text-sm text-stone-700">
-									<input
-										type="checkbox"
-										class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-										checked={settingsForm.ldc_payment_enabled === "true"}
-										onChange={(event) => {
-											const target =
-												event.currentTarget as HTMLInputElement | null;
-											onFormChange({
-												ldc_payment_enabled: target?.checked ? "true" : "false",
-											});
-										}}
-									/>
-									启用 LDC 支付充值
-								</label>
 							</div>
-							{settingsForm.ldc_payment_enabled === "true" && (
-								<>
-									<div>
-										<label
-											class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-											for="ldc-epay-pid"
-										>
-											商户 PID
-										</label>
-										<input
-											class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-											id="ldc-epay-pid"
-											name="ldc_epay_pid"
-											type="text"
-											value={settingsForm.ldc_epay_pid}
-											onInput={(event) => {
-												const target =
-													event.currentTarget as HTMLInputElement | null;
-												onFormChange({
-													ldc_epay_pid: target?.value ?? "",
-												});
-											}}
-										/>
-									</div>
-									<div>
-										<label
-											class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-											for="ldc-epay-key"
-										>
-											商户密钥
-										</label>
-										<input
-											class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-											id="ldc-epay-key"
-											name="ldc_epay_key"
-											type="password"
-											value={settingsForm.ldc_epay_key}
-											onInput={(event) => {
-												const target =
-													event.currentTarget as HTMLInputElement | null;
-												onFormChange({
-													ldc_epay_key: target?.value ?? "",
-												});
-											}}
-										/>
-									</div>
-									<div>
-										<label
-											class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-											for="ldc-epay-gateway"
-										>
-											支付网关
-										</label>
-										<input
-											class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-											id="ldc-epay-gateway"
-											name="ldc_epay_gateway"
-											type="text"
-											placeholder="https://credit.linux.do/epay"
-											value={settingsForm.ldc_epay_gateway}
-											onInput={(event) => {
-												const target =
-													event.currentTarget as HTMLInputElement | null;
-												onFormChange({
-													ldc_epay_gateway: target?.value ?? "",
-												});
-											}}
-										/>
-									</div>
-									<div>
-										<label
-											class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-											for="ldc-exchange-rate"
-										>
-											汇率 (1 LDC = ? 余额)
-										</label>
-										<input
-											class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-											id="ldc-exchange-rate"
-											name="ldc_exchange_rate"
-											type="number"
-											min="0.001"
-											step="any"
-											value={settingsForm.ldc_exchange_rate}
-											onInput={(event) => {
-												const target =
-													event.currentTarget as HTMLInputElement | null;
-												onFormChange({
-													ldc_exchange_rate: target?.value ?? "",
-												});
-											}}
-										/>
-									</div>
-								</>
-							)}
+							<div>
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									for="ldc-epay-key"
+								>
+									商户密钥
+								</label>
+								<input
+									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+									id="ldc-epay-key"
+									name="ldc_epay_key"
+									type="password"
+									value={settingsForm.ldc_epay_key}
+									onInput={(event) => {
+										const target =
+											event.currentTarget as HTMLInputElement | null;
+										onFormChange({
+											ldc_epay_key: target?.value ?? "",
+										});
+									}}
+								/>
+							</div>
+							<div>
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									for="ldc-epay-gateway"
+								>
+									支付网关
+								</label>
+								<input
+									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+									id="ldc-epay-gateway"
+									name="ldc_epay_gateway"
+									type="text"
+									placeholder="https://credit.linux.do/epay"
+									value={settingsForm.ldc_epay_gateway}
+									onInput={(event) => {
+										const target =
+											event.currentTarget as HTMLInputElement | null;
+										onFormChange({
+											ldc_epay_gateway: target?.value ?? "",
+										});
+									}}
+								/>
+							</div>
+							<div>
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									for="ldc-exchange-rate"
+								>
+									汇率 (1 LDC = ? 余额)
+								</label>
+								<input
+									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+									id="ldc-exchange-rate"
+									name="ldc_exchange_rate"
+									type="number"
+									min="0.001"
+									step="any"
+									value={settingsForm.ldc_exchange_rate}
+									onInput={(event) => {
+										const target =
+											event.currentTarget as HTMLInputElement | null;
+										onFormChange({
+											ldc_exchange_rate: target?.value ?? "",
+										});
+									}}
+								/>
+							</div>
 						</>
 					)}
 					<div class="lg:col-span-2 border-t border-stone-100 pt-4 mt-1">
@@ -635,140 +387,135 @@ export const SettingsView = ({
 					</div>
 				</form>
 			</div>
-			{settingsForm.site_mode !== "personal" &&
-				settingsForm.require_invite_code === "true" && (
-					<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
-						<div class="mb-4 flex items-center justify-between">
-							<h3 class="font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-								邀请码管理
-							</h3>
-							<button
-								type="button"
-								class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 hover:shadow-sm"
-								onClick={onExportCodes}
-							>
-								导出可用码
-							</button>
-						</div>
-						<div class="mb-4 flex flex-wrap items-end gap-3">
-							<div>
-								<label class="mb-1 block text-xs text-stone-500">数量</label>
-								<input
-									type="number"
-									min="1"
-									max="100"
-									class="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									value={genCount}
-									onInput={(e) =>
-										setGenCount(
-											(e.currentTarget as HTMLInputElement)?.value ?? "10",
-										)
-									}
-								/>
-							</div>
-							<div>
-								<label class="mb-1 block text-xs text-stone-500">
-									最大使用次数
-								</label>
-								<input
-									type="number"
-									min="1"
-									class="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									value={genMaxUses}
-									onInput={(e) =>
-										setGenMaxUses(
-											(e.currentTarget as HTMLInputElement)?.value ?? "1",
-										)
-									}
-								/>
-							</div>
-							<div>
-								<label class="mb-1 block text-xs text-stone-500">前缀</label>
-								<input
-									type="text"
-									class="w-24 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									value={genPrefix}
-									onInput={(e) =>
-										setGenPrefix(
-											(e.currentTarget as HTMLInputElement)?.value ?? "ZEN-",
-										)
-									}
-								/>
-							</div>
-							<button
-								type="button"
-								class="h-[34px] rounded-lg bg-stone-900 px-3 text-xs font-semibold text-white transition-all hover:shadow-lg"
-								onClick={() =>
-									onGenerateCodes(
-										Number(genCount) || 10,
-										Number(genMaxUses) || 1,
-										genPrefix || "ZEN-",
+			{settingsForm.require_invite_code === "true" && (
+				<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
+					<div class="mb-4 flex items-center justify-between">
+						<h3 class="font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+							邀请码管理
+						</h3>
+						<button
+							type="button"
+							class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 hover:shadow-sm"
+							onClick={onExportCodes}
+						>
+							导出可用码
+						</button>
+					</div>
+					<div class="mb-4 flex flex-wrap items-end gap-3">
+						<div>
+							<label class="mb-1 block text-xs text-stone-500">数量</label>
+							<input
+								type="number"
+								min="1"
+								max="100"
+								class="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+								value={genCount}
+								onInput={(e) =>
+									setGenCount(
+										(e.currentTarget as HTMLInputElement)?.value ?? "10",
 									)
 								}
-							>
-								批量生成
-							</button>
+							/>
 						</div>
-						{inviteCodes.length === 0 ? (
-							<p class="py-4 text-center text-sm text-stone-400">暂无邀请码</p>
-						) : (
-							<div class="overflow-x-auto">
-								<table class="w-full text-left text-sm">
-									<thead>
-										<tr class="border-b border-stone-100 text-xs uppercase tracking-widest text-stone-400">
-											<th class="pb-2 pr-4 font-medium">邀请码</th>
-											<th class="pb-2 pr-4 font-medium">最大次数</th>
-											<th class="pb-2 pr-4 font-medium">已使用</th>
-											<th class="pb-2 pr-4 font-medium">状态</th>
-											<th class="pb-2 pr-4 font-medium">创建时间</th>
-											<th class="pb-2 font-medium">操作</th>
-										</tr>
-									</thead>
-									<tbody>
-										{inviteCodes.map((code) => (
-											<tr key={code.id} class="border-b border-stone-50">
-												<td class="py-2 pr-4 font-['Space_Grotesk'] text-stone-700">
-													{code.code}
-												</td>
-												<td class="py-2 pr-4 text-stone-600">
-													{code.max_uses}
-												</td>
-												<td class="py-2 pr-4 text-stone-600">
-													{code.used_count}
-												</td>
-												<td class="py-2 pr-4">
-													<span
-														class={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-															code.used_count >= code.max_uses
-																? "bg-stone-100 text-stone-500"
-																: "bg-green-50 text-green-600"
-														}`}
-													>
-														{code.used_count >= code.max_uses
-															? "已用完"
-															: "可用"}
-													</span>
-												</td>
-												<td class="py-2 pr-4 text-xs text-stone-500">
-													{code.created_at?.slice(0, 16)}
-												</td>
-												<td class="py-2">
-													<button
-														type="button"
-														class="text-xs text-red-500 hover:text-red-700"
-														onClick={() => onDeleteCode(code.id)}
-													>
-														删除
-													</button>
-												</td>
-											</tr>
-										))}
-									</tbody>
-								</table>
-							</div>
-						)}
+						<div>
+							<label class="mb-1 block text-xs text-stone-500">
+								最大使用次数
+							</label>
+							<input
+								type="number"
+								min="1"
+								class="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+								value={genMaxUses}
+								onInput={(e) =>
+									setGenMaxUses(
+										(e.currentTarget as HTMLInputElement)?.value ?? "1",
+									)
+								}
+							/>
+						</div>
+						<div>
+							<label class="mb-1 block text-xs text-stone-500">前缀</label>
+							<input
+								type="text"
+								class="w-24 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+								value={genPrefix}
+								onInput={(e) =>
+									setGenPrefix(
+										(e.currentTarget as HTMLInputElement)?.value ?? "ZEN-",
+									)
+								}
+							/>
+						</div>
+						<button
+							type="button"
+							class="h-[34px] rounded-lg bg-stone-900 px-3 text-xs font-semibold text-white transition-all hover:shadow-lg"
+							onClick={() =>
+								onGenerateCodes(
+									Number(genCount) || 10,
+									Number(genMaxUses) || 1,
+									genPrefix || "ZEN-",
+								)
+							}
+						>
+							批量生成
+						</button>
 					</div>
-				)}
+					{inviteCodes.length === 0 ? (
+						<p class="py-4 text-center text-sm text-stone-400">暂无邀请码</p>
+					) : (
+						<div class="overflow-x-auto">
+							<table class="w-full text-left text-sm">
+								<thead>
+									<tr class="border-b border-stone-100 text-xs uppercase tracking-widest text-stone-400">
+										<th class="pb-2 pr-4 font-medium">邀请码</th>
+										<th class="pb-2 pr-4 font-medium">最大次数</th>
+										<th class="pb-2 pr-4 font-medium">已使用</th>
+										<th class="pb-2 pr-4 font-medium">状态</th>
+										<th class="pb-2 pr-4 font-medium">创建时间</th>
+										<th class="pb-2 font-medium">操作</th>
+									</tr>
+								</thead>
+								<tbody>
+									{inviteCodes.map((code) => (
+										<tr key={code.id} class="border-b border-stone-50">
+											<td class="py-2 pr-4 font-['Space_Grotesk'] text-stone-700">
+												{code.code}
+											</td>
+											<td class="py-2 pr-4 text-stone-600">{code.max_uses}</td>
+											<td class="py-2 pr-4 text-stone-600">
+												{code.used_count}
+											</td>
+											<td class="py-2 pr-4">
+												<span
+													class={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+														code.used_count >= code.max_uses
+															? "bg-stone-100 text-stone-500"
+															: "bg-green-50 text-green-600"
+													}`}
+												>
+													{code.used_count >= code.max_uses ? "已用完" : "可用"}
+												</span>
+											</td>
+											<td class="py-2 pr-4 text-xs text-stone-500">
+												{code.created_at?.slice(0, 16)}
+											</td>
+											<td class="py-2">
+												<button
+													type="button"
+													class="text-xs text-red-500 hover:text-red-700"
+													onClick={() => onDeleteCode(code.id)}
+												>
+													删除
+												</button>
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+					)}
+				</div>
+			)}
 		</div>
 	);
 };

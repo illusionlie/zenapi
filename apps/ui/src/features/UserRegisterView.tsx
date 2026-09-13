@@ -1,9 +1,8 @@
 import { useState } from "hono/jsx/dom";
-import type { RegistrationMode, SiteMode } from "../core/types";
+import type { RegistrationMode } from "../core/types";
 
 type UserRegisterViewProps = {
 	notice: string;
-	siteMode: SiteMode;
 	onSubmit: (
 		email: string,
 		name: string,
@@ -19,7 +18,6 @@ type UserRegisterViewProps = {
 
 export const UserRegisterView = ({
 	notice,
-	siteMode,
 	onSubmit,
 	onGoLogin,
 	onNavigate,
@@ -51,57 +49,6 @@ export const UserRegisterView = ({
 		}
 		onSubmit(email, name, password, inviteCode.trim() || undefined);
 	};
-
-	if (siteMode === "personal") {
-		return (
-			<div class="mx-auto flex min-h-[calc(100vh-57px)] items-center justify-center px-4 py-8">
-				<div class="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-8 shadow-lg">
-					<button
-						type="button"
-						class="mb-2 font-['Space_Grotesk'] text-2xl tracking-tight text-stone-900"
-						onClick={() => onNavigate("/")}
-					>
-						ZenAPI
-					</button>
-					<p class="text-sm text-stone-500">此站点为自用模式，暂不开放注册。</p>
-					<p class="mt-4 text-center text-sm text-stone-500">
-						已有账户？{" "}
-						<button
-							type="button"
-							class="text-amber-600 hover:text-amber-700"
-							onClick={onGoLogin}
-						>
-							登录
-						</button>
-					</p>
-					<div class="mt-5 rounded-lg border border-stone-100 bg-stone-50 px-4 py-3 text-xs leading-relaxed text-stone-500">
-						<p>
-							<a
-								href="https://api-worker.metayuandao.workers.dev/"
-								class="text-stone-600 underline"
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								api-worker.metayuandao.workers.dev
-							</a>{" "}
-							无法直连，仅 API
-						</p>
-						<p class="mt-1">
-							<a
-								href="https://zenapi.top/"
-								class="text-stone-600 underline"
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								zenapi.top
-							</a>{" "}
-							全功能，可直连
-						</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
 
 	if (registrationMode === "closed") {
 		return (

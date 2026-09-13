@@ -10,9 +10,6 @@ export type Channel = {
 	models_json?: string;
 	api_format: ChannelApiFormat;
 	custom_headers_json?: string | null;
-	contributed_by?: string | null;
-	charge_enabled?: number | null;
-	contribution_note?: string | null;
 };
 
 export type Token = {
@@ -129,31 +126,21 @@ export type MonitoringData = {
 	range: string;
 };
 
-export type SiteMode = "personal" | "service" | "shared";
-
 export type RegistrationMode = "open" | "linuxdo_only" | "closed";
 
 export type Settings = {
 	log_retention_days: number;
 	session_ttl_hours: number;
 	admin_password_set?: boolean;
-	site_mode: SiteMode;
 	registration_mode: RegistrationMode;
 	checkin_reward: number;
 	require_invite_code: boolean;
-	channel_fee_enabled: boolean;
-	channel_review_enabled: boolean;
-	user_channel_selection_enabled: boolean;
 	default_balance: number;
-	withdrawal_enabled: boolean;
-	withdrawal_fee_rate: number;
-	withdrawal_mode: string;
 	ldc_payment_enabled: boolean;
 	ldc_epay_pid: string;
 	ldc_epay_key: string;
 	ldc_epay_gateway: string;
 	ldc_exchange_rate: number;
-	ldoh_cookie: string;
 	announcement: string;
 };
 
@@ -195,8 +182,7 @@ export type TabId =
 	| "usage"
 	| "settings"
 	| "users"
-	| "playground"
-	| "ldoh";
+	| "playground";
 
 export type TabItem = {
 	id: TabId;
@@ -217,23 +203,15 @@ export type SettingsForm = {
 	log_retention_days: string;
 	session_ttl_hours: string;
 	admin_password: string;
-	site_mode: SiteMode;
 	registration_mode: RegistrationMode;
 	checkin_reward: string;
 	require_invite_code: string;
-	channel_fee_enabled: string;
-	channel_review_enabled: string;
-	user_channel_selection_enabled: string;
 	default_balance: string;
-	withdrawal_enabled: string;
-	withdrawal_fee_rate: string;
-	withdrawal_mode: string;
 	ldc_payment_enabled: string;
 	ldc_epay_pid: string;
 	ldc_epay_key: string;
 	ldc_epay_gateway: string;
 	ldc_exchange_rate: string;
-	ldoh_cookie: string;
 	announcement: string;
 };
 
@@ -249,43 +227,19 @@ export type User = {
 	updated_at: string;
 	linuxdo_id?: string | null;
 	linuxdo_username?: string | null;
-	tip_url?: string | null;
-};
-
-export type ContributionChannel = {
-	name: string;
-	requests: number;
-	total_tokens: number;
-};
-
-export type ContributionEntry = {
-	user_name: string;
-	linuxdo_id: string | null;
-	linuxdo_username: string | null;
-	tip_url: string | null;
-	channel_count: number;
-	channels: ContributionChannel[];
-	total_requests: number;
-	total_tokens: number;
+	allowed_models?: string[] | null;
 };
 
 export type UserDashboardData = {
 	balance: number;
-	withdrawable_balance: number;
 	total_requests: number;
 	total_tokens: number;
 	total_cost: number;
 	recent_usage: Array<{ day: string; requests: number; cost: number }>;
-	contributions: ContributionEntry[];
 	checked_in_today: boolean;
 	checkin_reward: number;
 	ldc_payment_enabled: boolean;
 	ldc_exchange_rate: number;
-	withdrawal_enabled: boolean;
-	withdrawal_fee_rate: number;
-	user_channel_selection_enabled: boolean;
-	channel_review_enabled: boolean;
-	violations: LdohViolation[];
 };
 
 export type UserTabId =
@@ -293,8 +247,7 @@ export type UserTabId =
 	| "monitoring"
 	| "models"
 	| "tokens"
-	| "usage"
-	| "channels";
+	| "usage";
 
 export type UserTabItem = {
 	id: UserTabId;
@@ -327,44 +280,5 @@ export type RechargeOrder = {
 	ldc_amount: number;
 	balance_amount: number;
 	status: string;
-	created_at: string;
-};
-
-export type LdohSite = {
-	id: string;
-	name: string;
-	description?: string;
-	api_base_url: string;
-	api_base_hostname: string;
-	tags_json?: string;
-	is_visible: number;
-	source: string;
-	synced_at: string;
-	maintainers?: LdohSiteMaintainer[];
-	blocked?: Array<{ id: string; hostname: string }>;
-	pending_channels?: number;
-	violation_count?: number;
-};
-
-export type LdohSiteMaintainer = {
-	id: string;
-	site_id: string;
-	user_id?: string;
-	name: string;
-	username: string;
-	linuxdo_id?: string;
-	approved: number;
-	source: string;
-};
-
-export type LdohViolation = {
-	id: string;
-	user_id: string;
-	user_name: string;
-	linuxdo_username?: string;
-	attempted_base_url: string;
-	matched_hostname: string;
-	site_id: string;
-	site_name: string;
 	created_at: string;
 };
