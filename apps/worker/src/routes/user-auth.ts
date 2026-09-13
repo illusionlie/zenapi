@@ -6,7 +6,6 @@ import {
 	getDefaultBalance,
 	getRegistrationMode,
 	getRequireInviteCode,
-	getSiteMode,
 } from "../services/settings";
 import { generateToken, sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
@@ -22,11 +21,6 @@ const userAuthRoutes = new Hono<AppEnv>();
  * Registers a new user.
  */
 userAuthRoutes.post("/register", async (c) => {
-	const siteMode = await getSiteMode(c.env.DB);
-	if (siteMode === "personal") {
-		return jsonError(c, 403, "registration_disabled", "registration_disabled");
-	}
-
 	const registrationMode = await getRegistrationMode(c.env.DB);
 	if (registrationMode === "closed" || registrationMode === "linuxdo_only") {
 		return jsonError(c, 403, "registration_disabled", "registration_disabled");
@@ -133,7 +127,6 @@ userAuthRoutes.post("/register", async (c) => {
 			name,
 			role: "user",
 			balance: defaultBalance,
-			withdrawable_balance: 0,
 			status: "active",
 		},
 	});
@@ -221,7 +214,6 @@ userAuthRoutes.get("/me", userAuth, async (c) => {
 			status: user.status,
 			linuxdo_id: user.linuxdo_id ?? null,
 			linuxdo_username: user.linuxdo_username ?? null,
-			tip_url: user.tip_url ?? null,
 		},
 	});
 });
@@ -241,14 +233,8 @@ userAuthRoutes.get("/linuxdo", async (c) => {
 	}
 
 	// Linux DO login/register redirect.
-	// Block only in personal mode (no users at all).
-	// In other modes, always allow — existing linked users can log in,
+	// Always allow — existing linked users can log in,
 	// and the callback will enforce registrationMode for new user creation.
-	const siteMode = await getSiteMode(c.env.DB);
-	if (siteMode === "personal") {
-		return jsonError(c, 403, "registration_disabled", "registration_disabled");
-	}
-
 	const origin = new URL(c.req.url).origin;
 	const redirectUri = `${origin}/api/u/auth/linuxdo/callback`;
 
@@ -532,11 +518,6 @@ userAuthRoutes.get("/linuxdo/callback", async (c) => {
 			.run();
 	} else {
 		// New user — create account
-		const siteMode = await getSiteMode(c.env.DB);
-		if (siteMode === "personal") {
-			return redirectWithError(c, "registration_disabled");
-		}
-
 		const registrationMode = await getRegistrationMode(c.env.DB);
 		if (registrationMode === "closed") {
 			return redirectWithError(c, "registration_disabled");
@@ -616,7 +597,6 @@ userAuthRoutes.get("/linuxdo/callback", async (c) => {
 			name: finalName,
 			role: "user",
 			balance: defaultBalance,
-			withdrawable_balance: 0,
 			status: "active",
 		};
 	}

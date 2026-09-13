@@ -1,9 +1,9 @@
 import { createMiddleware } from "hono/factory";
 import type { AppEnv } from "../env";
 import { canConsumeQuota, normalizeQuota } from "../services/quota";
-import { getSiteMode } from "../services/settings";
 import { sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
+import { parseAllowlist } from "../utils/model-allowlist";
 import { getBearerToken } from "../utils/request";
 
 export type TokenRecord = {
@@ -14,6 +14,8 @@ export type TokenRecord = {
 	status: string;
 	allowed_channels: string | null;
 	user_id: string | null;
+	/** User-level model allowlist (parsed); null/undefined = unrestricted. */
+	user_allowed_models?: string[] | null;
 };
 
 /**
@@ -53,30 +55,32 @@ export const tokenAuth = createMiddleware<AppEnv>(async (c, next) => {
 		return jsonError(c, 402, "quota_exceeded", "quota_exceeded");
 	}
 
-	// User-associated tokens: check site mode, user status, and balance
+	// User-associated tokens: check user status and balance
+	let userAllowedModels: string[] | null = null;
 	if (record.user_id) {
-		const siteMode = await getSiteMode(c.env.DB);
-		// Personal mode: user tokens are not allowed
-		if (siteMode === "personal") {
-			return jsonError(c, 403, "token_disabled", "token_disabled");
-		}
 		const user = await c.env.DB.prepare(
-			"SELECT balance, status FROM users WHERE id = ?",
+			"SELECT balance, status, allowed_models FROM users WHERE id = ?",
 		)
 			.bind(record.user_id)
-			.first<{ balance: number; status: string }>();
+			.first<{
+				balance: number;
+				status: string;
+				allowed_models: string | null;
+			}>();
 		if (!user || user.status !== "active") {
 			return jsonError(c, 403, "user_disabled", "user_disabled");
 		}
 		if (user.balance <= 0) {
 			return jsonError(c, 402, "insufficient_balance", "insufficient_balance");
 		}
+		userAllowedModels = parseAllowlist(user.allowed_models);
 	}
 
 	c.set("tokenRecord", {
 		...record,
 		quota_total: normalized.quotaTotal,
 		quota_used: normalized.quotaUsed,
+		user_allowed_models: userAllowedModels,
 	});
 	await next();
 });

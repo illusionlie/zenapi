@@ -110,10 +110,6 @@ export async function isAdminPasswordSet(db: D1Database): Promise<boolean> {
 	return Boolean(hash);
 }
 
-const SITE_MODE_KEY = "site_mode";
-export type SiteMode = "personal" | "service" | "shared";
-const VALID_SITE_MODES: SiteMode[] = ["personal", "service", "shared"];
-
 const REGISTRATION_MODE_KEY = "registration_mode";
 export type RegistrationMode = "open" | "linuxdo_only" | "closed";
 const VALID_REGISTRATION_MODES: RegistrationMode[] = [
@@ -121,30 +117,6 @@ const VALID_REGISTRATION_MODES: RegistrationMode[] = [
 	"linuxdo_only",
 	"closed",
 ];
-
-/**
- * Returns the site mode setting.
- */
-export async function getSiteMode(db: D1Database): Promise<SiteMode> {
-	const value = await readSetting(db, SITE_MODE_KEY);
-	if (value && VALID_SITE_MODES.includes(value as SiteMode)) {
-		return value as SiteMode;
-	}
-	return "personal";
-}
-
-/**
- * Updates the site mode setting.
- */
-export async function setSiteMode(
-	db: D1Database,
-	mode: SiteMode,
-): Promise<void> {
-	if (!VALID_SITE_MODES.includes(mode)) {
-		return;
-	}
-	await upsertSetting(db, SITE_MODE_KEY, mode);
-}
 
 /**
  * Returns the registration mode setting.
@@ -301,71 +273,6 @@ export async function setLdcExchangeRate(
 	await upsertSetting(db, LDC_EXCHANGE_RATE_KEY, value);
 }
 
-// Channel fee settings
-const CHANNEL_FEE_ENABLED_KEY = "channel_fee_enabled";
-
-/**
- * Returns whether channel contributor fee collection is enabled.
- */
-export async function getChannelFeeEnabled(db: D1Database): Promise<boolean> {
-	const value = await readSetting(db, CHANNEL_FEE_ENABLED_KEY);
-	return value === "true";
-}
-
-/**
- * Updates the channel fee enabled setting.
- */
-export async function setChannelFeeEnabled(
-	db: D1Database,
-	enabled: boolean,
-): Promise<void> {
-	await upsertSetting(db, CHANNEL_FEE_ENABLED_KEY, enabled ? "true" : "false");
-}
-
-// Withdrawal settings
-const WITHDRAWAL_ENABLED_KEY = "withdrawal_enabled";
-const WITHDRAWAL_FEE_RATE_KEY = "withdrawal_fee_rate";
-
-/**
- * Returns whether balance withdrawal is enabled.
- */
-export async function getWithdrawalEnabled(db: D1Database): Promise<boolean> {
-	const value = await readSetting(db, WITHDRAWAL_ENABLED_KEY);
-	return value === "true";
-}
-
-/**
- * Updates the withdrawal enabled setting.
- */
-export async function setWithdrawalEnabled(
-	db: D1Database,
-	enabled: boolean,
-): Promise<void> {
-	await upsertSetting(db, WITHDRAWAL_ENABLED_KEY, enabled ? "true" : "false");
-}
-
-/**
- * Returns the withdrawal fee rate percentage (0-100).
- */
-export async function getWithdrawalFeeRate(db: D1Database): Promise<number> {
-	const value = await readSetting(db, WITHDRAWAL_FEE_RATE_KEY);
-	if (!value) return 0;
-	const parsed = Number(value);
-	if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 100) return parsed;
-	return 0;
-}
-
-/**
- * Updates the withdrawal fee rate setting.
- */
-export async function setWithdrawalFeeRate(
-	db: D1Database,
-	rate: number,
-): Promise<void> {
-	const value = Math.max(0, Math.min(100, rate)).toString();
-	await upsertSetting(db, WITHDRAWAL_FEE_RATE_KEY, value);
-}
-
 // Default balance for new users
 const DEFAULT_BALANCE_KEY = "default_balance";
 
@@ -389,100 +296,6 @@ export async function setDefaultBalance(
 ): Promise<void> {
 	const value = Math.max(0, amount).toString();
 	await upsertSetting(db, DEFAULT_BALANCE_KEY, value);
-}
-
-// User channel selection
-const USER_CHANNEL_SELECTION_ENABLED_KEY = "user_channel_selection_enabled";
-
-/**
- * Returns whether user channel selection is enabled.
- */
-export async function getUserChannelSelectionEnabled(
-	db: D1Database,
-): Promise<boolean> {
-	const value = await readSetting(db, USER_CHANNEL_SELECTION_ENABLED_KEY);
-	return value === "true";
-}
-
-/**
- * Updates the user channel selection enabled setting.
- */
-export async function setUserChannelSelectionEnabled(
-	db: D1Database,
-	enabled: boolean,
-): Promise<void> {
-	await upsertSetting(
-		db,
-		USER_CHANNEL_SELECTION_ENABLED_KEY,
-		enabled ? "true" : "false",
-	);
-}
-
-// Withdrawal mode: "lenient" = consumption deducts welfare first; "strict" = consumption always reduces withdrawable
-const WITHDRAWAL_MODE_KEY = "withdrawal_mode";
-export type WithdrawalMode = "lenient" | "strict";
-
-/**
- * Returns the withdrawal mode.
- */
-export async function getWithdrawalMode(
-	db: D1Database,
-): Promise<WithdrawalMode> {
-	const value = await readSetting(db, WITHDRAWAL_MODE_KEY);
-	if (value === "strict") return "strict";
-	return "lenient";
-}
-
-/**
- * Updates the withdrawal mode.
- */
-export async function setWithdrawalMode(
-	db: D1Database,
-	mode: WithdrawalMode,
-): Promise<void> {
-	await upsertSetting(db, WITHDRAWAL_MODE_KEY, mode);
-}
-
-// Channel review: require admin approval for user-contributed channels
-const CHANNEL_REVIEW_ENABLED_KEY = "channel_review_enabled";
-
-/**
- * Returns whether channel contribution review is enabled.
- */
-export async function getChannelReviewEnabled(
-	db: D1Database,
-): Promise<boolean> {
-	const value = await readSetting(db, CHANNEL_REVIEW_ENABLED_KEY);
-	return value === "true";
-}
-
-/**
- * Updates the channel review enabled setting.
- */
-export async function setChannelReviewEnabled(
-	db: D1Database,
-	enabled: boolean,
-): Promise<void> {
-	await upsertSetting(
-		db,
-		CHANNEL_REVIEW_ENABLED_KEY,
-		enabled ? "true" : "false",
-	);
-}
-
-// LDOH cookie for syncing public sites
-const LDOH_COOKIE_KEY = "ldoh_cookie";
-
-export async function getLdohCookie(db: D1Database): Promise<string> {
-	const value = await readSetting(db, LDOH_COOKIE_KEY);
-	return value ?? "";
-}
-
-export async function setLdohCookie(
-	db: D1Database,
-	cookie: string,
-): Promise<void> {
-	await upsertSetting(db, LDOH_COOKIE_KEY, cookie);
 }
 
 // Announcement

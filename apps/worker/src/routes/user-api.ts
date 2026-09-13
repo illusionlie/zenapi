@@ -2,25 +2,20 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import type { UserRecord } from "../middleware/userAuth";
 import { userAuth } from "../middleware/userAuth";
-import {
-	extractModelIds,
-	extractModelPricings,
-	extractSharedModelPricings,
-} from "../services/channel-models";
+import { extractModelPricings } from "../services/channel-models";
 import { listActiveChannels } from "../services/channel-repo";
 import { loadAllChannelAliasesGrouped } from "../services/model-aliases";
 import {
-	getChannelReviewEnabled,
 	getCheckinReward,
 	getLdcExchangeRate,
 	getLdcPaymentEnabled,
-	getSiteMode,
-	getUserChannelSelectionEnabled,
-	getWithdrawalEnabled,
-	getWithdrawalFeeRate,
 } from "../services/settings";
 import { generateToken, sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
+import {
+	filterModelsByAllowlist,
+	parseAllowlist,
+} from "../utils/model-allowlist";
 import { nowIso } from "../utils/time";
 
 const userApi = new Hono<AppEnv>();
@@ -29,32 +24,9 @@ const userApi = new Hono<AppEnv>();
 userApi.use("/*", userAuth);
 
 /**
- * Updates the current user's profile (tip_url).
- */
-userApi.patch("/profile", async (c) => {
-	const userId = c.get("userId") as string;
-	const body = await c.req.json().catch(() => null);
-	if (!body) {
-		return jsonError(c, 400, "missing_body", "missing_body");
-	}
-
-	if (body.tip_url !== undefined) {
-		const tipUrl = String(body.tip_url).trim() || null;
-		await c.env.DB.prepare(
-			"UPDATE users SET tip_url = ?, updated_at = ? WHERE id = ?",
-		)
-			.bind(tipUrl, nowIso(), userId)
-			.run();
-	}
-
-	return c.json({ ok: true });
-});
-
-/**
  * Returns models visible to users using the effective mapping algorithm.
  */
 userApi.get("/models", async (c) => {
-	const siteMode = await getSiteMode(c.env.DB);
 	const channels = await listActiveChannels(c.env.DB);
 
 	// Load alias data
@@ -73,11 +45,7 @@ userApi.get("/models", async (c) => {
 	>();
 
 	for (const channel of channels) {
-		const pricings =
-			siteMode === "shared"
-				? extractSharedModelPricings(channel)
-				: extractModelPricings(channel);
-		const modelIds = pricings.map((p) => p.id);
+		const pricings = extractModelPricings(channel);
 		const chAliases = aliasGroups.get(channel.id);
 
 		for (const p of pricings) {
@@ -122,7 +90,12 @@ userApi.get("/models", async (c) => {
 		});
 	}
 
-	return c.json({ models, site_mode: siteMode });
+	// Filter by the current user's model allowlist (null = unrestricted)
+	const userRecord = c.get("userRecord") as UserRecord;
+	const allowlist = parseAllowlist(userRecord.allowed_models);
+	const visibleModels = filterModelsByAllowlist(models, allowlist);
+
+	return c.json({ models: visibleModels });
 });
 
 /**
@@ -148,36 +121,6 @@ userApi.post("/tokens", async (c) => {
 		return jsonError(c, 400, "name_required", "name_required");
 	}
 
-	let allowedChannels: string | null = null;
-	if (
-		body.allowed_channels &&
-		typeof body.allowed_channels === "object" &&
-		!Array.isArray(body.allowed_channels)
-	) {
-		const channelSelectionEnabled = await getUserChannelSelectionEnabled(
-			c.env.DB,
-		);
-		if (!channelSelectionEnabled) {
-			return jsonError(
-				c,
-				403,
-				"channel_selection_disabled",
-				"channel_selection_disabled",
-			);
-		}
-		// Validate: Record<string, string[]>
-		const map = body.allowed_channels as Record<string, unknown>;
-		const cleaned: Record<string, string[]> = {};
-		for (const [modelId, chIds] of Object.entries(map)) {
-			if (Array.isArray(chIds) && chIds.length > 0) {
-				cleaned[modelId] = chIds.filter((v: unknown) => typeof v === "string");
-			}
-		}
-		if (Object.keys(cleaned).length > 0) {
-			allowedChannels = JSON.stringify(cleaned);
-		}
-	}
-
 	const rawToken = generateToken("sk-");
 	const tokenHash = await sha256Hex(rawToken);
 	const id = crypto.randomUUID();
@@ -196,7 +139,7 @@ userApi.post("/tokens", async (c) => {
 			null,
 			0,
 			"active",
-			allowedChannels,
+			null,
 			userId,
 			now,
 			now,
@@ -207,7 +150,7 @@ userApi.post("/tokens", async (c) => {
 });
 
 /**
- * Updates a user's token (name, allowed_channels).
+ * Updates a user's token (name).
  */
 userApi.patch("/tokens/:id", async (c) => {
 	const userId = c.get("userId") as string;
@@ -218,10 +161,10 @@ userApi.patch("/tokens/:id", async (c) => {
 	}
 
 	const existing = await c.env.DB.prepare(
-		"SELECT id, name, allowed_channels FROM tokens WHERE id = ? AND user_id = ?",
+		"SELECT id, name FROM tokens WHERE id = ? AND user_id = ?",
 	)
 		.bind(tokenId, userId)
-		.first<{ id: string; name: string; allowed_channels: string | null }>();
+		.first<{ id: string; name: string }>();
 
 	if (!existing) {
 		return jsonError(c, 404, "token_not_found", "token_not_found");
@@ -232,43 +175,10 @@ userApi.patch("/tokens/:id", async (c) => {
 			? body.name.trim()
 			: existing.name;
 
-	let newAllowedChannels: string | null = existing.allowed_channels;
-	if (body.allowed_channels !== undefined) {
-		if (body.allowed_channels === null) {
-			newAllowedChannels = null;
-		} else if (
-			typeof body.allowed_channels === "object" &&
-			!Array.isArray(body.allowed_channels)
-		) {
-			const channelSelectionEnabled = await getUserChannelSelectionEnabled(
-				c.env.DB,
-			);
-			if (!channelSelectionEnabled) {
-				return jsonError(
-					c,
-					403,
-					"channel_selection_disabled",
-					"channel_selection_disabled",
-				);
-			}
-			const map = body.allowed_channels as Record<string, unknown>;
-			const cleaned: Record<string, string[]> = {};
-			for (const [modelId, chIds] of Object.entries(map)) {
-				if (Array.isArray(chIds) && chIds.length > 0) {
-					cleaned[modelId] = chIds.filter(
-						(v: unknown) => typeof v === "string",
-					);
-				}
-			}
-			newAllowedChannels =
-				Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
-		}
-	}
-
 	await c.env.DB.prepare(
-		"UPDATE tokens SET name = ?, allowed_channels = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+		"UPDATE tokens SET name = ?, updated_at = ? WHERE id = ? AND user_id = ?",
 	)
-		.bind(newName, newAllowedChannels, nowIso(), tokenId, userId)
+		.bind(newName, nowIso(), tokenId, userId)
 		.run();
 
 	return c.json({ ok: true });
@@ -420,16 +330,9 @@ userApi.get("/dashboard", async (c) => {
 		.bind(userId)
 		.all();
 
-	const siteMode = await getSiteMode(c.env.DB);
 	const checkinReward = await getCheckinReward(c.env.DB);
 	const ldcPaymentEnabled = await getLdcPaymentEnabled(c.env.DB);
 	const ldcExchangeRate = await getLdcExchangeRate(c.env.DB);
-	const withdrawalEnabled = await getWithdrawalEnabled(c.env.DB);
-	const withdrawalFeeRate = await getWithdrawalFeeRate(c.env.DB);
-	const userChannelSelectionEnabled = await getUserChannelSelectionEnabled(
-		c.env.DB,
-	);
-	const channelReviewEnabled = await getChannelReviewEnabled(c.env.DB);
 	const todayStr = new Date().toISOString().slice(0, 10);
 	const checkinRow = await c.env.DB.prepare(
 		"SELECT id FROM user_checkins WHERE user_id = ? AND checkin_date = ?",
@@ -438,107 +341,16 @@ userApi.get("/dashboard", async (c) => {
 		.first();
 	const checkedInToday = Boolean(checkinRow);
 
-	let contributions: Array<{
-		user_name: string;
-		linuxdo_id: string | null;
-		linuxdo_username: string | null;
-		tip_url: string | null;
-		channel_count: number;
-		channels: Array<{ name: string; requests: number; total_tokens: number }>;
-		total_requests: number;
-		total_tokens: number;
-	}> = [];
-
-	if (siteMode === "shared") {
-		const contribRows = await c.env.DB.prepare(
-			`SELECT
-				u.id AS user_id,
-				u.name AS user_name,
-				u.linuxdo_id,
-				u.linuxdo_username,
-				u.tip_url,
-				COUNT(DISTINCT c.id) AS channel_count,
-				COALESCE(SUM(CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END), 0) AS total_requests,
-				COALESCE(SUM(ul.total_tokens), 0) AS total_tokens
-			FROM channels c
-			JOIN users u ON c.contributed_by = u.id
-			LEFT JOIN usage_logs ul ON ul.channel_id = c.id
-			WHERE c.contributed_by IS NOT NULL AND c.status = 'active'
-			GROUP BY u.id, u.name, u.linuxdo_id, u.linuxdo_username, u.tip_url
-			ORDER BY total_requests DESC`,
-		).all();
-
-		const contributorIds = (contribRows.results ?? []).map((r) =>
-			String(r.user_id),
-		);
-
-		const channelDetailMap = new Map<
-			string,
-			Array<{ name: string; requests: number; total_tokens: number }>
-		>();
-		if (contributorIds.length > 0) {
-			const channelRows = await c.env.DB.prepare(
-				`SELECT
-					c.contributed_by,
-					c.name,
-					COALESCE(SUM(CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END), 0) AS requests,
-					COALESCE(SUM(ul.total_tokens), 0) AS total_tokens
-				FROM channels c
-				LEFT JOIN usage_logs ul ON ul.channel_id = c.id
-				WHERE c.contributed_by IS NOT NULL AND c.status = 'active'
-				GROUP BY c.id, c.contributed_by, c.name
-				ORDER BY requests DESC`,
-			).all();
-
-			for (const row of channelRows.results ?? []) {
-				const uid = String(row.contributed_by);
-				const arr = channelDetailMap.get(uid) ?? [];
-				arr.push({
-					name: String(row.name),
-					requests: Number(row.requests),
-					total_tokens: Number(row.total_tokens),
-				});
-				channelDetailMap.set(uid, arr);
-			}
-		}
-
-		contributions = (contribRows.results ?? []).map((row) => ({
-			user_name: String(row.user_name),
-			linuxdo_id: row.linuxdo_id ? String(row.linuxdo_id) : null,
-			linuxdo_username: row.linuxdo_username
-				? String(row.linuxdo_username)
-				: null,
-			tip_url: row.tip_url ? String(row.tip_url) : null,
-			channel_count: Number(row.channel_count),
-			channels: channelDetailMap.get(String(row.user_id)) ?? [],
-			total_requests: Number(row.total_requests),
-			total_tokens: Number(row.total_tokens),
-		}));
-	}
-
-	// Fetch recent violations for shame wall
-	const violationsResult = await c.env.DB.prepare(
-		"SELECT * FROM ldoh_violations ORDER BY created_at DESC LIMIT 50",
-	).all();
-	const violationRows = violationsResult.results ?? [];
-
 	return c.json({
 		balance: user.balance,
-		withdrawable_balance: Math.min(user.balance, user.withdrawable_balance),
 		total_requests: summary?.total_requests ?? 0,
 		total_tokens: summary?.total_tokens ?? 0,
 		total_cost: summary?.total_cost ?? 0,
 		recent_usage: recentUsage.results ?? [],
-		contributions,
 		checked_in_today: checkedInToday,
 		checkin_reward: checkinReward,
 		ldc_payment_enabled: ldcPaymentEnabled,
 		ldc_exchange_rate: ldcExchangeRate,
-		withdrawal_enabled: withdrawalEnabled,
-		withdrawal_fee_rate: withdrawalFeeRate,
-		user_channel_selection_enabled: userChannelSelectionEnabled,
-		channel_review_enabled: channelReviewEnabled,
-		violations: violationRows,
 	});
 });
 

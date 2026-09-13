@@ -2,18 +2,69 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
+import { parseAllowlist } from "../utils/model-allowlist";
 import { nowIso } from "../utils/time";
 
 const adminUsers = new Hono<AppEnv>();
+
+type AdminUserRow = {
+	id: string;
+	email: string;
+	name: string;
+	role: string;
+	balance: number;
+	status: string;
+	allowed_models: string | null;
+	created_at: string;
+	updated_at: string;
+};
+
+/**
+ * Validates and serializes an `allowed_models` payload into the JSON string
+ * stored in `users.allowed_models`.
+ * - null / [] → null (unrestricted)
+ * - array of non-empty strings → JSON string
+ * - anything else (non-array, non-string or empty element) → invalid
+ */
+function serializeAllowedModels(
+	input: unknown,
+): { ok: true; value: string | null } | { ok: false } {
+	if (input === null) {
+		return { ok: true, value: null };
+	}
+	if (!Array.isArray(input)) {
+		return { ok: false };
+	}
+	const models: string[] = [];
+	for (const item of input) {
+		if (typeof item !== "string") {
+			return { ok: false };
+		}
+		const trimmed = item.trim();
+		if (!trimmed) {
+			return { ok: false };
+		}
+		models.push(trimmed);
+	}
+	if (models.length === 0) {
+		return { ok: true, value: null };
+	}
+	return { ok: true, value: JSON.stringify(models) };
+}
 
 /**
  * Lists all users.
  */
 adminUsers.get("/", async (c) => {
 	const result = await c.env.DB.prepare(
-		"SELECT id, email, name, role, balance, status, created_at, updated_at FROM users ORDER BY created_at DESC",
+		"SELECT id, email, name, role, balance, status, allowed_models, created_at, updated_at FROM users ORDER BY created_at DESC",
 	).all();
-	return c.json({ users: result.results ?? [] });
+	const users = ((result.results ?? []) as AdminUserRow[]).map((user) => ({
+		...user,
+		// Expose the parsed array (or null) so the frontend can consume it directly
+		allowed_models: parseAllowlist(user.allowed_models),
+	}));
+	return c.json({ users });
 });
 
 /**
@@ -44,13 +95,23 @@ adminUsers.post("/", async (c) => {
 		return jsonError(c, 409, "email_or_name_exists", "email_or_name_exists");
 	}
 
+	const allowedModels = serializeAllowedModels(body.allowed_models ?? null);
+	if (!allowedModels.ok) {
+		return jsonError(
+			c,
+			400,
+			"invalid_allowed_models",
+			"invalid_allowed_models",
+		);
+	}
+
 	const id = crypto.randomUUID();
 	const passwordHash = await sha256Hex(password);
 	const now = nowIso();
 	const balance = Number(body.balance ?? 0);
 
 	await c.env.DB.prepare(
-		"INSERT INTO users (id, email, name, password_hash, role, balance, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO users (id, email, name, password_hash, role, balance, status, allowed_models, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	)
 		.bind(
 			id,
@@ -60,6 +121,7 @@ adminUsers.post("/", async (c) => {
 			body.role ?? "user",
 			balance,
 			"active",
+			allowedModels.value,
 			now,
 			now,
 		)
@@ -72,6 +134,7 @@ adminUsers.post("/", async (c) => {
 		role: body.role ?? "user",
 		balance,
 		status: "active",
+		allowed_models: parseAllowlist(allowedModels.value),
 	});
 });
 
@@ -86,7 +149,7 @@ adminUsers.patch("/:id", async (c) => {
 	}
 
 	const existing = await c.env.DB.prepare(
-		"SELECT id, email, name, role, balance, status FROM users WHERE id = ?",
+		"SELECT id, email, name, role, balance, status, allowed_models FROM users WHERE id = ?",
 	)
 		.bind(id)
 		.first<{
@@ -96,10 +159,27 @@ adminUsers.patch("/:id", async (c) => {
 			role: string;
 			balance: number;
 			status: string;
+			allowed_models: string | null;
 		}>();
 
 	if (!existing) {
 		return jsonError(c, 404, "user_not_found", "user_not_found");
+	}
+
+	// allowed_models: undefined = keep, null/[] = clear (unrestricted),
+	// array of non-empty strings = replace
+	let nextAllowedModels = existing.allowed_models;
+	if (body.allowed_models !== undefined) {
+		const serialized = serializeAllowedModels(body.allowed_models);
+		if (!serialized.ok) {
+			return jsonError(
+				c,
+				400,
+				"invalid_allowed_models",
+				"invalid_allowed_models",
+			);
+		}
+		nextAllowedModels = serialized.value;
 	}
 
 	const now = nowIso();
@@ -107,13 +187,14 @@ adminUsers.patch("/:id", async (c) => {
 		body.balance !== undefined ? Number(body.balance) : existing.balance;
 
 	await c.env.DB.prepare(
-		"UPDATE users SET name = ?, role = ?, balance = ?, status = ?, updated_at = ? WHERE id = ?",
+		"UPDATE users SET name = ?, role = ?, balance = ?, status = ?, allowed_models = ?, updated_at = ? WHERE id = ?",
 	)
 		.bind(
 			body.name ?? existing.name,
 			body.role ?? existing.role,
 			Number.isNaN(newBalance) ? existing.balance : newBalance,
 			body.status ?? existing.status,
+			nextAllowedModels,
 			now,
 			id,
 		)

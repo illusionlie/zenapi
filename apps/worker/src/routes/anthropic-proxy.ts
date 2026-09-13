@@ -13,15 +13,11 @@ import {
 	loadChannelAliasOnlyMap,
 } from "../services/model-aliases";
 import { calculateCost, getModelPrice } from "../services/pricing";
-import {
-	getChannelFeeEnabled,
-	getSiteMode,
-	getWithdrawalMode,
-} from "../services/settings";
 import { recordUsage } from "../services/usage";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
+import { isModelAllowed } from "../utils/model-allowlist";
 import { isRetryableStatus, sleep } from "../utils/retry";
 import { cfSafeUrl, normalizeBaseUrl } from "../utils/url";
 import {
@@ -30,11 +26,7 @@ import {
 	parseUsageFromHeaders,
 	parseUsageFromSse,
 } from "../utils/usage";
-import {
-	channelSupportsModel,
-	channelSupportsSharedModel,
-	filterAllowedChannels,
-} from "./proxy";
+import { channelSupportsModel, filterAllowedChannels } from "./proxy";
 
 const anthropicProxy = new Hono<AppEnv>();
 
@@ -58,6 +50,12 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 			: null;
 	const isStream = parsedBody?.stream === true;
 
+	// User-level model allowlist (design.md D2): exact match on the requested
+	// model name before any channel routing work
+	if (!isModelAllowed(tokenRecord.user_allowed_models, model)) {
+		return jsonError(c, 403, "model_not_allowed", "model_not_allowed");
+	}
+
 	// Resolve per-channel aliases for this model name
 	const channelAliasHits = model
 		? await loadChannelAliasesByAlias(c.env.DB, model)
@@ -79,9 +77,6 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 		.all();
 	const activeChannels = (channelResult.results ?? []) as ChannelRecord[];
 
-	const siteMode = await getSiteMode(c.env.DB);
-	const useSharedFilter = siteMode === "shared" && !!tokenRecord.user_id;
-
 	// Resolve channel/model routing syntax (uses original model name)
 	const { targetChannel, actualModel } = resolveChannelRoute(
 		model,
@@ -101,12 +96,6 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 
 	let candidates: ChannelRecord[];
 	if (targetChannel) {
-		if (
-			useSharedFilter &&
-			!channelSupportsSharedModel(targetChannel, actualModel)
-		) {
-			return jsonError(c, 403, "model_not_shared", "model_not_shared");
-		}
 		candidates = [targetChannel];
 	} else {
 		const allowedChannels = filterAllowedChannels(
@@ -115,26 +104,19 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 			model,
 		);
 		if (model) {
-			const supportsFn = useSharedFilter
-				? channelSupportsSharedModel
-				: channelSupportsModel;
 			candidates = allowedChannels.filter((channel) => {
 				// Channel matched via per-channel alias → include
 				if (channelAliasHitMap.has(channel.id)) return true;
 				// Channel natively supports this model → include UNLESS alias_only
-				if (supportsFn(channel, model)) {
+				if (channelSupportsModel(channel, model)) {
 					const aliasOnlyModels = perChannelAliasOnlyMap.get(channel.id);
 					return !aliasOnlyModels?.has(model);
 				}
 				return false;
 			});
 		} else {
-			const supportsFn = useSharedFilter
-				? channelSupportsSharedModel
-				: channelSupportsModel;
-			candidates = allowedChannels.filter((channel) =>
-				supportsFn(channel, null),
-			);
+			// No model specified — all channels qualify
+			candidates = allowedChannels;
 		}
 	}
 
@@ -416,51 +398,11 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 			// Deduct user balance
 			if (cost > 0 && tokenRecord.user_id) {
 				const now = new Date().toISOString();
-				const withdrawalMode = await getWithdrawalMode(c.env.DB);
-				if (withdrawalMode === "strict") {
-					await c.env.DB.prepare(
-						"UPDATE users SET balance = balance - ?, withdrawable_balance = MAX(0, withdrawable_balance - ?), updated_at = ? WHERE id = ?",
-					)
-						.bind(cost, cost, now, tokenRecord.user_id)
-						.run();
-				} else {
-					await c.env.DB.prepare(
-						"UPDATE users SET balance = balance - ?, updated_at = ? WHERE id = ?",
-					)
-						.bind(cost, now, tokenRecord.user_id)
-						.run();
-				}
-			}
-			// Credit contributor balance
-			if (
-				cost > 0 &&
-				channelForUsage.contributed_by &&
-				channelForUsage.charge_enabled === 1
-			) {
-				const feeEnabled = await getChannelFeeEnabled(c.env.DB);
-				if (feeEnabled) {
-					const now = new Date().toISOString();
-					let withdrawableCredit = 0;
-					if (tokenRecord.user_id) {
-						const consumer = await c.env.DB.prepare(
-							"SELECT balance, withdrawable_balance FROM users WHERE id = ?",
-						)
-							.bind(tokenRecord.user_id)
-							.first<{ balance: number; withdrawable_balance: number }>();
-						if (consumer) {
-							const giftedPortion = Math.max(
-								0,
-								consumer.balance + cost - consumer.withdrawable_balance,
-							);
-							withdrawableCredit = Math.max(0, cost - giftedPortion);
-						}
-					}
-					await c.env.DB.prepare(
-						"UPDATE users SET balance = balance + ?, withdrawable_balance = withdrawable_balance + ?, updated_at = ? WHERE id = ?",
-					)
-						.bind(cost, withdrawableCredit, now, channelForUsage.contributed_by)
-						.run();
-				}
+				await c.env.DB.prepare(
+					"UPDATE users SET balance = balance - ?, updated_at = ? WHERE id = ?",
+				)
+					.bind(cost, now, tokenRecord.user_id)
+					.run();
 			}
 		};
 

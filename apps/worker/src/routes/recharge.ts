@@ -194,9 +194,9 @@ recharge.get("/notify", async (c) => {
 		.run();
 
 	await c.env.DB.prepare(
-		"UPDATE users SET balance = balance + ?, withdrawable_balance = withdrawable_balance + ?, updated_at = ? WHERE id = ?",
+		"UPDATE users SET balance = balance + ?, updated_at = ? WHERE id = ?",
 	)
-		.bind(order.balance_amount, order.balance_amount, now, order.user_id)
+		.bind(order.balance_amount, now, order.user_id)
 		.run();
 
 	return c.text("success");

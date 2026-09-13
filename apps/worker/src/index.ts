@@ -9,8 +9,6 @@ import authRoutes from "./routes/auth";
 import channelRoutes from "./routes/channels";
 import dashboardRoutes from "./routes/dashboard";
 import inviteCodeRoutes from "./routes/invite-codes";
-import ldohRoutes from "./routes/ldoh";
-import ldohUserRoutes from "./routes/ldoh-user";
 import modelAliasRoutes from "./routes/model-aliases";
 import modelRoutes from "./routes/models";
 import monitoringRoutes from "./routes/monitoring";
@@ -26,8 +24,6 @@ import tokenRoutes from "./routes/tokens";
 import usageRoutes from "./routes/usage";
 import userApiRoutes from "./routes/user-api";
 import userAuthRoutes from "./routes/user-auth";
-import userChannelRoutes from "./routes/user-channels";
-import withdrawalRoutes from "./routes/withdrawal";
 
 const app = new Hono<AppEnv>({ strict: false });
 
@@ -143,7 +139,6 @@ app.route("/api/dashboard", dashboardRoutes);
 app.route("/api/monitoring", monitoringRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/invite-codes", inviteCodeRoutes);
-app.route("/api/ldoh", ldohRoutes);
 app.route("/api/public", publicRoutes);
 app.route("/api/channel", newapiChannelRoutes);
 app.route("/api/user", newapiUserRoutes);
@@ -152,10 +147,7 @@ app.route("/api/playground", playgroundRoutes);
 app.route("/api/users", adminUserRoutes);
 app.route("/api/u/auth", userAuthRoutes);
 app.route("/api/u", userApiRoutes);
-app.route("/api/u/channels", userChannelRoutes);
-app.route("/api/u/ldoh", ldohUserRoutes);
 app.route("/api/recharge", rechargeRoutes);
-app.route("/api/u/withdrawal", withdrawalRoutes);
 
 app.route("/v1", proxyRoutes);
 app.route("/anthropic/v1", anthropicProxyRoutes);

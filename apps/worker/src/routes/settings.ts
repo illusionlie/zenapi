@@ -2,8 +2,6 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import {
 	getAnnouncement,
-	getChannelFeeEnabled,
-	getChannelReviewEnabled,
 	getCheckinReward,
 	getDefaultBalance,
 	getLdcEpayGateway,
@@ -11,23 +9,14 @@ import {
 	getLdcEpayPid,
 	getLdcExchangeRate,
 	getLdcPaymentEnabled,
-	getLdohCookie,
 	getRegistrationMode,
 	getRequireInviteCode,
 	getRetentionDays,
 	getSessionTtlHours,
-	getSiteMode,
-	getUserChannelSelectionEnabled,
-	getWithdrawalEnabled,
-	getWithdrawalFeeRate,
-	getWithdrawalMode,
 	isAdminPasswordSet,
 	type RegistrationMode,
-	type SiteMode,
 	setAdminPasswordHash,
 	setAnnouncement,
-	setChannelFeeEnabled,
-	setChannelReviewEnabled,
 	setCheckinReward,
 	setDefaultBalance,
 	setLdcEpayGateway,
@@ -35,17 +24,10 @@ import {
 	setLdcEpayPid,
 	setLdcExchangeRate,
 	setLdcPaymentEnabled,
-	setLdohCookie,
 	setRegistrationMode,
 	setRequireInviteCode,
 	setRetentionDays,
 	setSessionTtlHours,
-	setSiteMode,
-	setUserChannelSelectionEnabled,
-	setWithdrawalEnabled,
-	setWithdrawalFeeRate,
-	setWithdrawalMode,
-	type WithdrawalMode,
 } from "../services/settings";
 import { sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
@@ -59,7 +41,6 @@ settings.get("/", async (c) => {
 	const retention = await getRetentionDays(c.env.DB);
 	const sessionTtlHours = await getSessionTtlHours(c.env.DB);
 	const adminPasswordSet = await isAdminPasswordSet(c.env.DB);
-	const siteMode = await getSiteMode(c.env.DB);
 	const registrationMode = await getRegistrationMode(c.env.DB);
 	const checkinReward = await getCheckinReward(c.env.DB);
 	const requireInviteCode = await getRequireInviteCode(c.env.DB);
@@ -68,22 +49,12 @@ settings.get("/", async (c) => {
 	const ldcEpayKey = await getLdcEpayKey(c.env.DB);
 	const ldcEpayGateway = await getLdcEpayGateway(c.env.DB);
 	const ldcExchangeRate = await getLdcExchangeRate(c.env.DB);
-	const channelFeeEnabled = await getChannelFeeEnabled(c.env.DB);
-	const channelReviewEnabled = await getChannelReviewEnabled(c.env.DB);
-	const userChannelSelectionEnabled = await getUserChannelSelectionEnabled(
-		c.env.DB,
-	);
 	const defaultBalance = await getDefaultBalance(c.env.DB);
-	const withdrawalEnabled = await getWithdrawalEnabled(c.env.DB);
-	const withdrawalFeeRate = await getWithdrawalFeeRate(c.env.DB);
-	const withdrawalMode = await getWithdrawalMode(c.env.DB);
-	const ldohCookie = await getLdohCookie(c.env.DB);
 	const announcement = await getAnnouncement(c.env.DB);
 	return c.json({
 		log_retention_days: retention,
 		session_ttl_hours: sessionTtlHours,
 		admin_password_set: adminPasswordSet,
-		site_mode: siteMode,
 		registration_mode: registrationMode,
 		checkin_reward: checkinReward,
 		require_invite_code: requireInviteCode,
@@ -92,14 +63,7 @@ settings.get("/", async (c) => {
 		ldc_epay_key: ldcEpayKey,
 		ldc_epay_gateway: ldcEpayGateway,
 		ldc_exchange_rate: ldcExchangeRate,
-		channel_fee_enabled: channelFeeEnabled,
-		channel_review_enabled: channelReviewEnabled,
-		user_channel_selection_enabled: userChannelSelectionEnabled,
 		default_balance: defaultBalance,
-		withdrawal_enabled: withdrawalEnabled,
-		withdrawal_fee_rate: withdrawalFeeRate,
-		withdrawal_mode: withdrawalMode,
-		ldoh_cookie: ldohCookie,
 		announcement: announcement,
 	});
 });
@@ -146,15 +110,6 @@ settings.put("/", async (c) => {
 	if (typeof body.admin_password === "string" && body.admin_password.trim()) {
 		const hash = await sha256Hex(body.admin_password.trim());
 		await setAdminPasswordHash(c.env.DB, hash);
-		touched = true;
-	}
-
-	if (body.site_mode !== undefined) {
-		const validModes: SiteMode[] = ["personal", "service", "shared"];
-		if (!validModes.includes(body.site_mode)) {
-			return jsonError(c, 400, "invalid_site_mode", "invalid_site_mode");
-		}
-		await setSiteMode(c.env.DB, body.site_mode);
 		touched = true;
 	}
 
@@ -229,29 +184,6 @@ settings.put("/", async (c) => {
 		touched = true;
 	}
 
-	if (body.channel_fee_enabled !== undefined) {
-		const value =
-			body.channel_fee_enabled === true || body.channel_fee_enabled === "true";
-		await setChannelFeeEnabled(c.env.DB, value);
-		touched = true;
-	}
-
-	if (body.channel_review_enabled !== undefined) {
-		const value =
-			body.channel_review_enabled === true ||
-			body.channel_review_enabled === "true";
-		await setChannelReviewEnabled(c.env.DB, value);
-		touched = true;
-	}
-
-	if (body.user_channel_selection_enabled !== undefined) {
-		const value =
-			body.user_channel_selection_enabled === true ||
-			body.user_channel_selection_enabled === "true";
-		await setUserChannelSelectionEnabled(c.env.DB, value);
-		touched = true;
-	}
-
 	if (body.default_balance !== undefined) {
 		const amount = Number(body.default_balance);
 		if (Number.isNaN(amount) || amount < 0) {
@@ -263,46 +195,6 @@ settings.put("/", async (c) => {
 			);
 		}
 		await setDefaultBalance(c.env.DB, amount);
-		touched = true;
-	}
-
-	if (body.withdrawal_enabled !== undefined) {
-		const value =
-			body.withdrawal_enabled === true || body.withdrawal_enabled === "true";
-		await setWithdrawalEnabled(c.env.DB, value);
-		touched = true;
-	}
-
-	if (body.withdrawal_fee_rate !== undefined) {
-		const rate = Number(body.withdrawal_fee_rate);
-		if (Number.isNaN(rate) || rate < 0 || rate > 100) {
-			return jsonError(
-				c,
-				400,
-				"invalid_withdrawal_fee_rate",
-				"invalid_withdrawal_fee_rate",
-			);
-		}
-		await setWithdrawalFeeRate(c.env.DB, rate);
-		touched = true;
-	}
-
-	if (body.withdrawal_mode !== undefined) {
-		const validModes: WithdrawalMode[] = ["lenient", "strict"];
-		if (!validModes.includes(body.withdrawal_mode)) {
-			return jsonError(
-				c,
-				400,
-				"invalid_withdrawal_mode",
-				"invalid_withdrawal_mode",
-			);
-		}
-		await setWithdrawalMode(c.env.DB, body.withdrawal_mode);
-		touched = true;
-	}
-
-	if (body.ldoh_cookie !== undefined) {
-		await setLdohCookie(c.env.DB, String(body.ldoh_cookie));
 		touched = true;
 	}
 

@@ -94,7 +94,6 @@ export async function updateChannelTestResult(
 		models?: string[];
 		modelsJson?: string;
 		existingModelsJson?: string | null;
-		defaultShared?: boolean;
 	},
 ): Promise<void> {
 	const now = Math.floor(Date.now() / 1000);
@@ -112,7 +111,6 @@ export async function updateChannelTestResult(
 				{
 					input_price?: number;
 					output_price?: number;
-					shared?: boolean;
 					enabled?: boolean;
 				}
 			>();
@@ -120,7 +118,6 @@ export async function updateChannelTestResult(
 				existingMap.set(p.id, {
 					input_price: p.input_price,
 					output_price: p.output_price,
-					shared: p.shared,
 					enabled: p.enabled,
 				});
 			}
@@ -138,12 +135,6 @@ export async function updateChannelTestResult(
 					entry.input_price = existing.input_price;
 				if (existing?.output_price != null)
 					entry.output_price = existing.output_price;
-				// Preserve existing shared flag, or use default for new models
-				if (existing?.shared != null) {
-					entry.shared = existing.shared;
-				} else if (result.defaultShared) {
-					entry.shared = true;
-				}
 				// Preserve existing enabled flag
 				if (existing?.enabled != null) {
 					entry.enabled = existing.enabled;
@@ -152,22 +143,7 @@ export async function updateChannelTestResult(
 			});
 			modelsJson = JSON.stringify(merged);
 		} else {
-			// No existing models — if defaultShared, mark all as shared
-			if (result.defaultShared) {
-				const newModels = safeJsonParse<Array<{ id?: string }>>(
-					result.modelsJson,
-					[],
-				);
-				const marked: ModelPricing[] = (
-					Array.isArray(newModels) ? newModels : []
-				).map((m) => {
-					const mid = typeof m === "string" ? m : String(m?.id ?? "");
-					return { id: mid, shared: true };
-				});
-				modelsJson = JSON.stringify(marked);
-			} else {
-				modelsJson = result.modelsJson;
-			}
+			modelsJson = result.modelsJson;
 		}
 	} else if (result.models) {
 		modelsJson = modelsToJson(result.models);

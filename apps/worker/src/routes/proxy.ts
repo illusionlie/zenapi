@@ -1,11 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { type TokenRecord, tokenAuth } from "../middleware/tokenAuth";
-import {
-	extractModelIds,
-	extractSharedModelPricings,
-	extractSharedModels,
-} from "../services/channel-models";
+import { extractModelIds } from "../services/channel-models";
 import { resolveChannelRoute } from "../services/channel-route";
 import {
 	type ChannelRecord,
@@ -23,15 +19,14 @@ import {
 	loadChannelAliasOnlyMap,
 } from "../services/model-aliases";
 import { calculateCost, getModelPrice } from "../services/pricing";
-import {
-	getChannelFeeEnabled,
-	getSiteMode,
-	getWithdrawalMode,
-} from "../services/settings";
 import { recordUsage } from "../services/usage";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
+import {
+	filterModelsByAllowlist,
+	isModelAllowed,
+} from "../utils/model-allowlist";
 import { extractReasoningEffort } from "../utils/reasoning";
 import { isRetryableStatus, sleep } from "../utils/retry";
 import { cfSafeUrl, normalizeBaseUrl } from "../utils/url";
@@ -56,20 +51,6 @@ export function channelSupportsModel(
 		return true;
 	}
 	const models = extractModels(channel);
-	return models.some((entry) => entry.id === model);
-}
-
-export function channelSupportsSharedModel(
-	channel: ChannelRecord,
-	model?: string | null,
-): boolean {
-	const models = extractSharedModels(
-		channel as unknown as { id: string; name: string; models_json: string },
-	);
-	if (!model) {
-		// No specific model requested — channel qualifies if it has any shared model
-		return models.length > 0;
-	}
 	return models.some((entry) => entry.id === model);
 }
 
@@ -240,18 +221,10 @@ proxy.get("/models", tokenAuth, async (c) => {
 		? activeChannels
 		: filterAllowedChannels(activeChannels, tokenRecord);
 
-	const siteMode = await getSiteMode(c.env.DB);
-	const useSharedFilter = siteMode === "shared" && !!tokenRecord.user_id;
-
 	// Build per-channel model ID sets
 	const channelModelIds = new Map<string, string[]>();
 	for (const ch of baseAllowed) {
-		const chModelIds = useSharedFilter
-			? extractSharedModelPricings(ch)
-					.filter((m) => m.enabled !== false)
-					.map((m) => m.id)
-			: extractModelIds(ch);
-		channelModelIds.set(ch.id, chModelIds);
+		channelModelIds.set(ch.id, extractModelIds(ch));
 	}
 
 	// Load alias data
@@ -310,9 +283,15 @@ proxy.get("/models", tokenAuth, async (c) => {
 		}
 	}
 
+	// User-level model allowlist: only expose callable names the user may use
+	const visibleModels = filterModelsByAllowlist(
+		modelData,
+		tokenRecord.user_allowed_models,
+	);
+
 	return c.json({
 		object: "list",
-		data: modelData,
+		data: visibleModels,
 	});
 });
 
@@ -331,6 +310,12 @@ proxy.all("/*", tokenAuth, async (c) => {
 			? String(parsedBody.model)
 			: null;
 	const isStream = parsedBody?.stream === true;
+
+	// User-level model allowlist (design.md D2): exact match on the requested
+	// model name before any channel routing work
+	if (!isModelAllowed(tokenRecord.user_allowed_models, model)) {
+		return jsonError(c, 403, "model_not_allowed", "model_not_allowed");
+	}
 
 	// Resolve per-channel aliases for this model name
 	const channelAliasHits = model
@@ -369,9 +354,6 @@ proxy.all("/*", tokenAuth, async (c) => {
 		.all();
 	const activeChannels = (channelResult.results ?? []) as ChannelRecord[];
 
-	const siteMode = await getSiteMode(c.env.DB);
-	const useSharedFilter = siteMode === "shared" && !!tokenRecord.user_id;
-
 	// Resolve channel/model routing syntax (uses original model name)
 	const { targetChannel, actualModel } = resolveChannelRoute(
 		model,
@@ -388,11 +370,7 @@ proxy.all("/*", tokenAuth, async (c) => {
 	let candidates: ChannelRecord[];
 	if (targetChannel) {
 		// Explicit channel routing — verify the model exists on this channel
-		if (useSharedFilter) {
-			if (!channelSupportsSharedModel(targetChannel, actualModel)) {
-				return jsonError(c, 403, "model_not_shared", "model_not_shared");
-			}
-		} else if (!channelSupportsModel(targetChannel, actualModel)) {
+		if (!channelSupportsModel(targetChannel, actualModel)) {
 			return jsonError(
 				c,
 				404,
@@ -408,14 +386,11 @@ proxy.all("/*", tokenAuth, async (c) => {
 			model,
 		);
 		if (model) {
-			const supportsFn = useSharedFilter
-				? channelSupportsSharedModel
-				: channelSupportsModel;
 			candidates = allowedChannels.filter((channel) => {
 				// Channel matched via per-channel alias → include
 				if (channelAliasHitMap.has(channel.id)) return true;
 				// Channel natively supports this model → include UNLESS alias_only
-				if (supportsFn(channel, model)) {
+				if (channelSupportsModel(channel, model)) {
 					const aliasOnlyModels = perChannelAliasOnlyMap.get(channel.id);
 					return !aliasOnlyModels?.has(model);
 				}
@@ -423,12 +398,7 @@ proxy.all("/*", tokenAuth, async (c) => {
 			});
 		} else {
 			// No model specified — all channels qualify
-			const supportsFn = useSharedFilter
-				? channelSupportsSharedModel
-				: channelSupportsModel;
-			candidates = allowedChannels.filter((channel) =>
-				supportsFn(channel, null),
-			);
+			candidates = allowedChannels;
 		}
 	}
 
@@ -673,58 +643,11 @@ proxy.all("/*", tokenAuth, async (c) => {
 			// Deduct user balance
 			if (cost > 0 && tokenRecord.user_id) {
 				const now = new Date().toISOString();
-				const withdrawalMode = await getWithdrawalMode(c.env.DB);
-				if (withdrawalMode === "strict") {
-					await c.env.DB.prepare(
-						"UPDATE users SET balance = balance - ?, withdrawable_balance = MAX(0, withdrawable_balance - ?), updated_at = ? WHERE id = ?",
-					)
-						.bind(cost, cost, now, tokenRecord.user_id)
-						.run();
-				} else {
-					await c.env.DB.prepare(
-						"UPDATE users SET balance = balance - ?, updated_at = ? WHERE id = ?",
-					)
-						.bind(cost, now, tokenRecord.user_id)
-						.run();
-				}
-			}
-			// Credit contributor balance
-			// Only credit withdrawable_balance for the portion that came from the consumer's withdrawable balance,
-			// so gifted/free balance (default_balance, checkin rewards) cannot be laundered into withdrawable funds.
-			if (
-				cost > 0 &&
-				channelForUsage.contributed_by &&
-				channelForUsage.charge_enabled === 1
-			) {
-				const feeEnabled = await getChannelFeeEnabled(c.env.DB);
-				if (feeEnabled) {
-					const now = new Date().toISOString();
-					// Read the consumer's current balance AFTER deduction to determine how much came from withdrawable
-					let withdrawableCredit = 0;
-					if (tokenRecord.user_id) {
-						const consumer = await c.env.DB.prepare(
-							"SELECT balance, withdrawable_balance FROM users WHERE id = ?",
-						)
-							.bind(tokenRecord.user_id)
-							.first<{ balance: number; withdrawable_balance: number }>();
-						if (consumer) {
-							// After deduction: balance is already reduced by cost
-							// Before deduction: old_balance = consumer.balance + cost
-							// Gifted portion = old_balance - withdrawable_balance = (consumer.balance + cost) - consumer.withdrawable_balance
-							const giftedPortion = Math.max(
-								0,
-								consumer.balance + cost - consumer.withdrawable_balance,
-							);
-							// Amount consumed from withdrawable = cost - giftedPortion (clamped to [0, cost])
-							withdrawableCredit = Math.max(0, cost - giftedPortion);
-						}
-					}
-					await c.env.DB.prepare(
-						"UPDATE users SET balance = balance + ?, withdrawable_balance = withdrawable_balance + ?, updated_at = ? WHERE id = ?",
-					)
-						.bind(cost, withdrawableCredit, now, channelForUsage.contributed_by)
-						.run();
-				}
+				await c.env.DB.prepare(
+					"UPDATE users SET balance = balance - ?, updated_at = ? WHERE id = ?",
+				)
+					.bind(cost, now, tokenRecord.user_id)
+					.run();
 			}
 		};
 		const logUsage = (

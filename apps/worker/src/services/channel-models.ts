@@ -5,7 +5,6 @@ export type ModelPricing = {
 	id: string;
 	input_price?: number; // per million tokens, USD
 	output_price?: number; // per million tokens, USD
-	shared?: boolean; // whether this model is exposed in shared mode
 	enabled?: boolean; // undefined/true = enabled, false = disabled
 };
 
@@ -22,7 +21,6 @@ type ModelLike = {
 	id?: unknown;
 	input_price?: unknown;
 	output_price?: unknown;
-	shared?: unknown;
 	enabled?: unknown;
 };
 
@@ -76,7 +74,6 @@ export function modelsToJson(models: string[] | ModelPricing[]): string {
 			const entry: ModelPricing = { id: m.id };
 			if (m.input_price != null) entry.input_price = m.input_price;
 			if (m.output_price != null) entry.output_price = m.output_price;
-			if (m.shared != null) entry.shared = m.shared;
 			if (m.enabled != null) entry.enabled = m.enabled;
 			return entry;
 		}),
@@ -127,38 +124,14 @@ export function extractModelPricings(
 			if (model && typeof model === "object") {
 				const ip = (model as ModelLike).input_price;
 				const op = (model as ModelLike).output_price;
-				const sh = (model as ModelLike).shared;
 				const en = (model as ModelLike).enabled;
 				if (ip != null && Number(ip) > 0) entry.input_price = Number(ip);
 				if (op != null && Number(op) > 0) entry.output_price = Number(op);
-				if (sh != null) entry.shared = Boolean(sh);
 				if (en != null) entry.enabled = Boolean(en);
 			}
 			return entry;
 		})
 		.filter((m): m is ModelPricing => m !== null);
-}
-
-export function extractSharedModelPricings(
-	channel: Pick<ChannelRow, "models_json">,
-): ModelPricing[] {
-	return extractModelPricings(channel).filter(
-		(m) => m.shared !== false && m.enabled !== false,
-	);
-}
-
-export function extractSharedModels(
-	channel: Pick<ChannelRow, "id" | "name" | "models_json">,
-): ModelEntry[] {
-	const pricings = extractSharedModelPricings(channel);
-	return pricings.map((p) => ({
-		id: p.id,
-		label: p.id,
-		channelId: channel.id,
-		channelName: channel.name,
-		inputPrice: p.input_price,
-		outputPrice: p.output_price,
-	}));
 }
 
 export function collectUniqueModelIds(
@@ -168,18 +141,6 @@ export function collectUniqueModelIds(
 	for (const channel of channels) {
 		for (const id of extractModelIds(channel)) {
 			models.add(id);
-		}
-	}
-	return Array.from(models);
-}
-
-export function collectUniqueSharedModelIds(
-	channels: Array<Pick<ChannelRow, "models_json">>,
-): string[] {
-	const models = new Set<string>();
-	for (const channel of channels) {
-		for (const p of extractSharedModelPricings(channel)) {
-			models.add(p.id);
 		}
 	}
 	return Array.from(models);

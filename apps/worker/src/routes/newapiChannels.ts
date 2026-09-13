@@ -28,7 +28,6 @@ import {
 	toNewApiChannel,
 	withNewApiDefaults,
 } from "../services/newapi";
-import { getSiteMode } from "../services/settings";
 import { generateToken } from "../utils/crypto";
 import { safeJsonParse } from "../utils/json";
 import { parseApiKeys } from "../utils/keys";
@@ -390,7 +389,6 @@ newapi.get("/test/:id", async (c) => {
 		elapsed: number;
 		modelsJson?: string;
 		existingModelsJson?: string | null;
-		defaultShared?: boolean;
 	} = { ok: true, elapsed: result.elapsed };
 
 	if (hasModels && result.payload) {
@@ -399,10 +397,6 @@ newapi.get("/test/:id", async (c) => {
 			: ((result.payload as { data?: unknown[] })?.data ?? []);
 		updateData.modelsJson = JSON.stringify(payloadData);
 		updateData.existingModelsJson = channel.models_json ?? null;
-		const siteMode = await getSiteMode(c.env.DB);
-		if (siteMode === "shared") {
-			updateData.defaultShared = true;
-		}
 	}
 
 	await updateChannelTestResult(c.env.DB, id, updateData);
@@ -439,7 +433,6 @@ newapi.post("/test", async (c) => {
 		elapsed: number;
 		modelsJson?: string;
 		existingModelsJson?: string | null;
-		defaultShared?: boolean;
 	} = { ok: true, elapsed: result.elapsed };
 
 	if (hasModels && result.payload) {
@@ -448,10 +441,6 @@ newapi.post("/test", async (c) => {
 			: ((result.payload as { data?: unknown[] })?.data ?? []);
 		updateData.modelsJson = JSON.stringify(payloadData);
 		updateData.existingModelsJson = channel.models_json ?? null;
-		const siteMode = await getSiteMode(c.env.DB);
-		if (siteMode === "shared") {
-			updateData.defaultShared = true;
-		}
 	}
 
 	await updateChannelTestResult(c.env.DB, String(id), updateData);
@@ -483,13 +472,11 @@ newapi.get("/fetch_models/:id", async (c) => {
 		const payloadData = Array.isArray(result.payload)
 			? result.payload
 			: ((result.payload as { data?: unknown[] })?.data ?? []);
-		const siteMode = await getSiteMode(c.env.DB);
 		await updateChannelTestResult(c.env.DB, id, {
 			ok: true,
 			elapsed: result.elapsed,
 			modelsJson: JSON.stringify(payloadData),
 			existingModelsJson: channel.models_json ?? null,
-			defaultShared: siteMode === "shared",
 		});
 	} else {
 		await updateChannelTestResult(c.env.DB, id, {
