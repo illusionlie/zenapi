@@ -1,6 +1,9 @@
 {
-	"enableSkillCommands": true,
-	"extensions": ["./extensions/trellis/index.ts"],
-	"skills": ["./skills"],
-	"prompts": ["./prompts"]
+  "enableSkillCommands": true,
+  "extensions": [
+    "./extensions/trellis/index.ts"
+  ],
+  "prompts": [
+    "./prompts"
+  ]
 }

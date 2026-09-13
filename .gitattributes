@@ -1,0 +1,20 @@
+# Trellis: append-only developer journals should merge cleanly across
+# parallel sessions/worktrees — each session only appends a new block, so
+# there is nothing to actually conflict on.
+#
+# Do NOT add a rule for workspace/*/index.md here — it is fully regenerated
+# every session, so a real conflict there is expected and safe to resolve by
+# picking either side (task state lives in task.json, not index.md). See
+# .trellis/spec/cli/backend/directory-structure.md for details.
+.trellis/workspace/*/journal-*.md merge=union
+
+
+# Trellis workflow system + per-platform AI adapters (.claude/.pi/.zcode/.agents)
+# are tool-generated and idempotently re-created by `trellis update`. Exclude
+# them from GitHub language stats, otherwise the hook scripts make the repo
+# show up as Python instead of the actual JavaScript codebase.
+.trellis/** linguist-generated
+.claude/** linguist-generated
+.pi/** linguist-generated
+.zcode/** linguist-generated
+.agents/** linguist-generated
