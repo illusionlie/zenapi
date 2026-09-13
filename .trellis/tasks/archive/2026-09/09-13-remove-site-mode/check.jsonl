@@ -1,0 +1,8 @@
+{"file": ".trellis/tasks/09-13-remove-site-mode/research/backend-inventory.md", "reason": "对照检查后端删除完整性——每处 file:line 锚点应零残留（site_mode/withdrawal/ldoh/contributed_by/shared 标记/tip_url）"}
+{"file": ".trellis/tasks/09-13-remove-site-mode/research/frontend-docs-inventory.md", "reason": "对照检查前端删除完整性与保留项未被误删（LinuxDO 绑定、签到、充值入口、邀请码）"}
+{"file": ".trellis/tasks/09-13-remove-site-mode/design.md", "reason": "验收技术决策落地：D2 校验语义（请求模型名/403 model_not_allowed）、D3 用户令牌不再接受 allowed_channels、D5 迁移语句形状"}
+{"file": ".trellis/tasks/09-13-remove-site-mode/prd.md", "reason": "Acceptance Criteria 逐条核对（迁移可重复执行、403 行为、白名单过滤、文档一致性）"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "后端质量门槛——提交前 check/typecheck/test 全绿的执行标准"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端质量门槛"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "复用检查——allowed_models 多选 UI 应复用渠道拉取模型弹窗骨架而非另造轮子"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "跨层一致性——API 删除字段的前端消费点必须同步清零（UserDashboardData 7 字段等）"}
