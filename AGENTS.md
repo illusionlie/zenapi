@@ -5,7 +5,7 @@
 
 ## 1. 项目简介
 
-ZenAPI —— 基于 Cloudflare Workers + D1 的轻量 AI API 网关，内置管理后台与多用户系统。
+ZenAPI —— 基于 Cloudflare Workers + D1 的轻量 AI API 网关，内置管理后台与多用户系统（固定服务模式：用户注册登录、余额计费，管理员可按用户配置可用模型白名单）。
 支持 OpenAI (`/v1/*`) 与 Anthropic (`/anthropic/v1/*`) 双协议代理、格式互转、按权重负载均衡与故障重试。
 
 ## 2. 技术栈
@@ -37,14 +37,14 @@ apps/worker/                # Hono 后端
   wrangler.toml             # Cloudflare 配置
 apps/ui/                    # 管理台 / 用户端前端
   src/
-    App.tsx                 # 顶层路由分发（按站点模式选 Admin/User/Public）
+    App.tsx                 # 顶层路由分发（Admin/User/Public）
     AdminApp.tsx            # 管理后台主组件
     UserApp.tsx             # 用户端主组件
     PublicApp.tsx           # 公开页主组件
     core/                   # api / constants / types / utils
     features/               # 各功能视图（AdminApp/UserApp 各自的 View）
   dist/                     # 构建产物（由 Worker Static Assets 托管，勿手动改）
-tests/                      # Vitest 单测（如 worker/url.test.ts）
+tests/                      # Vitest 单测（如 model-allowlist.test.ts、channel-models.test.ts、filter-allowed-channels.test.ts）
 ```
 
 ## 4. 开发命令
@@ -86,19 +86,15 @@ tests/                      # Vitest 单测（如 worker/url.test.ts）
 | `/api/monitoring` | `routes/monitoring.ts` | 渠道健康 / 成功率 / 延迟（15m/1h/1d/7d/30d） |
 | `/api/settings` | `routes/settings.ts` | 系统键值配置 |
 | `/api/invite-codes` | `routes/invite-codes.ts` | 邀请码 |
-| `/api/ldoh` | `routes/ldoh.ts` | LDOH 站点管理 |
-| `/api/public` | `routes/public.ts` | 站点信息 / 公开模型（受站点模式控制） |
+| `/api/public` | `routes/public.ts` | 站点信息 / 公开模型（含定价） |
 | `/api/channel` | `routes/newapiChannels.ts` | New API 兼容渠道（含 tag 批量、fetch_models） |
 | `/api/user` | `routes/newapiUsers.ts` | New API 兼容用户 |
 | `/api/group` | `routes/newapiGroups.ts` | New API 兼容分组（从 `group_name` 解析，空取 `default`） |
 | `/api/playground` | `routes/playground.ts` | 对话测试（不记用量、不扣费） |
-| `/api/users` | `routes/admin-users.ts` | 用户管理 CRUD |
+| `/api/users` | `routes/admin-users.ts` | 用户管理 CRUD（含 `allowed_models` 可用模型白名单） |
 | `/api/u/auth` | `routes/user-auth.ts` | 用户注册 / 登录 / 登出 / me |
 | `/api/u` | `routes/user-api.ts` | 用户仪表盘 / 模型 / 令牌 / 日志 |
-| `/api/u/channels` | `routes/user-channels.ts` | 共享模式渠道贡献 |
-| `/api/u/ldoh` | `routes/ldoh-user.ts` | 用户侧 LDOH |
 | `/api/recharge` | `routes/recharge.ts` | 充值订单 |
-| `/api/u/withdrawal` | `routes/withdrawal.ts` | 提现订单 |
 | `/v1` | `routes/proxy.ts` | OpenAI 兼容代理（见 §8） |
 | `/anthropic/v1` | `routes/anthropic-proxy.ts` | Anthropic Messages 代理（含格式互转） |
 
@@ -120,6 +116,7 @@ tests/                      # Vitest 单测（如 worker/url.test.ts）
 - `base_url` 入库前规范化为无尾斜杠；空值返回空串避免崩溃。
 - usage 记录：输入/输出 tokens、首 token 延迟、流式标记、推理强度（取自请求体 `reasoning` / `reasoning_effort`）。
 - **禁用的模型不参与路由匹配**，也不出现在 `/v1/models`。
+- **用户级可用模型白名单**：`users.allowed_models`（JSON 数组，空 = 不限制）；按请求模型名**精确匹配**，白名单外返回 403 `model_not_allowed`；`/v1/models` 与 `/api/u/models` 同步过滤；与令牌级 `allowed_channels` 相互独立、正交生效。
 
 ## 9. 静态资源 / SPA 回退
 
@@ -131,9 +128,8 @@ tests/                      # Vitest 单测（如 worker/url.test.ts）
 
 - **代理**：`channels`、`tokens`、`usage_logs`、`model_aliases`、`channel_model_aliases`
 - **会话/设置**：`admin_sessions`、`settings`
-- **用户体系**：`users`、`user_sessions`、`user_checkins`、`invite_codes`
-- **资金**：`recharge_orders`、`withdrawal_orders`
-- **LDOH**：`ldoh_sites`、`ldoh_site_maintainers`、`ldoh_blocked_urls`、`ldoh_violations`
+- **用户体系**：`users`（含 `allowed_models` 白名单）、`user_sessions`、`user_checkins`、`invite_codes`
+- **资金**：`recharge_orders`
 
 迁移位于 `apps/worker/migrations/`，按文件名顺序执行。
 
@@ -147,7 +143,7 @@ tests/                      # Vitest 单测（如 worker/url.test.ts）
 | `PROXY_RETRY_DELAY_MS` | 重试间隔毫秒（默认 200） |
 | `LINUXDO_CLIENT_ID` / `LINUXDO_CLIENT_SECRET` | LinuxDO OAuth（如启用） |
 
-管理员密码、站点模式、会话时长、日志保留天数等**业务配置存 `settings` 表**，经管理台「系统设置」修改，非环境变量。
+管理员密码、注册模式、会话时长、日志保留天数等**业务配置存 `settings` 表**，经管理台「系统设置」修改，非环境变量。
 
 ## 12. 部署
 
@@ -157,7 +153,7 @@ GitHub Actions 工作流「Deploy SPA CF Workers[Worker一体化部署]」，区
 
 1. 改路由前先看 `index.ts` 的挂载点与鉴权放行清单，避免漏挂或破坏鉴权边界。
 2. 新增表必须同时加 `schema.sql` 与编号迁移文件。
-3. 改前端入口结构时同步更新本文件 §3；`App.tsx` 是模式分发入口，勿直接堆业务。
+3. 改前端入口结构时同步更新本文件 §3；`App.tsx` 是视图分发入口，勿直接堆业务。
 4. 提交前必跑 `bun run check && bun run typecheck && bun run test`。
 5. 本文件是 agent 规范的**唯一事实来源**；如与 README 冲突，以代码与本文件为准并提 issue 修正 README。
 <!-- TRELLIS:START -->
