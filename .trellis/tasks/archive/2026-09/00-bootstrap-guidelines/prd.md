@@ -21,9 +21,12 @@ the rest conversationally.
 
 ## Status (update the checkboxes as you complete each item)
 
-- [ ] Fill guidelines for api-worker-ui
-- [ ] Fill guidelines for api-worker
-- [ ] Add code examples
+- [x] Fill guidelines for api-worker-ui（frontend 全部填充；backend 目录 N/A——ui 包无后端代码）
+- [x] Fill guidelines for api-worker（backend 全部填充；frontend 目录 N/A——worker 包无前端代码）
+- [x] Add code examples（已填充文件均含真实代码路径/命令/形态示例）
+
+> 收尾记录（2026-09-14）：采用「随真实任务按需捕获」路线（D1 迁移教训、a11y 规范、0-error 门禁），
+> 剩余空模板已在归档前一次性补齐；无关目录（api-worker/frontend、api-worker-ui/backend）标注 N/A。
 
 ---
 
