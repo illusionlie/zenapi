@@ -75,3 +75,33 @@ Fixed ZenAPI to service-only mode: removed site_mode mechanism (17 backend ancho
 ### Status
 
 [OK] **Completed**
+
+## Session 4: 全局通知改造——notice banner 迁移为底部 Toast
+
+**Date**: 2026-09-14
+**Task**: 09-14-toast-notification-refactor（全流程：规划→实施→检查→归档）
+**Branch**: `main`
+
+### Summary
+
+痛点：notice banner 渲染在 main 文档流（无定位无 z-index），被 11 个 z-50 modal 的遮罩盖死，「成功才关弹窗」类弹窗的失败提示 100% 不可见。方案（用户四项决策：创建任务/底部 toast/分层迁移/区分类型）：自研轻量 toast——core/toast.ts 模块级 store（success 3s/error 5s/info 3s、堆叠上限 5、两段式退场）+ ToastHost createPortal 挂 body（z-[100]）+ Tailwind v4 @theme 动画。71 处 setNotice 全量迁移 + UserDashboard 补充 8 处（签到/充值反馈，实施中发现规划漏盘点），7 处手工 clear 删除，4 份 notice state/6 处 banner/3 条 props 链拆除。明文类 5 处（令牌/邀请码）升级 SecretValueModal（展示+复制）。分层保留：注册表单校验/充值金额校验（改红色语义）、Playground 对话区错误。
+
+### Key learnings
+
+1. hono/jsx/dom 原生支持 createPortal（4.13.7 验证），但 ToastHost 不能挂在有 early return 的 App 组件返回树里（分支切换会卸载）——用 fragment 包 `<ToastHost/><AppRoutes/>`，顺带修复 401 登出组件卸载丢 notice 的问题（store 独立于组件树生命周期）。
+2. Tailwind v4 @theme 内嵌 @keyframes 会被 Biome 拒绝，需 biome.json 开 `css.parser.tailwindDirectives` 且 keyframes 提到顶层。
+3. 同文件混两个功能的提交分离：checkout HEAD 版本 → 重放 A 功能 hunk → commit A → 还原完整版 → commit B（注意 A 的上下文行若被 B 改过，patch 不能直接 apply，须手工重放）。
+4. a11y：动态 toast 容器补 `role="status" aria-live="polite"`（WAI-ARIA toast 标准模式）。
+5. spec 翻转约定：「不引入 toast 库」→「不引入第三方 toast 库」，state-management.md 三处已同步。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a1bb0b4` | feat(ui): 拉取模型默认仅预勾选已存在模型（上个任务遗留改动分离提交） |
+| `98b4127` | feat(ui): 全局通知迁移为底部 toast，明文信息升级弹窗 |
+| `501347d` | chore(task): archive 09-14-toast-notification-refactor |
+
+### Status
+
+[OK] **Completed**（遗留：浏览器手动冒烟清单已交用户，代码层机制经 check 全量验证）
