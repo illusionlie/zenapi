@@ -9,6 +9,8 @@ import {
 	getLdcEpayPid,
 	getLdcExchangeRate,
 	getLdcPaymentEnabled,
+	getProxyExtraHeaders,
+	getProxyRemoveHeaders,
 	getRegistrationMode,
 	getRequireInviteCode,
 	getRetentionDays,
@@ -24,6 +26,8 @@ import {
 	setLdcEpayPid,
 	setLdcExchangeRate,
 	setLdcPaymentEnabled,
+	setProxyExtraHeaders,
+	setProxyRemoveHeaders,
 	setRegistrationMode,
 	setRequireInviteCode,
 	setRetentionDays,
@@ -31,6 +35,7 @@ import {
 } from "../services/settings";
 import { sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
+import { parseExtraHeaders, parseRemoveHeaders } from "../utils/proxy-headers";
 
 const settings = new Hono<AppEnv>();
 
@@ -51,6 +56,8 @@ settings.get("/", async (c) => {
 	const ldcExchangeRate = await getLdcExchangeRate(c.env.DB);
 	const defaultBalance = await getDefaultBalance(c.env.DB);
 	const announcement = await getAnnouncement(c.env.DB);
+	const proxyExtraHeaders = await getProxyExtraHeaders(c.env.DB);
+	const proxyRemoveHeaders = await getProxyRemoveHeaders(c.env.DB);
 	return c.json({
 		log_retention_days: retention,
 		session_ttl_hours: sessionTtlHours,
@@ -65,6 +72,8 @@ settings.get("/", async (c) => {
 		ldc_exchange_rate: ldcExchangeRate,
 		default_balance: defaultBalance,
 		announcement: announcement,
+		proxy_extra_headers: proxyExtraHeaders,
+		proxy_remove_headers: proxyRemoveHeaders,
 	});
 });
 
@@ -200,6 +209,34 @@ settings.put("/", async (c) => {
 
 	if (body.announcement !== undefined) {
 		await setAnnouncement(c.env.DB, String(body.announcement));
+		touched = true;
+	}
+
+	if (body.proxy_extra_headers !== undefined) {
+		const raw = body.proxy_extra_headers;
+		if (typeof raw !== "string" || parseExtraHeaders(raw) === null) {
+			return jsonError(
+				c,
+				400,
+				"invalid_proxy_extra_headers",
+				"invalid_proxy_extra_headers",
+			);
+		}
+		await setProxyExtraHeaders(c.env.DB, raw);
+		touched = true;
+	}
+
+	if (body.proxy_remove_headers !== undefined) {
+		const raw = body.proxy_remove_headers;
+		if (typeof raw !== "string" || parseRemoveHeaders(raw) === null) {
+			return jsonError(
+				c,
+				400,
+				"invalid_proxy_remove_headers",
+				"invalid_proxy_remove_headers",
+			);
+		}
+		await setProxyRemoveHeaders(c.env.DB, raw);
 		touched = true;
 	}
 

@@ -18,6 +18,10 @@ import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
 import { isModelAllowed } from "../utils/model-allowlist";
+import {
+	applyHeaderPolicy,
+	loadProxyHeaderPolicy,
+} from "../utils/proxy-headers";
 import { isRetryableStatus, sleep } from "../utils/retry";
 import { cfSafeUrl, normalizeBaseUrl } from "../utils/url";
 import {
@@ -70,11 +74,13 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 	// Convert Anthropic request -> OpenAI format for internal use
 	const openaiBody = parsedBody ? anthropicToOpenaiRequest(parsedBody) : null;
 
-	const channelResult = await c.env.DB.prepare(
-		"SELECT * FROM channels WHERE status = ?",
-	)
-		.bind("active")
-		.all();
+	// 全局头策略与活跃渠道查询并行预载：每请求只读一次库，重试轮复用
+	const [channelResult, headerPolicy] = await Promise.all([
+		c.env.DB.prepare("SELECT * FROM channels WHERE status = ?")
+			.bind("active")
+			.all(),
+		loadProxyHeaderPolicy(c.env.DB),
+	]);
 	const activeChannels = (channelResult.results ?? []) as ChannelRecord[];
 
 	// Resolve channel/model routing syntax (uses original model name)
@@ -203,6 +209,12 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 							headers.set("anthropic-beta", betaHeader);
 						}
 
+						applyHeaderPolicy(
+							headers,
+							headerPolicy,
+							channel.custom_headers_json,
+						);
+
 						response = await fetch(target, {
 							method: "POST",
 							headers,
@@ -222,6 +234,11 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 						const headers = new Headers();
 						headers.set("Authorization", `Bearer ${apiKey}`);
 						headers.set("content-type", "application/json");
+						applyHeaderPolicy(
+							headers,
+							headerPolicy,
+							channel.custom_headers_json,
+						);
 
 						const bodyToSend = channelOpenaiBody
 							? JSON.stringify(channelOpenaiBody)
@@ -270,16 +287,11 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 						headers.set("Authorization", `Bearer ${apiKey}`);
 						headers.set("x-api-key", String(apiKey));
 						headers.set("content-type", "application/json");
-
-						if (channel.custom_headers_json) {
-							const customHeaders = safeJsonParse<Record<string, string>>(
-								channel.custom_headers_json,
-								{},
-							);
-							for (const [key, value] of Object.entries(customHeaders)) {
-								headers.set(key, value);
-							}
-						}
+						applyHeaderPolicy(
+							headers,
+							headerPolicy,
+							channel.custom_headers_json,
+						);
 
 						response = await fetch(target, {
 							method: "POST",

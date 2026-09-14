@@ -92,6 +92,8 @@ playground.post("/chat", async (c) => {
 				const incomingHeaders = new Headers();
 				incomingHeaders.set("content-type", "application/json");
 
+				// 豁免全局请求头策略：Playground 对话测试不注入/剔除全局头，
+				// 不传 policy（默认 null），渠道级 custom_headers 仍生效
 				const {
 					target,
 					headers,

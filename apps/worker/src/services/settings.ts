@@ -1,4 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import {
+	PROXY_EXTRA_HEADERS_KEY,
+	PROXY_REMOVE_HEADERS_KEY,
+} from "../utils/proxy-headers";
 import { nowIso } from "../utils/time";
 
 const DEFAULT_LOG_RETENTION_DAYS = 30;
@@ -296,6 +300,44 @@ export async function setDefaultBalance(
 ): Promise<void> {
 	const value = Math.max(0, amount).toString();
 	await upsertSetting(db, DEFAULT_BALANCE_KEY, value);
+}
+
+// Proxy header policy (global inject / remove, raw JSON strings)
+
+/**
+ * Returns the global proxy extra headers JSON (empty string if not set).
+ */
+export async function getProxyExtraHeaders(db: D1Database): Promise<string> {
+	const value = await readSetting(db, PROXY_EXTRA_HEADERS_KEY);
+	return value ?? "";
+}
+
+/**
+ * Updates the global proxy extra headers JSON. Pass empty string to clear.
+ */
+export async function setProxyExtraHeaders(
+	db: D1Database,
+	value: string,
+): Promise<void> {
+	await upsertSetting(db, PROXY_EXTRA_HEADERS_KEY, value);
+}
+
+/**
+ * Returns the global proxy remove headers JSON (empty string if not set).
+ */
+export async function getProxyRemoveHeaders(db: D1Database): Promise<string> {
+	const value = await readSetting(db, PROXY_REMOVE_HEADERS_KEY);
+	return value ?? "";
+}
+
+/**
+ * Updates the global proxy remove headers JSON. Pass empty string to clear.
+ */
+export async function setProxyRemoveHeaders(
+	db: D1Database,
+	value: string,
+): Promise<void> {
+	await upsertSetting(db, PROXY_REMOVE_HEADERS_KEY, value);
 }
 
 // Announcement

@@ -27,6 +27,11 @@ import {
 	filterModelsByAllowlist,
 	isModelAllowed,
 } from "../utils/model-allowlist";
+import {
+	applyHeaderPolicy,
+	loadProxyHeaderPolicy,
+	type ProxyHeaderPolicy,
+} from "../utils/proxy-headers";
 import { extractReasoningEffort } from "../utils/reasoning";
 import { isRetryableStatus, sleep } from "../utils/retry";
 import { cfSafeUrl, normalizeBaseUrl } from "../utils/url";
@@ -94,6 +99,8 @@ function isChatPath(path: string): boolean {
 /**
  * Builds per-channel fetch target and body based on channel api_format.
  * Returns the target URL, headers, and request body.
+ * policy 为 null 时跳过全局注入/剔除（Playground 豁免），渠道级 custom_headers
+ * 经 applyHeaderPolicy 统一在三种格式分支生效（剔除 → 全局注入 → 渠道级）。
  */
 export function buildChannelRequest(
 	channel: ChannelRecord,
@@ -104,9 +111,11 @@ export function buildChannelRequest(
 	parsedBody: Record<string, unknown> | null,
 	isStream: boolean,
 	apiKey?: string,
+	policy?: ProxyHeaderPolicy | null,
 ): { target: string; headers: Headers; body: string | undefined } {
 	const effectiveKey = apiKey ?? channel.api_key;
 	const apiFormat = channel.api_format ?? "openai";
+	const headerPolicy = policy ?? null;
 	const headers = new Headers(incomingHeaders);
 	headers.delete("host");
 	headers.delete("content-length");
@@ -118,6 +127,7 @@ export function buildChannelRequest(
 		headers.set("anthropic-version", "2023-06-01");
 		headers.set("content-type", "application/json");
 		headers.delete("Authorization");
+		applyHeaderPolicy(headers, headerPolicy, channel.custom_headers_json);
 
 		const anthropicBody = parsedBody
 			? openaiToAnthropicRequest(parsedBody)
@@ -133,17 +143,7 @@ export function buildChannelRequest(
 		const target = cfSafeUrl(`${channel.base_url}${querySuffix}`);
 		headers.set("Authorization", `Bearer ${effectiveKey}`);
 		headers.set("x-api-key", String(effectiveKey));
-
-		// Merge custom headers
-		if (channel.custom_headers_json) {
-			const customHeaders = safeJsonParse<Record<string, string>>(
-				channel.custom_headers_json,
-				{},
-			);
-			for (const [key, value] of Object.entries(customHeaders)) {
-				headers.set(key, value);
-			}
-		}
+		applyHeaderPolicy(headers, headerPolicy, channel.custom_headers_json);
 		return { target, headers, body: requestText || undefined };
 	}
 
@@ -154,6 +154,7 @@ export function buildChannelRequest(
 	const target = cfSafeUrl(`${baseUrl}${subPath}${querySuffix}`);
 	headers.set("Authorization", `Bearer ${effectiveKey}`);
 	headers.set("x-api-key", String(effectiveKey));
+	applyHeaderPolicy(headers, headerPolicy, channel.custom_headers_json);
 	return { target, headers, body: requestText || undefined };
 }
 
@@ -347,11 +348,13 @@ proxy.all("/*", tokenAuth, async (c) => {
 		requestText = JSON.stringify(parsedBody);
 	}
 
-	const channelResult = await c.env.DB.prepare(
-		"SELECT * FROM channels WHERE status = ?",
-	)
-		.bind("active")
-		.all();
+	// 全局头策略与活跃渠道查询并行预载：每请求只读一次库，重试轮复用
+	const [channelResult, headerPolicy] = await Promise.all([
+		c.env.DB.prepare("SELECT * FROM channels WHERE status = ?")
+			.bind("active")
+			.all(),
+		loadProxyHeaderPolicy(c.env.DB),
+	]);
 	const activeChannels = (channelResult.results ?? []) as ChannelRecord[];
 
 	// Resolve channel/model routing syntax (uses original model name)
@@ -498,6 +501,7 @@ proxy.all("/*", tokenAuth, async (c) => {
 					channelParsedBody,
 					isStream,
 					apiKey,
+					headerPolicy,
 				);
 
 				try {
