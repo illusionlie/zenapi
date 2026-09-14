@@ -377,6 +377,63 @@ export const SettingsView = ({
 							设置后，所有用户登录进入站点时会收到公告通知。清空公告内容即可关闭。
 						</p>
 					</div>
+					<div class="lg:col-span-2">
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="proxy-extra-headers"
+						>
+							额外注入请求头 (JSON)
+						</label>
+						<textarea
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="proxy-extra-headers"
+							name="proxy_extra_headers"
+							rows={3}
+							placeholder='{"X-Trace-Id": "zen", "X-Env": "prod"}'
+							value={settingsForm.proxy_extra_headers}
+							onInput={(event) => {
+								const target =
+									event.currentTarget as HTMLTextAreaElement | null;
+								onFormChange({
+									proxy_extra_headers: target?.value ?? "",
+								});
+							}}
+						/>
+						<p class="mt-1 text-xs text-stone-500">
+							仅对计费代理请求（/v1 与 /anthropic/v1）生效，Playground
+							对话测试与渠道连通性测试不套用。同名头优先级：渠道级自定义请求头
+							&gt; 全局注入 &gt; 系统内置头；覆盖 Authorization / x-api-key
+							等鉴权头可能导致上游 401，请谨慎配置。
+						</p>
+					</div>
+					<div class="lg:col-span-2">
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="proxy-remove-headers"
+						>
+							剔除请求头 (JSON)
+						</label>
+						<textarea
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="proxy-remove-headers"
+							name="proxy_remove_headers"
+							rows={3}
+							placeholder='["user-agent", "x-client-id"]'
+							value={settingsForm.proxy_remove_headers}
+							onInput={(event) => {
+								const target =
+									event.currentTarget as HTMLTextAreaElement | null;
+								onFormChange({
+									proxy_remove_headers: target?.value ?? "",
+								});
+							}}
+						/>
+						<p class="mt-1 text-xs text-stone-500">
+							JSON
+							字符串数组，列出的客户端请求头不会转发给上游。作用范围与优先级同「额外注入请求头」。注意：剔除是无差别的，同名内置鉴权头（如
+							Authorization）也会被删除，请勿剔除代理鉴权依赖的头。
+						</p>
+					</div>
 					<div class="flex items-end lg:col-span-2">
 						<button
 							class="h-11 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"

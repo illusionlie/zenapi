@@ -1070,30 +1070,32 @@ export const ChannelsView = ({
 									</div>
 								)}
 							</div>
-							{channelForm.api_format === "custom" && (
-								<div>
-									<label
-										class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-										for="channel-custom-headers"
-									>
-										自定义请求头 (JSON)
-									</label>
-									<textarea
-										class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 font-mono"
-										id="channel-custom-headers"
-										rows={3}
-										placeholder={'{"X-Custom-Header": "value"}'}
-										value={channelForm.custom_headers}
-										onInput={(event) =>
-											onFormChange({
-												custom_headers: (
-													event.currentTarget as HTMLTextAreaElement
-												).value,
-											})
-										}
-									/>
-								</div>
-							)}
+							<div>
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									for="channel-custom-headers"
+								>
+									自定义请求头 (JSON)
+								</label>
+								<textarea
+									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+									id="channel-custom-headers"
+									rows={3}
+									placeholder={'{"X-Custom-Header": "value"}'}
+									value={channelForm.custom_headers}
+									onInput={(event) =>
+										onFormChange({
+											custom_headers: (
+												event.currentTarget as HTMLTextAreaElement
+											).value,
+										})
+									}
+								/>
+								<p class="mt-1 text-xs text-stone-500">
+									对所有 API
+									格式生效。同名头覆盖系统设置中的全局注入头与内置鉴权头。
+								</p>
+							</div>
 							<div class="flex flex-wrap items-center justify-end gap-2 pt-2">
 								<button
 									class="h-10 rounded-full border border-stone-200 bg-stone-50 px-4 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"

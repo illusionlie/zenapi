@@ -170,6 +170,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				settings.ldc_epay_gateway ?? "https://credit.linux.do/epay",
 			ldc_exchange_rate: String(settings.ldc_exchange_rate ?? 0.1),
 			announcement: settings.announcement ?? "",
+			proxy_extra_headers: settings.proxy_extra_headers ?? "",
+			proxy_remove_headers: settings.proxy_remove_headers ?? "",
 		});
 		if (settings.require_invite_code) {
 			const result = await apiFetch<{ codes: InviteCode[] }>(
@@ -521,6 +523,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				ldc_epay_gateway: settingsForm.ldc_epay_gateway,
 				ldc_exchange_rate: Number(settingsForm.ldc_exchange_rate),
 				announcement: settingsForm.announcement,
+				proxy_extra_headers: settingsForm.proxy_extra_headers,
+				proxy_remove_headers: settingsForm.proxy_remove_headers,
 			};
 			const password = settingsForm.admin_password.trim();
 			if (password) {

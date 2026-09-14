@@ -62,4 +62,6 @@ export const initialSettingsForm: SettingsForm = {
 	ldc_epay_gateway: "https://credit.linux.do/epay",
 	ldc_exchange_rate: "0.1",
 	announcement: "",
+	proxy_extra_headers: "",
+	proxy_remove_headers: "",
 };
