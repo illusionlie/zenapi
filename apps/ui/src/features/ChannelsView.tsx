@@ -308,6 +308,12 @@ export const ChannelsView = ({
 		[channelForm.models],
 	);
 
+	// IDs already present in the models textarea (for pre-check + badge)
+	const existingModelIdSet = useMemo(
+		() => new Set(parsedModelIds),
+		[parsedModelIds],
+	);
+
 	// Filtered & visible fetched models for the picker modal
 	const visibleFetched = useMemo(
 		() =>
@@ -321,6 +327,13 @@ export const ChannelsView = ({
 	const allVisibleFetchedSelected =
 		visibleFetched.length > 0 &&
 		visibleFetched.every((m) => selectedFetched.has(m));
+
+	// Selected models that confirm would actually add (excluding existing ones)
+	const newSelectedCount = useMemo(
+		() =>
+			[...selectedFetched].filter((id) => !existingModelIdSet.has(id)).length,
+		[selectedFetched, existingModelIdSet],
+	);
 
 	const toggleAliasExpanded = useCallback((modelId: string) => {
 		setExpandedAliasModels((prev) => {
@@ -910,6 +923,11 @@ export const ChannelsView = ({
 																<span class="min-w-0 break-all font-mono text-xs text-stone-700">
 																	{m}
 																</span>
+																{existingModelIdSet.has(m) && (
+																	<span class="ml-auto shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500">
+																		已存在
+																	</span>
+																)}
 															</label>
 														))}
 													</div>
@@ -928,7 +946,7 @@ export const ChannelsView = ({
 													onClick={onConfirmFetched}
 													class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
 												>
-													确认加入（已选 {selectedFetched.size}）
+													确认加入（新增 {newSelectedCount}）
 												</button>
 											</div>
 										</div>

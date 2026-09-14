@@ -559,7 +559,16 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				}),
 			});
 			setFetchedModels(result.models);
-			setSelectedFetched(new Set(result.models));
+			// 默认全不选；仅预勾选模型列表中已存在的模型
+			const existingIds = new Set(
+				channelForm.models
+					.split("\n")
+					.map((line) => line.split("|")[0]?.trim() ?? "")
+					.filter(Boolean),
+			);
+			setSelectedFetched(
+				new Set(result.models.filter((id) => existingIds.has(id))),
+			);
 			setFetchedSearch("");
 		} catch (error) {
 			setNotice((error as Error).message);
