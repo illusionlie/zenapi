@@ -46,6 +46,9 @@ bun run test
 
 ## 跟进检查（task.py start 前）
 
-- [ ] prd.md 已通过收敛检查，无遗留 Open Questions。
-- [ ] design.md / implement.md 已就绪。
-- [ ] 用户已审阅或明确同意进入实现。
+- [x] prd.md 已通过收敛检查，无遗留 Open Questions。
+- [x] design.md / implement.md 已就绪。
+- [x] 用户已审阅或明确同意进入实现。
+
+> 完成记录（2026-09-14）：实现已随 `9692fa3 feat: fetch model` 提交；归档前复验门禁全绿
+> （check 1 error = spec 豁免项、typecheck 0 error、test 49/49）。
