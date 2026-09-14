@@ -30,6 +30,8 @@ on:
 jobs:
   check-config:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       should_deploy: ${{ steps.check.outputs.should_deploy }}
       deploy_action: ${{ steps.plan.outputs.deploy_action }}
@@ -199,6 +201,8 @@ jobs:
     needs: check-config
     if: needs.check-config.outputs.should_deploy == 'true' && needs.check-config.outputs.deploy_action == 'init'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -318,6 +322,8 @@ jobs:
     needs: check-config
     if: needs.check-config.outputs.should_deploy == 'true' && needs.check-config.outputs.deploy_action != 'init'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
