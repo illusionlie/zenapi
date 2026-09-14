@@ -105,3 +105,31 @@ Fixed ZenAPI to service-only mode: removed site_mode mechanism (17 backend ancho
 ### Status
 
 [OK] **Completed**（遗留：浏览器手动冒烟清单已交用户，代码层机制经 check 全量验证）
+
+## Session 5: 令牌「查看」改直接复制，明文弹窗降级为兜底
+
+**Date**: 2026-09-14
+**Task**: 09-14-token-reveal-direct-copy（轻量任务：PRD-only，规划→实施→检查→归档）
+**Branch**: `main`
+
+### Summary
+
+上一任务把令牌 reveal 主路径改成了 SecretValueModal，用户反馈过重（参考 newapi：直接复制即可）。本任务纠正交互主次：令牌列表按钮「查看」→「复制」，点击 fetch reveal → clipboard.writeText → toast 反馈；仅复制失败（Safari/iOS 用户激活过期、非安全上下文 clipboard 为 undefined）回落 SecretValueModal 兜底。管理台 TokensView 2 处按钮文案 + AdminApp/UserApp 两处 handleTokenReveal；UserTokensView 文案本就是「复制」只改行为。无后端改动（token_plain 存库可重复获取）。一次性展示弹窗（新令牌创建、邀请码导出）保留不动；明文不进 toast 文案。
+
+### Key learnings
+
+1. **兜底不能升主路径**：上个任务为救「复制失败无处看明文」把弹窗当唯一出口，本任务纠正——高频动作（复制）必须是零摩擦主路径，弹窗只留给低频/一次性场景。spec state-management.md 已把明文展示分成「一次性弹窗」与「可重复获取走复制优先」两类。
+2. `await fetch` 后调 `navigator.clipboard.writeText` 在 Chrome/Firefox 无碍（transient activation 窗口约 5s），Safari/iOS 可能拒绝；内层 catch 弹窗兜底顺带覆盖非安全上下文（http 部署下 clipboard 为 undefined 同步抛 TypeError）。
+3. `bun run check`（`biome check --write .`）会顺手重排仓库内不合规范的簿记 JSON（归档 task.json 2 空格→tab），quality-guidelines 预告过：不回滚，随任务提交。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `da45d78` | feat(ui): 令牌查看改为直接复制，明文弹窗降级为失败兜底 |
+| `80b18db` | chore(task): biome 重排归档任务 task.json 缩进 |
+| `3a4a684` | chore(task): archive 09-14-token-reveal-direct-copy |
+
+### Status
+
+[OK] **Completed**（check 全绿：PRD R1-R6 逐项合规、Admin/User handler 同构、三命令 0 error / 49 用例通过；浏览器手动冒烟建议用户自验）
