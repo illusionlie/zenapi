@@ -52,3 +52,26 @@ Fixed ZenAPI to service-only mode: removed site_mode mechanism (17 backend ancho
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: 清账归档两个挂起任务 + 补全 spec 空模板
+
+**Date**: 2026-09-14
+**Task**: 07-27-channel-model-picker（验收归档）、00-bootstrap-guidelines（补全后归档）
+**Branch**: `main`
+
+### Summary
+
+盘点发现两个 in_progress 任务实为「已完成未归档」：channel-model-picker 代码早已随 9692fa3 提交（仅差 checkbox 与归档）；bootstrap-guidelines 走了「随任务按需捕获」路线但留下 6 个空模板 + 11 个与包性质不符的空壳目录。处理：归档前从真实代码提炼补全 7 个有效 spec（logging/quality/directory-structure、UI 的 directory/hook/state/type-safety，要点：console 前缀标签惯例、jsonError snake_case 错误码、零状态库容器集中持有、hono/jsx-dom 无自定义 hook、类型直通 snake_case）；api-worker/frontend 与 api-worker-ui/backend 整体标注 N/A；刷新 4 个 index 状态表。验收：check 1E（spec 豁免项）、typecheck 0E、49/49 tests。归档后 0 active tasks。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9f91211` | chore(task): archive 07-27-channel-model-picker |
+| `9adcb42` | chore(task): archive 00-bootstrap-guidelines |
+| (本次) | docs(trellis): fill spec templates & mark N/A dirs |
+
+### Status
+
+[OK] **Completed**

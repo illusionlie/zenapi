@@ -1,12 +1,6 @@
-# Frontend Development Guidelines
+# Frontend Development Guidelines — api-worker-ui
 
-> Best practices for frontend development in this project.
-
----
-
-## Overview
-
-This directory contains guidelines for frontend development. Fill in each file with your project's specific conventions.
+> `apps/ui`（hono/jsx/dom + Vite + Tailwind v4 SPA）前端规范索引。内容均来自真实代码与任务教训。
 
 ---
 
@@ -14,26 +8,18 @@ This directory contains guidelines for frontend development. Fill in each file w
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | To fill |
-| [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | To fill |
-| [State Management](./state-management.md) | Local state, global state, server state | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
+| [Directory Structure](./directory-structure.md) | App 分发三层、core 基础设施、features 纯展示视图 | ✅ Filled |
+| [Component Guidelines](./component-guidelines.md) | a11y 约定（htmlFor/aria）、语义化按钮、Tailwind 色系 | ✅ Filled |
+| [Quality Guidelines](./quality-guidelines.md) | 全仓 0-error 门禁、a11y 清偿记录、新增 UI 代码保持全绿 | ✅ Filled |
+| [Hook Guidelines](./hook-guidelines.md) | 无自定义 hook、容器 hooks 惯用法、hono/jsx/dom 注意事项 | ✅ Filled |
+| [State Management](./state-management.md) | 零状态库、容器集中持有 + props 单向下发、localStorage token | ✅ Filled |
+| [Type Safety](./type-safety.md) | 类型集中在 core/types.ts、snake_case 直通、strict 门禁 | ✅ Filled |
 
 ---
 
-## How to Fill These Guidelines
+## Sources
 
-For each guideline file:
+- `AGENTS.md` §3/§5（仓库布局与代码规范）
+- 真实任务教训：`f6f9a9d` a11y 清偿、`0b09027` 质量门禁升级
 
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
-
-The goal is to help AI assistants and new team members understand how YOUR project works.
-
----
-
-**Language**: All documentation should be written in **English**.
+**Language**: 与 AGENTS.md 一致，中文为主。

@@ -1,12 +1,6 @@
-# Backend Development Guidelines
+# Backend Development Guidelines — api-worker
 
-> Best practices for backend development in this project.
-
----
-
-## Overview
-
-This directory contains guidelines for backend development. Fill in each file with your project's specific conventions.
+> `apps/worker`（Cloudflare Workers + Hono + D1）后端规范索引。内容均来自真实代码与任务教训，随任务持续增补。
 
 ---
 
@@ -14,25 +8,17 @@ This directory contains guidelines for backend development. Fill in each file wi
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Database Guidelines](./database-guidelines.md) | ORM patterns, queries, migrations | To fill |
-| [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
+| [Directory Structure](./directory-structure.md) | index.ts 唯一挂载点、鉴权放行清单、routes 薄壳 + services 下沉 | ✅ Filled |
+| [Database Guidelines](./database-guidelines.md) | D1 迁移与 schema.sql 同步、幂等性分层（Migrations 章节已填，Query Patterns 待补） | 🟡 Partial |
+| [Error Handling](./error-handling.md) | jsonError 统一错误形态、snake_case 错误码 | 🟡 Partial |
+| [Quality Guidelines](./quality-guidelines.md) | 提交门禁（check/typecheck/test）、Biome 规则、命名、禁则 | ✅ Filled |
+| [Logging Guidelines](./logging-guidelines.md) | console.* 前缀标签惯例、错误靠 jsonError/落库不打日志 | ✅ Filled |
 
 ---
 
-## How to Fill These Guidelines
+## Sources
 
-For each guideline file:
+- `AGENTS.md`（agent 规范唯一事实来源，本目录与其互补不重复）
+- 真实任务教训：`4fac541` D1 迁移/错误处理、`0b09027` 质量门禁 0 error
 
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
-
-The goal is to help AI assistants and new team members understand how YOUR project works.
-
----
-
-**Language**: All documentation should be written in **English**.
+**Language**: 与 AGENTS.md 一致，中文为主。
