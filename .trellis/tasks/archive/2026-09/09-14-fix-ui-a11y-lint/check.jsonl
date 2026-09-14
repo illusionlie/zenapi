@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "验收需对照质检门槛（check/typecheck/test 全绿判定方法）并确认 Known Debt 清偿与门槛升级已写入"}
+{"file": ".trellis/spec/api-worker-ui/frontend/index.md", "reason": "frontend 层规范索引，检查时确认改动未违反层内约定"}

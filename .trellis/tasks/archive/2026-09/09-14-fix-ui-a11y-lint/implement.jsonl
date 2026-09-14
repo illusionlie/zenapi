@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "Known Debt 记录了本批 24 个存量 a11y 错误的背景与零新增先例写法（span 替代缺 control 的 label、checkbox 嵌套 label）；R3 完成后还需更新本文件的 Known Debt 与质检门槛描述"}
+{"file": ".trellis/spec/api-worker-ui/frontend/index.md", "reason": "frontend 层规范索引，实施前过一遍确认无遗漏约定"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "JSX 组件修改约定（含 Accessibility 节），label/SVG/可点击元素的语义化改法需遵守"}
