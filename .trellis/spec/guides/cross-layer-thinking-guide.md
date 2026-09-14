@@ -325,3 +325,26 @@ state correctly, but several commands still re-parsed event payload fields with
 local casts. The fix was to make the core event layer own `ThreadChannelEvent`
 and `isThreadEvent`, make `reduceChannelMetadata` the only channel metadata
 projection, and make `reduceThreads` the only thread replay reducer.
+
+---
+
+### Checklist: After Adding A New Settings Key (KV Config)
+
+- [ ] Define the key constant once (co-located with its domain util, e.g.
+      `utils/proxy-headers.ts`), never inline string literals in routes
+- [ ] Add `get`/`set` pair in the settings service (store raw string, mirror
+      an existing setter like `setAnnouncement`)
+- [ ] Wire `GET /api/settings` (default `""`) and `PUT` validation with a
+      snake_case 400 error code
+- [ ] Update UI `Settings` **and** `SettingsForm` types (both, or tsc fails)
+- [ ] Update `initialSettingsForm`, `loadSettings` (`?? ""`) and
+      `handleSettingsSubmit` in `AdminApp.tsx`
+- [ ] Add the form field + explanatory copy in `SettingsView.tsx`
+- [ ] No D1 migration needed (settings is a KV table); missing key = empty
+      config, runtime must tolerate unparseable values
+- [ ] Full chain smoke: PUT invalid → 400; PUT valid → GET echo matches
+
+**Real-world example**: task `09-14-global-custom-headers` added
+`proxy_extra_headers` / `proxy_remove_headers`. The seven-hop chain
+(service → route → types ×2 → constants → AdminApp ×2 → View) is now the
+reference implementation in `.trellis/spec/api-worker/backend/proxy-headers.md` §8.
