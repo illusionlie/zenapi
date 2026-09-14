@@ -708,7 +708,12 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					toast.error("未找到令牌");
 					return;
 				}
-				setSecretModal({ title: "令牌详情", value: result.token });
+				try {
+					await navigator.clipboard.writeText(result.token);
+					toast.success("令牌已复制到剪贴板");
+				} catch {
+					setSecretModal({ title: "令牌详情", value: result.token });
+				}
 			} catch (error) {
 				toast.error((error as Error).message);
 			}

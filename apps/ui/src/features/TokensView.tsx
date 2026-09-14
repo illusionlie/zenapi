@@ -130,7 +130,7 @@ export const TokensView = ({
 												type="button"
 												onClick={() => onReveal(tokenItem.id)}
 											>
-												查看
+												复制
 											</button>
 											<button
 												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -210,7 +210,7 @@ export const TokensView = ({
 											type="button"
 											onClick={() => onReveal(tokenItem.id)}
 										>
-											查看
+											复制
 										</button>
 										<button
 											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:text-stone-900 hover:shadow-lg"

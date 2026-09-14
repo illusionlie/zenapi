@@ -24,7 +24,7 @@ core/toast.ts    ── 全局 toast store（模块级单例，独立于组件�
 
 ### Convention: 服务端数据按 Tab 域聚合在容器 state
 
-**What**: AdminApp 用 `useState<AdminData>(initialData)` 持有聚合数据对象，`loadTab(activeTab)` 按当前 Tab 拉取并 `setData`；表单用独立 state（`channelForm`、`settingsForm`，初值来自 `core/constants.ts` 的 `initialXxxForm`）；用户反馈统一走 `core/toast.ts` 的 `toast.success/error/info`（命令式调用，无需 props 传递）；需要长期查看/复制的明文（令牌、邀请码）用 `SecretValueModal` 弹窗展示，不走 toast。
+**What**: AdminApp 用 `useState<AdminData>(initialData)` 持有聚合数据对象，`loadTab(activeTab)` 按当前 Tab 拉取并 `setData`；表单用独立 state（`channelForm`、`settingsForm`，初值来自 `core/constants.ts` 的 `initialXxxForm`）；用户反馈统一走 `core/toast.ts` 的 `toast.success/error/info`（命令式调用，无需 props 传递）。敏感明文的展示分两类：**一次性展示**（新令牌创建、邀请码导出）直接弹 `SecretValueModal`；**可重复获取的令牌明文**走「直接复制优先」——列表按钮点击 → fetch reveal → `clipboard.writeText` → toast 反馈，仅复制失败时（如 Safari 用户激活过期、非安全上下文）回落弹窗兜底，明文不进 toast 文案。
 
 **Why**: 一个 Tab 一个加载入口，数据源可追溯；不搞按组件粒度的缓存失效。
 
