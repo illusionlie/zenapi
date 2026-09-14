@@ -1,4 +1,4 @@
-import { useMemo, useState } from "hono/jsx/dom";
+import { useState } from "hono/jsx/dom";
 import type { PublicModelItem } from "../core/types";
 
 type UserModelsViewProps = {

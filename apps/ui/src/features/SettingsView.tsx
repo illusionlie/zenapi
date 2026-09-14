@@ -403,8 +403,14 @@ export const SettingsView = ({
 					</div>
 					<div class="mb-4 flex flex-wrap items-end gap-3">
 						<div>
-							<label class="mb-1 block text-xs text-stone-500">数量</label>
+							<label
+								class="mb-1 block text-xs text-stone-500"
+								htmlFor="invite-gen-count"
+							>
+								数量
+							</label>
 							<input
+								id="invite-gen-count"
 								type="number"
 								min="1"
 								max="100"
@@ -418,10 +424,14 @@ export const SettingsView = ({
 							/>
 						</div>
 						<div>
-							<label class="mb-1 block text-xs text-stone-500">
+							<label
+								class="mb-1 block text-xs text-stone-500"
+								htmlFor="invite-gen-max-uses"
+							>
 								最大使用次数
 							</label>
 							<input
+								id="invite-gen-max-uses"
 								type="number"
 								min="1"
 								class="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
@@ -434,8 +444,14 @@ export const SettingsView = ({
 							/>
 						</div>
 						<div>
-							<label class="mb-1 block text-xs text-stone-500">前缀</label>
+							<label
+								class="mb-1 block text-xs text-stone-500"
+								htmlFor="invite-gen-prefix"
+							>
+								前缀
+							</label>
 							<input
+								id="invite-gen-prefix"
 								type="text"
 								class="w-24 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 								value={genPrefix}

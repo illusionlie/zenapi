@@ -151,10 +151,14 @@ export const UserDashboard = ({
 					</p>
 					<div class="flex flex-col gap-3 sm:flex-row sm:items-end">
 						<div class="flex-1">
-							<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+							<label
+								class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+								htmlFor="recharge-amount"
+							>
 								LDC 积分数量
 							</label>
 							<input
+								id="recharge-amount"
 								class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 								type="number"
 								min="1"

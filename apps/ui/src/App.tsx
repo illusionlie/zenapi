@@ -125,11 +125,6 @@ const App = () => {
 		[updateUserToken, navigateTo],
 	);
 
-	const handleUserLogout = useCallback(() => {
-		updateUserToken(null);
-		navigateTo("/login");
-	}, [updateUserToken, navigateTo]);
-
 	const handleUserRefresh = useCallback(() => {
 		if (!userToken) return;
 		const api = createApiFetch(userToken, () => updateUserToken(null));
@@ -304,13 +299,14 @@ const AnnouncementModal = ({
 	onClose: () => void;
 }) => {
 	return (
-		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-			onClick={(e) => {
-				if (e.target === e.currentTarget) onClose();
-			}}
-		>
-			<div class="mx-4 w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
+		<div class="fixed inset-0 z-50 flex items-center justify-center">
+			<button
+				type="button"
+				class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+				aria-label="关闭公告"
+				onClick={onClose}
+			/>
+			<div class="relative z-10 mx-4 w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
 				<div class="mb-4 flex items-center gap-2">
 					<span class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
 						<svg
@@ -318,6 +314,7 @@ const AnnouncementModal = ({
 							class="h-5 w-5"
 							viewBox="0 0 20 20"
 							fill="currentColor"
+							aria-hidden="true"
 						>
 							<path
 								fill-rule="evenodd"

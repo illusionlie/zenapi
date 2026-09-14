@@ -152,7 +152,7 @@ export const UserApp = ({
 
 	const loadTab = useCallback(
 		async (tabId: UserTabId) => {
-			if (!loadedTabs.current!.has(tabId)) setLoading(true);
+			if (!loadedTabs.current?.has(tabId)) setLoading(true);
 			setNotice("");
 			try {
 				if (tabId === "dashboard") await loadDashboard();
@@ -163,7 +163,7 @@ export const UserApp = ({
 					await loadModels();
 				}
 				if (tabId === "usage") await loadUsage();
-				loadedTabs.current!.add(tabId);
+				loadedTabs.current?.add(tabId);
 			} catch (error) {
 				setNotice((error as Error).message);
 			} finally {
@@ -329,6 +329,7 @@ export const UserApp = ({
 				<button
 					class="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 transition-all hover:bg-stone-50 hover:text-stone-900"
 					type="button"
+					aria-label="切换菜单"
 					onClick={toggleMobileMenu}
 				>
 					<svg
@@ -338,6 +339,7 @@ export const UserApp = ({
 						stroke-width="2"
 						stroke="currentColor"
 						class="h-5 w-5"
+						aria-hidden="true"
 					>
 						{isMobileMenuOpen ? (
 							<path

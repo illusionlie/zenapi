@@ -48,6 +48,8 @@ const MiniSparkline = ({
 			height={height}
 			class="inline-block"
 			viewBox={`0 0 ${width} ${height}`}
+			role="img"
+			aria-label="每日请求趋势"
 		>
 			<polygon points={areaPoints} fill="rgba(245,158,11,0.15)" />
 			<polyline

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "hono/jsx/dom";
 import type { Channel, ChannelApiFormat, ChannelForm } from "../core/types";
 import { buildPageItems } from "../core/utils";
-import type { ModelAliasConfig, ModelAliasesMap } from "../UserApp";
+import type { ModelAliasesMap } from "../UserApp";
 
 type ParsedModel = {
 	id: string;
@@ -144,8 +144,14 @@ const ModelPricingEditor = ({
 							</span>
 						</div>
 						<div class="flex shrink-0 items-center gap-1.5">
-							<label class="text-xs text-stone-400">输入</label>
+							<label
+								class="text-xs text-stone-400"
+								htmlFor={`model-input-price-${i}`}
+							>
+								输入
+							</label>
 							<input
+								id={`model-input-price-${i}`}
 								class="w-20 rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-900 placeholder:text-stone-300 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
 								type="number"
 								min="0"
@@ -160,8 +166,14 @@ const ModelPricingEditor = ({
 									)
 								}
 							/>
-							<label class="text-xs text-stone-400">输出</label>
+							<label
+								class="text-xs text-stone-400"
+								htmlFor={`model-output-price-${i}`}
+							>
+								输出
+							</label>
 							<input
+								id={`model-output-price-${i}`}
 								class="w-20 rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-900 placeholder:text-stone-300 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
 								type="number"
 								min="0"

@@ -150,7 +150,7 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 
 				for (const line of lines) {
 					const trimmedLine = line.trim();
-					if (!trimmedLine || !trimmedLine.startsWith("data: ")) continue;
+					if (!trimmedLine?.startsWith("data: ")) continue;
 					const data = trimmedLine.slice(6);
 					if (data === "[DONE]") continue;
 

@@ -209,9 +209,12 @@ const ChannelBar = ({
 					const rate = trend ? trend.success_rate : null;
 					const isSelected = selectedSlot === slot;
 					return (
-						<div
+						<button
+							type="button"
 							key={slot}
 							class="relative flex-1 cursor-pointer"
+							aria-label={`查看 ${formatSlotLabel(slot, range)} 请求详情`}
+							aria-pressed={isSelected}
 							onMouseEnter={() => setHoveredSlot(slot)}
 							onMouseLeave={() => setHoveredSlot(null)}
 							onClick={() => handleSlotClick(slot)}
@@ -220,7 +223,7 @@ const ChannelBar = ({
 								class={`h-8 rounded-sm transition-opacity hover:opacity-80 ${isSelected ? "ring-2 ring-stone-900 ring-offset-1" : ""}`}
 								style={{ backgroundColor: barColor(rate) }}
 							/>
-						</div>
+						</button>
 					);
 				})}
 			</div>

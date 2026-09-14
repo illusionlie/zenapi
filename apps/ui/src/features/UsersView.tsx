@@ -280,10 +280,14 @@ export const UsersView = ({
 						</h3>
 						<form class="grid gap-4" onSubmit={handleCreate}>
 							<div>
-								<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									htmlFor="user-create-email"
+								>
 									邮箱
 								</label>
 								<input
+									id="user-create-email"
 									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 									type="email"
 									required
@@ -297,10 +301,14 @@ export const UsersView = ({
 								/>
 							</div>
 							<div>
-								<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									htmlFor="user-create-name"
+								>
 									用户名
 								</label>
 								<input
+									id="user-create-name"
 									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 									type="text"
 									required
@@ -314,10 +322,14 @@ export const UsersView = ({
 								/>
 							</div>
 							<div>
-								<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									htmlFor="user-create-password"
+								>
 									密码
 								</label>
 								<input
+									id="user-create-password"
 									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 									type="password"
 									required
@@ -332,10 +344,14 @@ export const UsersView = ({
 								/>
 							</div>
 							<div>
-								<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									htmlFor="user-create-balance"
+								>
 									初始余额
 								</label>
 								<input
+									id="user-create-balance"
 									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 									type="number"
 									step="0.01"
@@ -386,10 +402,14 @@ export const UsersView = ({
 						</h3>
 						<form class="grid gap-4" onSubmit={handleEdit}>
 							<div>
-								<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									htmlFor="user-edit-name"
+								>
 									用户名
 								</label>
 								<input
+									id="user-edit-name"
 									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 									type="text"
 									required
@@ -403,10 +423,14 @@ export const UsersView = ({
 								/>
 							</div>
 							<div>
-								<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									htmlFor="user-edit-balance"
+								>
 									余额
 								</label>
 								<input
+									id="user-edit-balance"
 									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 									type="number"
 									step="0.01"
@@ -421,10 +445,14 @@ export const UsersView = ({
 								/>
 							</div>
 							<div>
-								<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									htmlFor="user-edit-status"
+								>
 									状态
 								</label>
 								<select
+									id="user-edit-status"
 									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 									value={editForm.status}
 									onChange={(e) =>
@@ -440,10 +468,14 @@ export const UsersView = ({
 								</select>
 							</div>
 							<div>
-								<label class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500">
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									htmlFor="user-edit-password"
+								>
 									新密码（留空不修改）
 								</label>
 								<input
+									id="user-edit-password"
 									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 									type="password"
 									value={editForm.password}
