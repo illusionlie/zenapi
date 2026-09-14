@@ -133,3 +133,36 @@ Fixed ZenAPI to service-only mode: removed site_mode mechanism (17 backend ancho
 ### Status
 
 [OK] **Completed**（check 全绿：PRD R1-R6 逐项合规、Admin/User handler 同构、三命令 0 error / 49 用例通过；浏览器手动冒烟建议用户自验）
+
+---
+
+## Session 6 — 全局自定义请求头（注入/剔除）与渠道级统一
+
+**Date**: 2026-09-15
+**Task**: 09-14-global-custom-headers（复杂任务：PRD + design + implement，规划→实施→检查→冒烟→归档）
+**Branch**: `main`
+
+### Summary
+
+系统设置新增两个全局头策略（仅 /v1 与 /anthropic/v1 计费代理生效，Playground 与连通性测试豁免）：① proxy_extra_headers 注入（JSON 对象）② proxy_remove_headers 剔除（JSON 字符串数组）。核心是新建 utils/proxy-headers.ts 单点 applyHeaderPolicy（固定顺序：剔除 → 全局注入 → 渠道级，后应用者赢），两条代理链路全部 6 个上游 fetch 分支统一接入；顺带把渠道级 custom_headers_json 从 custom-only 扩展到全格式并把 ChannelsView 编辑字段常显（用户此前根本看不到该字段——条件渲染 + 后端仅 custom 分支生效的双重隐藏）。buildChannelRequest 加可选第 9 参 policy 保住 Playground 豁免边界。settings KV 原文存储，零迁移。实施派 trellis-implement（TDD 25 用例）、核查派 trellis-check（抓出 placeholder 非法 JSON 真 bug），最后本地 wrangler dev + 回显上游做端到端冒烟（6 分支 × 注入/剔除/覆盖矩阵全 PASS）。
+
+### Key learnings
+
+1. **跨层契约改动必须先盘全部分支**：动手前逐分支盘点（design §2 接入矩阵）避免了遗漏——anthropic-proxy 的 openai 转换分支是 fresh Headers 白名单式，不看代码根本想不到剔除在那里是 no-op。
+2. **豁免边界用参数显式化**：全局配置若在共享函数内自动读库，Playground 这类复用方无法豁免；改为调用方传 policy（null = 仅渠道级），边界清晰且读库时机（与渠道查询 Promise.all）由调用方控制。
+3. **「后应用者赢」保持现状能力**：历史 custom 分支渠道级就能覆盖 x-api-key，统一时不加保护名单回退它，规则单一 + UI 警示兜底。
+4. **冒烟断言也会拿错对象**：两次 FAIL 都是断言脚本自身错位（拿 custom 渠道行为断言 openai 渠道、拿渠道级值判全局豁免），先看原始日志再下结论。
+5. wrangler d1 execute --local 必须在 apps/worker/ 目录下执行；本地 dev D1 有历史管理员密码时，直接往 admin_sessions 插已知 hash 的会话是最无侵入的冒烟通道。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c7e1e18` | feat(worker): 全局自定义请求头注入/剔除与渠道级 custom_headers 全格式生效 |
+| `a4f6825` | feat(ui): 系统设置新增请求头注入/剔除配置，渠道级自定义请求头常显 |
+| `21d3148` | chore(task): archive 09-14-global-custom-headers |
+| `686c623` | docs(spec): 沉淀上游请求头策略契约与 settings 新增配置项标准链路 |
+
+### Status
+
+[OK] **Completed**（check/typecheck/test 全绿：74 用例、0 error；端到端冒烟 6 分支矩阵全 PASS，AC1–AC10 逐项达成；spec 沉淀至 api-worker/backend/proxy-headers.md + cross-layer guide checklist）
