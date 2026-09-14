@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/api-worker/backend/index.md", "reason": "后端规范索引：routes 薄壳 + services 下沉、挂载点约定"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "Biome 规则、命名禁则、提交门禁（check/typecheck/test）"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "settings 路由新增 400 校验分支需沿用 jsonError + snake_case 错误码风格"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "SettingsView/ChannelsView 表单组件与文案风格"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端质量门禁与禁则"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "跨层数据流：settings KV → service → route → proxy headers → UI 表单回显，字段命名需三层一致"}

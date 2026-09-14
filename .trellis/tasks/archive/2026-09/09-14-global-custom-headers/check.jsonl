@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "验收门禁：check/typecheck/test 全绿、Biome 格式"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端改动质量核对"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "核对 settings 字段在 worker/ui 两层命名与流转一致性"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "核对渠道级 merge 是否真正收敛到 applyHeaderPolicy 单点"}
