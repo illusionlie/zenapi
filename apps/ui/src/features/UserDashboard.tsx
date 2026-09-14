@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "hono/jsx/dom";
 import { createApiFetch } from "../core/api";
+import { toast } from "../core/toast";
 import type { User, UserDashboardData } from "../core/types";
 
 type UserDashboardProps = {
@@ -34,10 +35,9 @@ export const UserDashboard = ({
 	onUserRefresh,
 }: UserDashboardProps) => {
 	const [checkinLoading, setCheckinLoading] = useState(false);
-	const [checkinNotice, setCheckinNotice] = useState("");
 	const [rechargeAmount, setRechargeAmount] = useState("");
 	const [rechargeLoading, setRechargeLoading] = useState(false);
-	const [rechargeNotice, setRechargeNotice] = useState("");
+	const [rechargeError, setRechargeError] = useState("");
 
 	const apiFetch = useMemo(
 		() => createApiFetch(token, () => updateToken(null)),
@@ -55,13 +55,13 @@ export const UserDashboard = ({
 				method: "POST",
 			});
 			if (result.already_checked_in) {
-				setCheckinNotice("今日已签到");
+				toast.info("今日已签到");
 			} else if (result.ok) {
-				setCheckinNotice(`签到成功，获得 $${result.reward?.toFixed(2) ?? "0"}`);
+				toast.success(`签到成功，获得 $${result.reward?.toFixed(2) ?? "0"}`);
 				onUserRefresh();
 			}
 		} catch (error) {
-			setCheckinNotice((error as Error).message);
+			toast.error((error as Error).message);
 		} finally {
 			setCheckinLoading(false);
 		}
@@ -70,11 +70,11 @@ export const UserDashboard = ({
 	const handleRecharge = useCallback(async () => {
 		const amount = Number(rechargeAmount);
 		if (!amount || amount <= 0) {
-			setRechargeNotice("请输入有效的充值金额");
+			setRechargeError("请输入有效的充值金额");
 			return;
 		}
 		setRechargeLoading(true);
-		setRechargeNotice("");
+		setRechargeError("");
 		try {
 			const result = await apiFetch<{ order_id: string; redirect_url: string }>(
 				"/api/recharge/create",
@@ -87,7 +87,7 @@ export const UserDashboard = ({
 				window.location.href = result.redirect_url;
 			}
 		} catch (error) {
-			setRechargeNotice((error as Error).message);
+			toast.error((error as Error).message);
 		} finally {
 			setRechargeLoading(false);
 		}
@@ -133,11 +133,6 @@ export const UserDashboard = ({
 						</button>
 					)}
 				</div>
-				{checkinNotice && (
-					<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
-						{checkinNotice}
-					</div>
-				)}
 			</div>
 
 			{/* Recharge card */}
@@ -188,9 +183,9 @@ export const UserDashboard = ({
 							余额
 						</p>
 					)}
-					{rechargeNotice && (
-						<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
-							{rechargeNotice}
+					{rechargeError && (
+						<div class="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+							{rechargeError}
 						</div>
 					)}
 				</div>

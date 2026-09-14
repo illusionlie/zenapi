@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/api-worker-ui/frontend/index.md", "reason": "前端层规范索引，实施前必读"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "新建 ToastHost/SecretValueModal 组件须遵守组件规范"}
+{"file": ".trellis/spec/api-worker-ui/frontend/state-management.md", "reason": "现行 notice 状态管理约定出处，本任务将其替换为 toast 模式（阶段 6 修订）"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "TS strict 约定，store 类型设计参照"}
+{"file": ".trellis/tasks/09-14-toast-notification-refactor/research/current-state.md", "reason": "71 处 setNotice 调用点逐行语义分类表与 banner/modal 现状，迁移的唯一事实依据"}

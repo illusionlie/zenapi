@@ -2,8 +2,10 @@ import "./styles.css";
 import { render, useCallback, useEffect, useState } from "hono/jsx/dom";
 import { AdminApp } from "./AdminApp";
 import { createApiFetch } from "./core/api";
+import { toast } from "./core/toast";
 import type { RegistrationMode, User } from "./core/types";
 import { LoginView } from "./features/LoginView";
+import { ToastHost } from "./features/ToastHost";
 import { PublicApp } from "./PublicApp";
 import { UserApp } from "./UserApp";
 
@@ -18,7 +20,7 @@ const normalizePath = (path: string) => {
 	return path.replace(/\/+$/, "") || "/";
 };
 
-const App = () => {
+const AppRoutes = () => {
 	const [adminToken, setAdminToken] = useState<string | null>(() =>
 		localStorage.getItem("admin_token"),
 	);
@@ -32,7 +34,6 @@ const App = () => {
 		useState<RegistrationMode>("open");
 	const [linuxdoEnabled, setLinuxdoEnabled] = useState(false);
 	const [requireInviteCode, setRequireInviteCode] = useState(false);
-	const [notice, setNotice] = useState("");
 	const [announcement, setAnnouncement] = useState("");
 	const [showAnnouncement, setShowAnnouncement] = useState(false);
 	const [path, setPath] = useState(() =>
@@ -156,9 +157,8 @@ const App = () => {
 					body: JSON.stringify({ password }),
 				});
 				updateAdminToken(result.token);
-				setNotice("");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[updateAdminToken],
@@ -169,11 +169,7 @@ const App = () => {
 		if (!adminToken) {
 			return (
 				<div class="min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased">
-					<LoginView
-						notice={notice}
-						onSubmit={handleAdminLogin}
-						onNavigate={navigateTo}
-					/>
+					<LoginView onSubmit={handleAdminLogin} onNavigate={navigateTo} />
 				</div>
 			);
 		}
@@ -343,5 +339,13 @@ const AnnouncementModal = ({
 		</div>
 	);
 };
+
+// ToastHost 挂在路由分发之外：portal 到 document.body，登录态切换/分支卸载不影响其存活。
+const App = () => (
+	<>
+		<ToastHost />
+		<AppRoutes />
+	</>
+);
 
 render(<App />, root);

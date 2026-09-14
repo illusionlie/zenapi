@@ -1,5 +1,4 @@
 type LoginViewProps = {
-	notice: string;
 	onSubmit: (event: Event) => void;
 	onNavigate: (path: string) => void;
 };
@@ -13,7 +12,7 @@ type LoginViewProps = {
  * Returns:
  *   Login JSX element.
  */
-export const LoginView = ({ notice, onSubmit, onNavigate }: LoginViewProps) => (
+export const LoginView = ({ onSubmit, onNavigate }: LoginViewProps) => (
 	<div class="mx-auto mt-24 max-w-md rounded-2xl border border-stone-200 bg-white p-8 shadow-lg">
 		<button
 			type="button"
@@ -46,10 +45,5 @@ export const LoginView = ({ notice, onSubmit, onNavigate }: LoginViewProps) => (
 				登录
 			</button>
 		</form>
-		{notice && (
-			<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-				{notice}
-			</div>
-		)}
 	</div>
 );

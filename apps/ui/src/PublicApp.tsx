@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "hono/jsx/dom";
 import { createApiFetch } from "./core/api";
+import { toast } from "./core/toast";
 import type { RegistrationMode } from "./core/types";
 import { UserLoginView } from "./features/UserLoginView";
 import { UserRegisterView } from "./features/UserRegisterView";
@@ -29,7 +30,6 @@ export const PublicApp = ({
 		if (normalized === "/register") return "register";
 		return "login";
 	});
-	const [notice, setNotice] = useState("");
 
 	const apiFetch = useCallback(() => createApiFetch(null, () => {}), []);
 
@@ -65,7 +65,7 @@ export const PublicApp = ({
 				registration_disabled: "授权失败：注册已关闭",
 				invalid_invite_code: "授权失败：邀请码无效或已用完",
 			};
-			setNotice(errorMessages[linuxdoError] ?? `授权失败：${linuxdoError}`);
+			toast.error(errorMessages[linuxdoError] ?? `授权失败：${linuxdoError}`);
 		}
 	}, [onUserLogin]);
 
@@ -73,7 +73,6 @@ export const PublicApp = ({
 		const paths = { login: "/login", register: "/register" };
 		history.pushState(null, "", paths[target]);
 		setPage(target);
-		setNotice("");
 	}, []);
 
 	const handleLogin = useCallback(
@@ -86,7 +85,7 @@ export const PublicApp = ({
 				});
 				onUserLogin(result.token);
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, onUserLogin],
@@ -112,7 +111,7 @@ export const PublicApp = ({
 				});
 				onUserLogin(result.token);
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, onUserLogin],
@@ -149,7 +148,6 @@ export const PublicApp = ({
 					</div>
 				</nav>
 				<UserRegisterView
-					notice={notice}
 					onSubmit={handleRegister}
 					onGoLogin={() => navigate("login")}
 					onNavigate={onNavigate}
@@ -194,7 +192,6 @@ export const PublicApp = ({
 				</div>
 			</nav>
 			<UserLoginView
-				notice={notice}
 				onSubmit={handleLogin}
 				onGoRegister={() => navigate("register")}
 				onNavigate={onNavigate}

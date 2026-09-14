@@ -7,6 +7,7 @@ import {
 } from "hono/jsx/dom";
 import { createApiFetch } from "./core/api";
 import { userTabs } from "./core/constants";
+import { toast } from "./core/toast";
 import type {
 	MonitoringData,
 	PublicModelItem,
@@ -17,6 +18,7 @@ import type {
 	UserTabId,
 } from "./core/types";
 import { MonitoringView } from "./features/MonitoringView";
+import { SecretValueModal } from "./features/SecretValueModal";
 import { UserDashboard } from "./features/UserDashboard";
 import { UserModelsView } from "./features/UserModelsView";
 import { UserTokensView } from "./features/UserTokensView";
@@ -72,7 +74,6 @@ export const UserApp = ({
 		return userPathToTab[normalized] ?? "dashboard";
 	});
 	const [loading, setLoading] = useState(false);
-	const [notice, setNotice] = useState("");
 	const [dashboardData, setDashboardData] = useState<UserDashboardData | null>(
 		null,
 	);
@@ -81,6 +82,10 @@ export const UserApp = ({
 	const [usage, setUsage] = useState<UsageLog[]>([]);
 	const [monitoring, setMonitoring] = useState<MonitoringData | null>(null);
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+	const [secretModal, setSecretModal] = useState<{
+		title: string;
+		value: string;
+	} | null>(null);
 
 	// Handle Linux DO bind callback parameters
 	useEffect(() => {
@@ -90,7 +95,7 @@ export const UserApp = ({
 		const rechargeOk = params.get("recharge");
 		if (bindOk) {
 			history.replaceState(null, "", "/user");
-			setNotice("Linux DO 账号绑定成功");
+			toast.success("Linux DO 账号绑定成功");
 			onUserRefresh();
 		} else if (bindError) {
 			history.replaceState(null, "", "/user");
@@ -102,10 +107,10 @@ export const UserApp = ({
 				linuxdo_already_taken: "绑定失败：该 Linux DO 账号已被其他用户绑定",
 				invalid_bind_cookie: "绑定失败：绑定状态无效",
 			};
-			setNotice(errorMessages[bindError] ?? `绑定失败：${bindError}`);
+			toast.error(errorMessages[bindError] ?? `绑定失败：${bindError}`);
 		} else if (rechargeOk === "ok") {
 			history.replaceState(null, "", "/user");
-			setNotice("充值成功，余额已更新");
+			toast.success("充值成功，余额已更新");
 			onUserRefresh();
 		}
 	}, [onUserRefresh]);
@@ -153,7 +158,6 @@ export const UserApp = ({
 	const loadTab = useCallback(
 		async (tabId: UserTabId) => {
 			if (!loadedTabs.current?.has(tabId)) setLoading(true);
-			setNotice("");
 			try {
 				if (tabId === "dashboard") await loadDashboard();
 				if (tabId === "monitoring") await loadMonitoring();
@@ -165,7 +169,7 @@ export const UserApp = ({
 				if (tabId === "usage") await loadUsage();
 				loadedTabs.current?.add(tabId);
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			} finally {
 				setLoading(false);
 			}
@@ -204,10 +208,10 @@ export const UserApp = ({
 	const handleLinuxdoUnbind = useCallback(async () => {
 		try {
 			await apiFetch("/api/u/auth/linuxdo/unbind", { method: "POST" });
-			setNotice("Linux DO 账号已解除绑定");
+			toast.success("Linux DO 账号已解除绑定");
 			onUserRefresh();
 		} catch (error) {
-			setNotice((error as Error).message);
+			toast.error((error as Error).message);
 		}
 	}, [apiFetch, onUserRefresh]);
 
@@ -218,10 +222,11 @@ export const UserApp = ({
 					method: "POST",
 					body: JSON.stringify({ name }),
 				});
-				setNotice(`新令牌: ${result.token}`);
+				toast.success("令牌已创建");
+				setSecretModal({ title: "新令牌已创建", value: result.token });
 				await loadTokens();
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadTokens],
@@ -232,9 +237,9 @@ export const UserApp = ({
 			try {
 				await apiFetch(`/api/u/tokens/${id}`, { method: "DELETE" });
 				await loadTokens();
-				setNotice("令牌已删除");
+				toast.success("令牌已删除");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadTokens],
@@ -247,17 +252,12 @@ export const UserApp = ({
 					`/api/u/tokens/${id}/reveal`,
 				);
 				if (!result.token) {
-					setNotice("未找到令牌");
+					toast.error("未找到令牌");
 					return;
 				}
-				try {
-					await navigator.clipboard.writeText(result.token);
-					setNotice(`令牌已复制到剪贴板：${result.token}`);
-				} catch {
-					setNotice(`令牌: ${result.token}`);
-				}
+				setSecretModal({ title: "令牌详情", value: result.token });
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch],
@@ -492,13 +492,15 @@ export const UserApp = ({
 						</button>
 					</div>
 				</div>
-				{notice && (
-					<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-						{notice}
-					</div>
-				)}
 				<div key={activeTab}>{renderContent()}</div>
 			</main>
+			{secretModal && (
+				<SecretValueModal
+					title={secretModal.title}
+					value={secretModal.value}
+					onClose={() => setSecretModal(null)}
+				/>
+			)}
 		</div>
 	);
 };

@@ -6,6 +6,7 @@ import {
 	initialSettingsForm,
 	tabs,
 } from "./core/constants";
+import { toast } from "./core/toast";
 import type {
 	AdminData,
 	Channel,
@@ -28,6 +29,7 @@ import { DashboardView } from "./features/DashboardView";
 import { ModelsView } from "./features/ModelsView";
 import { MonitoringView } from "./features/MonitoringView";
 import { PlaygroundView } from "./features/PlaygroundView";
+import { SecretValueModal } from "./features/SecretValueModal";
 import { SettingsView } from "./features/SettingsView";
 import { TokensView } from "./features/TokensView";
 import { UsageView } from "./features/UsageView";
@@ -75,7 +77,6 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		return adminPathToTab[normalized] ?? "dashboard";
 	});
 	const [loading, setLoading] = useState(false);
-	const [notice, setNotice] = useState("");
 	const [data, setData] = useState<AdminData>(initialData);
 	const [settingsForm, setSettingsForm] =
 		useState<SettingsForm>(initialSettingsForm);
@@ -105,6 +106,10 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [users, setUsers] = useState<User[]>([]);
 	const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+	const [secretModal, setSecretModal] = useState<{
+		title: string;
+		value: string;
+	} | null>(null);
 
 	const apiFetch = useMemo(
 		() => createApiFetch(token, () => updateToken(null)),
@@ -187,7 +192,6 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	const loadTab = useCallback(
 		async (tabId: TabId) => {
 			setLoading(true);
-			setNotice("");
 			try {
 				if (tabId === "dashboard") await loadDashboard();
 				if (tabId === "monitoring") await loadMonitoring();
@@ -204,7 +208,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					/* no data to preload */
 				}
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			} finally {
 				setLoading(false);
 			}
@@ -298,12 +302,10 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		setChannelForm({ ...initialChannelForm });
 		setChannelAliasState({});
 		setChannelModalOpen(true);
-		setNotice("");
 	}, []);
 
 	const openTokenCreate = useCallback(() => {
 		setTokenModalOpen(true);
-		setNotice("");
 	}, []);
 
 	const startChannelEdit = useCallback(
@@ -370,7 +372,6 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			}
 			setChannelAliasState(initial);
 			setChannelModalOpen(true);
-			setNotice("");
 		},
 		[channelModelAliases],
 	);
@@ -388,7 +389,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					channel.id !== editingChannel?.id,
 			);
 			if (nameExists) {
-				setNotice("渠道名称已存在，请使用其他名称");
+				toast.error("渠道名称已存在，请使用其他名称");
 				return;
 			}
 			try {
@@ -445,18 +446,18 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 						method: "PATCH",
 						body: JSON.stringify(body),
 					});
-					setNotice("渠道已更新");
+					toast.success("渠道已更新");
 				} else {
 					await apiFetch("/api/channels", {
 						method: "POST",
 						body: JSON.stringify(body),
 					});
-					setNotice("渠道已创建");
+					toast.success("渠道已创建");
 				}
 				closeChannelModal();
 				await loadChannels();
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[
@@ -489,13 +490,14 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 							: null,
 					}),
 				});
-				setNotice(`新令牌: ${result.token}`);
+				toast.success("令牌已创建");
+				setSecretModal({ title: "新令牌已创建", value: result.token });
 				form.reset();
 				setTokenModalOpen(false);
 				setTokenPage(1);
 				await loadTokens();
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadTokens],
@@ -531,9 +533,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				});
 				await loadSettings();
 				setSettingsForm((prev) => ({ ...prev, admin_password: "" }));
-				setNotice("设置已更新");
+				toast.success("设置已更新");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadSettings, settingsForm],
@@ -541,7 +543,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 
 	const handleFetchModels = useCallback(async () => {
 		if (!channelForm.base_url.trim()) {
-			setNotice("请先填写 Base URL");
+			toast.error("请先填写 Base URL");
 			return;
 		}
 		setFetchingModels(true);
@@ -571,7 +573,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			);
 			setFetchedSearch("");
 		} catch (error) {
-			setNotice((error as Error).message);
+			toast.error((error as Error).message);
 		} finally {
 			setFetchingModels(false);
 		}
@@ -613,7 +615,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 		}
 		if (additions.length === 0) {
 			setFetchedModels(null);
-			setNotice("没有新模型可加入（已存在或未选择）");
+			toast.info("没有新模型可加入（已存在或未选择）");
 			return;
 		}
 		const prefix =
@@ -625,7 +627,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			models: prev.models + prefix + additions.join("\n"),
 		}));
 		setFetchedModels(null);
-		setNotice(`已加入 ${additions.length} 个模型`);
+		toast.success(`已加入 ${additions.length} 个模型`);
 	}, [channelForm.models, fetchedModels, selectedFetched]);
 
 	const cancelFetchedModels = useCallback(() => {
@@ -640,9 +642,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					{ method: "POST" },
 				);
 				await loadChannels();
-				setNotice(`连通测试完成，模型数 ${result.models?.length ?? 0}`);
+				toast.success(`连通测试完成，模型数 ${result.models?.length ?? 0}`);
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadChannels],
@@ -654,12 +656,12 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			try {
 				await apiFetch(`/api/channels/${id}`, { method: "DELETE" });
 				await loadChannels();
-				setNotice("渠道已删除");
+				toast.success("渠道已删除");
 				if (editingChannel?.id === id) {
 					closeChannelModal();
 				}
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, closeChannelModal, editingChannel, loadChannels],
@@ -674,9 +676,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					body: JSON.stringify({ status: next }),
 				});
 				await loadChannels();
-				setNotice(`渠道已${next === "active" ? "启用" : "停用"}`);
+				toast.success(`渠道已${next === "active" ? "启用" : "停用"}`);
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadChannels],
@@ -688,9 +690,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			try {
 				await apiFetch(`/api/tokens/${id}`, { method: "DELETE" });
 				await loadTokens();
-				setNotice("令牌已删除");
+				toast.success("令牌已删除");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadTokens],
@@ -703,17 +705,12 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					`/api/tokens/${id}/reveal`,
 				);
 				if (!result.token) {
-					setNotice("未找到令牌");
+					toast.error("未找到令牌");
 					return;
 				}
-				try {
-					await navigator.clipboard.writeText(result.token);
-					setNotice(`令牌已复制到剪贴板：${result.token}`);
-				} catch {
-					setNotice(`令牌: ${result.token}`);
-				}
+				setSecretModal({ title: "令牌详情", value: result.token });
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch],
@@ -728,9 +725,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					body: JSON.stringify({ status: next }),
 				});
 				await loadTokens();
-				setNotice(`令牌已${next === "active" ? "启用" : "停用"}`);
+				toast.success(`令牌已${next === "active" ? "启用" : "停用"}`);
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadTokens],
@@ -747,9 +744,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					"/api/invite-codes",
 				);
 				setInviteCodes(result.codes);
-				setNotice("邀请码已生成");
+				toast.success("邀请码已生成");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch],
@@ -763,9 +760,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					"/api/invite-codes",
 				);
 				setInviteCodes(result.codes);
-				setNotice("邀请码已删除");
+				toast.success("邀请码已删除");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch],
@@ -779,21 +776,21 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			const text = await res.text();
 			try {
 				await navigator.clipboard.writeText(text);
-				setNotice("邀请码已复制到剪贴板");
+				toast.success("已复制到剪贴板");
 			} catch {
-				setNotice(`邀请码:\n${text}`);
+				setSecretModal({ title: "邀请码导出", value: text });
 			}
 		} catch (error) {
-			setNotice((error as Error).message);
+			toast.error((error as Error).message);
 		}
 	}, [token]);
 
 	const handleUsageRefresh = useCallback(async () => {
 		try {
 			await loadUsage();
-			setNotice("日志已刷新");
+			toast.success("日志已刷新");
 		} catch (error) {
-			setNotice((error as Error).message);
+			toast.error((error as Error).message);
 		}
 	}, [loadUsage]);
 
@@ -805,9 +802,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					body: JSON.stringify({ aliases, alias_only: aliasOnly ?? false }),
 				});
 				await loadModels();
-				setNotice("别名已保存");
+				toast.success("别名已保存");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadModels],
@@ -828,9 +825,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					body: JSON.stringify({ prices }),
 				});
 				await loadModels();
-				setNotice("价格已保存");
+				toast.success("价格已保存");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadModels],
@@ -853,9 +850,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					body: JSON.stringify(userData),
 				});
 				await loadUsers();
-				setNotice("用户已创建");
+				toast.success("用户已创建");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadUsers],
@@ -869,9 +866,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					body: JSON.stringify(patch),
 				});
 				await loadUsers();
-				setNotice("用户已更新");
+				toast.success("用户已更新");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadUsers],
@@ -883,9 +880,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			try {
 				await apiFetch(`/api/users/${id}`, { method: "DELETE" });
 				await loadUsers();
-				setNotice("用户已删除");
+				toast.success("用户已删除");
 			} catch (error) {
-				setNotice((error as Error).message);
+				toast.error((error as Error).message);
 			}
 		},
 		[apiFetch, loadUsers],
@@ -1058,19 +1055,27 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	};
 
 	return (
-		<AppLayout
-			tabs={tabs}
-			activeTab={activeTab}
-			activeLabel={activeLabel}
-			token={token}
-			notice={notice}
-			isMobileMenuOpen={isMobileMenuOpen}
-			onTabChange={handleTabChange}
-			onToggleMobileMenu={toggleMobileMenu}
-			onLogout={handleLogout}
-			onNavigate={onNavigate}
-		>
-			<div key={activeTab}>{renderContent()}</div>
-		</AppLayout>
+		<>
+			<AppLayout
+				tabs={tabs}
+				activeTab={activeTab}
+				activeLabel={activeLabel}
+				token={token}
+				isMobileMenuOpen={isMobileMenuOpen}
+				onTabChange={handleTabChange}
+				onToggleMobileMenu={toggleMobileMenu}
+				onLogout={handleLogout}
+				onNavigate={onNavigate}
+			>
+				<div key={activeTab}>{renderContent()}</div>
+			</AppLayout>
+			{secretModal && (
+				<SecretValueModal
+					title={secretModal.title}
+					value={secretModal.value}
+					onClose={() => setSecretModal(null)}
+				/>
+			)}
+		</>
 	);
 };

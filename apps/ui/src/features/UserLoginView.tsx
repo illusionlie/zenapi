@@ -2,7 +2,6 @@ import { useState } from "hono/jsx/dom";
 import type { RegistrationMode } from "../core/types";
 
 type UserLoginViewProps = {
-	notice: string;
 	onSubmit: (account: string, password: string) => void;
 	onGoRegister: () => void;
 	onNavigate: (path: string) => void;
@@ -12,7 +11,6 @@ type UserLoginViewProps = {
 };
 
 export const UserLoginView = ({
-	notice,
 	onSubmit,
 	onGoRegister,
 	onNavigate,
@@ -157,11 +155,6 @@ export const UserLoginView = ({
 						</>
 					)}
 				</p>
-				{notice && (
-					<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-						{notice}
-					</div>
-				)}
 				<div class="mt-5 rounded-lg border border-stone-100 bg-stone-50 px-4 py-3 text-xs leading-relaxed text-stone-500">
 					<p>
 						<a

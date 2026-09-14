@@ -5,7 +5,6 @@ type AppLayoutProps = {
 	activeTab: TabId;
 	activeLabel: string;
 	token: string | null;
-	notice: string;
 	isMobileMenuOpen: boolean;
 	onTabChange: (tabId: TabId) => void;
 	onToggleMobileMenu: () => void;
@@ -22,7 +21,6 @@ export const AppLayout = ({
 	activeTab,
 	activeLabel,
 	token,
-	notice,
 	isMobileMenuOpen,
 	onTabChange,
 	onToggleMobileMenu,
@@ -183,11 +181,6 @@ export const AppLayout = ({
 					</button>
 				</div>
 			</div>
-			{notice && (
-				<div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 shrink-0">
-					{notice}
-				</div>
-			)}
 			<div class="flex-1 min-h-0 overflow-y-auto pb-8">{children}</div>
 		</main>
 	</div>

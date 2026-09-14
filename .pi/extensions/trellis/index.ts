@@ -1079,7 +1079,6 @@ function readTaskDir(root: string, key: string | null): string | null {
 		) as JsonObject;
 		let ref = str(ctx.current_task);
 		if (!ref) return null;
-		ref = ref;
 		ref = ref.replace(/\\/g, "/").replace(/^\.\//, "");
 		if (ref.startsWith("tasks/")) ref = `.trellis/${ref}`;
 		return ref.startsWith(".trellis/")

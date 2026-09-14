@@ -2,7 +2,6 @@ import { useState } from "hono/jsx/dom";
 import type { RegistrationMode } from "../core/types";
 
 type UserRegisterViewProps = {
-	notice: string;
 	onSubmit: (
 		email: string,
 		name: string,
@@ -17,7 +16,6 @@ type UserRegisterViewProps = {
 };
 
 export const UserRegisterView = ({
-	notice,
 	onSubmit,
 	onGoLogin,
 	onNavigate,
@@ -162,11 +160,6 @@ export const UserRegisterView = ({
 								</svg>
 								使用 Linux DO 注册
 							</button>
-						</div>
-					)}
-					{notice && (
-						<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-							{notice}
 						</div>
 					)}
 					<p class="mt-4 text-center text-sm text-stone-500">
@@ -324,9 +317,9 @@ export const UserRegisterView = ({
 						注册
 					</button>
 				</form>
-				{(error || notice) && (
-					<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-						{error || notice}
+				{error && (
+					<div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+						{error}
 					</div>
 				)}
 				{linuxdoEnabled && (
