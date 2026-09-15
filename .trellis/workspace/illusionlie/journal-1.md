@@ -199,3 +199,42 @@ Fixed ZenAPI to service-only mode: removed site_mode mechanism (17 backend ancho
 ### Status
 
 [OK] **Completed**（check/typecheck/test 全绿：8 文件 143 用例、Biome 0 error；check 代理 PRD 七条 AC 逐项勾选通过；真实上游手工冒烟留待用户自验）
+
+
+## Session 3: 代理重试参数迁入 settings（管理台可调）
+
+**Date**: 2026-09-16
+**Task**: 代理重试参数迁入 settings（管理台可调）
+**Branch**: `main`
+
+### Summary
+
+Session summary was not supplied.
+
+### Main Changes
+
+- 把 wrangler.toml 的 PROXY_RETRY_ROUNDS / PROXY_RETRY_DELAY_MS 迁为 settings 表配置（proxy_retry_rounds / proxy_retry_delay_ms），管理台系统设置新增两个数字字段
+- 建立三级回退链：settings → env（兼容回退，wrangler.toml 保留）→ 内置默认 2 轮 / 200ms；三条代理路径统一走 loadProxyRetryConfig，worker 端并入既有 Promise.all 预载（零串行新增）
+- 三层边界一致：PUT 整数+范围校验（1-10 / 0-60000，invalid_* 400）、读取侧 clamp、UI min/max 引用同一组 MIN/MAX 常量
+- 顺带修正历史漂移：旧代码兜底 ?? "1" 与 wrangler.toml "2" 不一致，内置默认归一为 2
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5f26fa4` | (see git log) |
+| `8c587c9` | (see git log) |
+
+### Testing
+
+- [OK] 新增 tests/proxy-retry-settings.test.ts 10 用例（回退链三分支 + clamp 边界矩阵 + 单 SQL 断言）；全量 9 文件 154 例全绿；check/typecheck 0 error
+- [OK] trellis-check 核查 8/8 PASS：预载合并、回退链、存量 proxy-responses 兼容（mock env 经回退行为逐值不变）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 后续版本可考虑从 wrangler.toml 移除两个 env 变量（现为兼容回退保留）
+- PUT 路由层校验暂无单测（需先解决 adminAuth mock 成本），属独立改进
