@@ -14,6 +14,7 @@
 | [Quality Guidelines](./quality-guidelines.md) | 提交门禁（check/typecheck/test）、Biome 规则、命名、禁则 | ✅ Filled |
 | [Logging Guidelines](./logging-guidelines.md) | console.* 前缀标签惯例、错误靠 jsonError/落库不打日志 | ✅ Filled |
 | [Proxy Headers](./proxy-headers.md) | 上游请求头策略契约（全局注入/剔除/渠道级）、settings 新增配置项标准链路 | ✅ Filled |
+| [Settings Config](./settings-config.md) | 数值型 settings 契约与 env→settings 迁移模式（三级回退链、读宽写严、clamp 三层一致） | ✅ Filled |
 
 ---
 
