@@ -9,6 +9,7 @@ import {
 	getLdcEpayPid,
 	getLdcExchangeRate,
 	getLdcPaymentEnabled,
+	getModelTestPrompt,
 	getProxyExtraHeaders,
 	getProxyRemoveHeaders,
 	getRegistrationMode,
@@ -26,6 +27,7 @@ import {
 	setLdcEpayPid,
 	setLdcExchangeRate,
 	setLdcPaymentEnabled,
+	setModelTestPrompt,
 	setProxyExtraHeaders,
 	setProxyRemoveHeaders,
 	setRegistrationMode,
@@ -58,6 +60,7 @@ settings.get("/", async (c) => {
 	const announcement = await getAnnouncement(c.env.DB);
 	const proxyExtraHeaders = await getProxyExtraHeaders(c.env.DB);
 	const proxyRemoveHeaders = await getProxyRemoveHeaders(c.env.DB);
+	const modelTestPrompt = await getModelTestPrompt(c.env.DB);
 	return c.json({
 		log_retention_days: retention,
 		session_ttl_hours: sessionTtlHours,
@@ -74,6 +77,7 @@ settings.get("/", async (c) => {
 		announcement: announcement,
 		proxy_extra_headers: proxyExtraHeaders,
 		proxy_remove_headers: proxyRemoveHeaders,
+		model_test_prompt: modelTestPrompt,
 	});
 });
 
@@ -237,6 +241,13 @@ settings.put("/", async (c) => {
 			);
 		}
 		await setProxyRemoveHeaders(c.env.DB, raw);
+		touched = true;
+	}
+
+	// 与 announcement 相同的宽容语义：接受任意字符串原样存库；
+	// 空串/空白在 getModelTestPrompt 读取时回退内置默认值
+	if (body.model_test_prompt !== undefined) {
+		await setModelTestPrompt(c.env.DB, String(body.model_test_prompt));
 		touched = true;
 	}
 

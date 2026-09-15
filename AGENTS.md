@@ -77,7 +77,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 | 挂载路径 | 路由文件 | 职责 |
 |----------|----------|------|
 | `/api/auth` | `routes/auth.ts` | 管理员登录 / 登出（密码存 `settings`，会话 hash 存 `admin_sessions`） |
-| `/api/channels` | `routes/channels.ts` | 渠道 CRUD、连通性测试（`/v1/models`）、模型拉取 |
+| `/api/channels` | `routes/channels.ts` | 渠道 CRUD、连通性测试（`/v1/models`）、单模型真实对话测试（`/test-model`）、模型拉取 |
 | `/api/models` | `routes/models.ts` | 模型广场聚合（仅启用渠道） |
 | `/api/model-aliases` | `routes/model-aliases.ts` | 模型别名映射 |
 | `/api/tokens` | `routes/tokens.ts` | API 令牌 CRUD、配额、`/reveal` 二次查看明文 |

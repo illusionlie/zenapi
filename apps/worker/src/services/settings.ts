@@ -4,6 +4,7 @@ import {
 	PROXY_REMOVE_HEADERS_KEY,
 } from "../utils/proxy-headers";
 import { nowIso } from "../utils/time";
+import { MODEL_TEST_DEFAULT_PROMPT } from "./model-testing";
 
 const DEFAULT_LOG_RETENTION_DAYS = 30;
 const DEFAULT_SESSION_TTL_HOURS = 12;
@@ -359,4 +360,26 @@ export async function setAnnouncement(
 	text: string,
 ): Promise<void> {
 	await upsertSetting(db, ANNOUNCEMENT_KEY, text);
+}
+
+// Model test prompt (default text for channel model testing)
+const MODEL_TEST_PROMPT_KEY = "model_test_prompt";
+
+/**
+ * Returns the model test prompt from settings, falling back to the built-in
+ * default when the key is missing or blank.
+ */
+export async function getModelTestPrompt(db: D1Database): Promise<string> {
+	const value = await readSetting(db, MODEL_TEST_PROMPT_KEY);
+	return value && value.trim().length > 0 ? value : MODEL_TEST_DEFAULT_PROMPT;
+}
+
+/**
+ * Updates the model test prompt. Pass empty string to reset to the default.
+ */
+export async function setModelTestPrompt(
+	db: D1Database,
+	text: string,
+): Promise<void> {
+	await upsertSetting(db, MODEL_TEST_PROMPT_KEY, text);
 }

@@ -144,6 +144,7 @@ export type Settings = {
 	announcement: string;
 	proxy_extra_headers: string;
 	proxy_remove_headers: string;
+	model_test_prompt: string;
 };
 
 export type ModelChannel = {
@@ -217,6 +218,16 @@ export type SettingsForm = {
 	announcement: string;
 	proxy_extra_headers: string;
 	proxy_remove_headers: string;
+	model_test_prompt: string;
+};
+
+export type ModelTestStatus = "pending" | "running" | "success" | "failed";
+
+export type ModelTestResult = {
+	status: ModelTestStatus;
+	elapsed?: number;
+	content?: string;
+	error?: string;
 };
 
 // User types

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "hono/jsx/dom";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "hono/jsx/dom";
 import { createApiFetch } from "./core/api";
 import {
 	initialChannelForm,
@@ -14,6 +20,7 @@ import type {
 	DashboardData,
 	InviteCode,
 	ModelItem,
+	ModelTestResult,
 	MonitoringData,
 	Settings,
 	SettingsForm,
@@ -71,6 +78,10 @@ const adminPathToTab: Record<string, TabId> = {
 	"/admin/playground": "playground",
 };
 
+// 模型测试并发上限：每模型一次独立 API 调用（各自一个 Worker invocation，
+// 仅 1 个子请求），并发 4 兼顾速度与上游限流（PRD 约束）
+const MODEL_TEST_CONCURRENCY = 4;
+
 export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	const [activeTab, setActiveTab] = useState<TabId>(() => {
 		const normalized = normalizePath(window.location.pathname);
@@ -102,6 +113,14 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	const [selectedFetched, setSelectedFetched] = useState<Set<string>>(
 		() => new Set<string>(),
 	);
+	const [modelTestResults, setModelTestResults] = useState<
+		Record<string, ModelTestResult>
+	>({});
+	const [modelTestRunning, setModelTestRunning] = useState(false);
+	// 模型测试会话代次：新批次/关闭弹窗时递增，使旧请求的写入失效
+	const modelTestRunIdRef = useRef(0);
+	// 当前批次的停止函数（闭包持有本地 stopped 标记），stopModelTests 调用
+	const modelTestStopFnRef = useRef<(() => void) | null>(null);
 	const [isTokenModalOpen, setTokenModalOpen] = useState(false);
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [users, setUsers] = useState<User[]>([]);
@@ -172,6 +191,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			announcement: settings.announcement ?? "",
 			proxy_extra_headers: settings.proxy_extra_headers ?? "",
 			proxy_remove_headers: settings.proxy_remove_headers ?? "",
+			model_test_prompt: settings.model_test_prompt ?? "",
 		});
 		if (settings.require_invite_code) {
 			const result = await apiFetch<{ codes: InviteCode[] }>(
@@ -293,6 +313,13 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	);
 
 	const closeChannelModal = useCallback(() => {
+		// 使在途模型测试请求的写入失效并停止调度，清理结果（PRD：结果仅存
+		// 在于当前弹窗会话）
+		modelTestRunIdRef.current += 1;
+		modelTestStopFnRef.current?.();
+		modelTestStopFnRef.current = null;
+		setModelTestResults({});
+		setModelTestRunning(false);
 		setEditingChannel(null);
 		setChannelForm({ ...initialChannelForm });
 		setChannelAliasState({});
@@ -525,6 +552,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				announcement: settingsForm.announcement,
 				proxy_extra_headers: settingsForm.proxy_extra_headers,
 				proxy_remove_headers: settingsForm.proxy_remove_headers,
+				model_test_prompt: settingsForm.model_test_prompt,
 			};
 			const password = settingsForm.admin_password.trim();
 			if (password) {
@@ -652,6 +680,107 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			}
 		},
 		[apiFetch, loadChannels],
+	);
+
+	// 单模型真实请求测试。请求体始终携带编辑表单当前配置 + editingChannel?.id
+	// （表单即真相：支持未保存渠道，也避免脏表单测到库中旧配置）；runId 用于
+	// 新批次/关弹窗后在途请求的写入失效
+	const runSingleModelTest = useCallback(
+		async (model: string, text: string, runId: number) => {
+			setModelTestResults((prev) => ({
+				...prev,
+				[model]: { status: "running" },
+			}));
+			try {
+				const result = await apiFetch<{
+					ok: boolean;
+					elapsed: number;
+					content?: string;
+					error?: string;
+				}>("/api/channels/test-model", {
+					method: "POST",
+					body: JSON.stringify({
+						id: editingChannel?.id,
+						base_url: channelForm.base_url.trim(),
+						api_key: channelForm.api_key.trim(),
+						api_format: channelForm.api_format,
+						custom_headers: channelForm.custom_headers.trim(),
+						model,
+						text,
+					}),
+				});
+				if (modelTestRunIdRef.current !== runId) return;
+				setModelTestResults((prev) => ({
+					...prev,
+					[model]: {
+						status: result.ok ? "success" : "failed",
+						elapsed: result.elapsed,
+						content: result.content,
+						error: result.error,
+					},
+				}));
+			} catch (error) {
+				if (modelTestRunIdRef.current !== runId) return;
+				setModelTestResults((prev) => ({
+					...prev,
+					[model]: {
+						status: "failed",
+						error: (error as Error).message,
+					},
+				}));
+			}
+		},
+		[apiFetch, channelForm, editingChannel],
+	);
+
+	// 批量测试：并发 4 的 worker-pool（递归取下一个），逐个完成即写状态触发
+	// 渲染；停止标记让未开始项保持 pending 并结束运行
+	const runModelTests = useCallback(
+		async (models: string[], text: string) => {
+			if (models.length === 0) return;
+			const runId = modelTestRunIdRef.current + 1;
+			modelTestRunIdRef.current = runId;
+			let stopped = false;
+			modelTestStopFnRef.current = () => {
+				stopped = true;
+			};
+			setModelTestRunning(true);
+			setModelTestResults(
+				Object.fromEntries(
+					models.map((model) => [model, { status: "pending" as const }]),
+				),
+			);
+			let nextIndex = 0;
+			const runNext = async (): Promise<void> => {
+				if (stopped) return;
+				const index = nextIndex;
+				if (index >= models.length) return;
+				nextIndex = index + 1;
+				await runSingleModelTest(models[index], text, runId);
+				await runNext();
+			};
+			await Promise.all(
+				Array.from(
+					{ length: Math.min(MODEL_TEST_CONCURRENCY, models.length) },
+					() => runNext(),
+				),
+			);
+			if (modelTestRunIdRef.current === runId) {
+				setModelTestRunning(false);
+			}
+		},
+		[runSingleModelTest],
+	);
+
+	const stopModelTests = useCallback(() => {
+		modelTestStopFnRef.current?.();
+	}, []);
+
+	const retryModelTest = useCallback(
+		async (model: string, text: string) => {
+			await runSingleModelTest(model, text, modelTestRunIdRef.current);
+		},
+		[runSingleModelTest],
 	);
 
 	const handleChannelDelete = useCallback(
@@ -993,6 +1122,12 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					onFetchedSearchChange={setFetchedSearch}
 					onToggleFetched={toggleFetchedModel}
 					onToggleAllFetched={toggleAllFetched}
+					modelTestResults={modelTestResults}
+					modelTestRunning={modelTestRunning}
+					modelTestPrompt={data.settings?.model_test_prompt ?? ""}
+					onRunModelTests={runModelTests}
+					onStopModelTests={stopModelTests}
+					onRetryModelTest={retryModelTest}
 				/>
 			);
 		}

@@ -52,6 +52,7 @@ export const SettingsView = ({
 	const [genMaxUses, setGenMaxUses] = useState("1");
 	const [genPrefix, setGenPrefix] = useState("ZEN-");
 	const announcementRef = useRef<HTMLTextAreaElement>(null);
+	const modelTestPromptRef = useRef<HTMLTextAreaElement>(null);
 
 	useEffect(() => {
 		if (
@@ -61,6 +62,15 @@ export const SettingsView = ({
 			announcementRef.current.value = settingsForm.announcement;
 		}
 	}, [settingsForm.announcement]);
+
+	useEffect(() => {
+		if (
+			modelTestPromptRef.current &&
+			modelTestPromptRef.current.value !== settingsForm.model_test_prompt
+		) {
+			modelTestPromptRef.current.value = settingsForm.model_test_prompt;
+		}
+	}, [settingsForm.model_test_prompt]);
 
 	return (
 		<div class="space-y-5">
@@ -432,6 +442,32 @@ export const SettingsView = ({
 							JSON
 							字符串数组，列出的客户端请求头不会转发给上游。作用范围与优先级同「额外注入请求头」。注意：剔除是无差别的，同名内置鉴权头（如
 							Authorization）也会被删除，请勿剔除代理鉴权依赖的头。
+						</p>
+					</div>
+					<div class="lg:col-span-2">
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="model-test-prompt"
+						>
+							模型测试文本
+						</label>
+						<textarea
+							ref={modelTestPromptRef}
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="model-test-prompt"
+							name="model_test_prompt"
+							rows={3}
+							placeholder="你好，请直接回复 OK 以确认服务可用。"
+							onInput={(event) => {
+								const target =
+									event.currentTarget as HTMLTextAreaElement | null;
+								onFormChange({
+									model_test_prompt: target?.value ?? "",
+								});
+							}}
+						/>
+						<p class="mt-1 text-xs text-stone-500">
+							渠道编辑弹窗内「模型测试」的默认对话文本。留空时服务端使用内置默认值；弹窗内可临时覆盖，仅影响当次测试。
 						</p>
 					</div>
 					<div class="flex items-end lg:col-span-2">

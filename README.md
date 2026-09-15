@@ -175,6 +175,7 @@ bun run dev:ui
 - `PATCH /api/channels/:id` — 更新渠道
 - `DELETE /api/channels/:id` — 删除渠道
 - `POST /api/channels/:id/test` — 连通性测试（自动刷新模型列表）
+- `POST /api/channels/test-model` — 单渠道单模型真实对话测试（body 传 `model` 与可选表单配置，未保存渠道可测；不写 usage、不更新连通性结果）
 
 **模型**
 - `GET /api/models` — 汇总所有渠道模型（含定价、用量、延迟统计）

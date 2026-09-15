@@ -64,4 +64,5 @@ export const initialSettingsForm: SettingsForm = {
 	announcement: "",
 	proxy_extra_headers: "",
 	proxy_remove_headers: "",
+	model_test_prompt: "",
 };

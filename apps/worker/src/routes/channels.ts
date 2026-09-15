@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
+import { buildChannelRequest, convertResponse } from "../routes/proxy";
 import {
 	channelExists,
 	deleteChannel,
@@ -12,8 +13,18 @@ import {
 	fetchChannelModels,
 	updateChannelTestResult,
 } from "../services/channel-testing";
-import type { ChannelApiFormat } from "../services/channel-types";
+import type {
+	ChannelApiFormat,
+	ChannelRecord,
+} from "../services/channel-types";
 import { saveChannelAliases } from "../services/model-aliases";
+import {
+	buildModelTestRequestBody,
+	MODEL_TEST_TIMEOUT_MS,
+	type ModelTestOutcome,
+	parseModelTestResponse,
+} from "../services/model-testing";
+import { getModelTestPrompt } from "../services/settings";
 import { generateToken } from "../utils/crypto";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
@@ -285,6 +296,146 @@ channels.post("/fetch_models", async (c) => {
 	}
 
 	return c.json({ ok: true, models: result.models, elapsed: result.elapsed });
+});
+
+type ModelTestPayload = {
+	id?: string | number;
+	base_url?: string;
+	api_key?: string;
+	api_format?: string;
+	custom_headers?: string;
+	model?: string;
+	text?: string;
+};
+
+/**
+ * Runs a one-shot real chat request against a single channel/model.
+ * Admin-only tool: no usage recording, no balance deduction, and channel
+ * connectivity test results are left untouched.
+ */
+channels.post("/test-model", async (c) => {
+	const body = (await c.req
+		.json()
+		.catch(() => null)) as ModelTestPayload | null;
+	const model = typeof body?.model === "string" ? body.model.trim() : "";
+	if (!model) {
+		return jsonError(
+			c,
+			400,
+			"model_test_invalid_request",
+			"model_test_invalid_request",
+		);
+	}
+
+	const requestedId =
+		body?.id !== undefined && body?.id !== null ? String(body.id).trim() : "";
+	const hasBodyBaseUrl =
+		typeof body?.base_url === "string" && body.base_url.trim().length > 0;
+	if (!requestedId && !hasBodyBaseUrl) {
+		return jsonError(
+			c,
+			400,
+			"model_test_invalid_request",
+			"model_test_invalid_request",
+		);
+	}
+
+	// Resolve channel config: DB row when id is given, then body fields
+	// override (the form is the source of truth — supports unsaved and
+	// dirty forms; same override semantics as PATCH /:id).
+	let dbChannel: ChannelRecord | null = null;
+	if (requestedId) {
+		dbChannel = await getChannelById(c.env.DB, requestedId);
+		if (!dbChannel) {
+			return jsonError(c, 404, "channel_not_found", "channel_not_found");
+		}
+	}
+
+	const apiFormat = (body?.api_format ??
+		dbChannel?.api_format ??
+		"openai") as ChannelApiFormat;
+	const baseUrl = hasBodyBaseUrl
+		? apiFormat === "anthropic"
+			? normalizeBaseUrl(String(body?.base_url))
+			: String(body?.base_url).trim().replace(/\/+$/, "")
+		: String(dbChannel?.base_url ?? "");
+	const apiKey =
+		body?.api_key !== undefined
+			? String(body.api_key)
+			: String(dbChannel?.api_key ?? "");
+	const customHeadersJson =
+		body?.custom_headers !== undefined
+			? body.custom_headers?.trim() || null
+			: (dbChannel?.custom_headers_json ?? null);
+	const text =
+		typeof body?.text === "string" && body.text.trim().length > 0
+			? body.text
+			: await getModelTestPrompt(c.env.DB);
+
+	// Minimal ChannelRecord: buildChannelRequest only reads base_url /
+	// api_key / api_format / custom_headers_json (plus typing-required
+	// identity fields).
+	const channelLike: ChannelRecord = {
+		id: dbChannel?.id ?? "model-test",
+		name: dbChannel?.name ?? "model-test",
+		base_url: baseUrl,
+		api_key: apiKey,
+		weight: Number(dbChannel?.weight ?? 1),
+		status: dbChannel?.status ?? "active",
+		api_format: apiFormat,
+		custom_headers_json: customHeadersJson,
+	};
+
+	const { bodyText, parsedBody } = buildModelTestRequestBody(model, text);
+	const upstreamKey = parseApiKeys(apiKey)[0] ?? apiKey;
+	const incomingHeaders = new Headers({ "content-type": "application/json" });
+
+	// 豁免全局请求头策略：模型测试不注入/剔除全局头（policy=null，同
+	// Playground），渠道级 custom_headers 仍生效
+	const {
+		target,
+		headers,
+		body: channelBody,
+	} = buildChannelRequest(
+		channelLike,
+		"/v1/chat/completions",
+		"",
+		incomingHeaders,
+		bodyText,
+		parsedBody,
+		false,
+		upstreamKey,
+		null,
+	);
+
+	const start = Date.now();
+	let outcome: ModelTestOutcome;
+	try {
+		const response = await fetch(target, {
+			method: "POST",
+			headers,
+			body: channelBody,
+			signal: AbortSignal.timeout(MODEL_TEST_TIMEOUT_MS),
+		});
+		// 先归一为 OpenAI 风格再解析：anthropic / responses 渠道复用现有
+		// 转换器（非流式），openai / custom 原样透传，保证三种格式得到
+		// 统一回显；仅对 2xx 转换，非 2xx 直接走错误分支
+		const normalized = response.ok
+			? await convertResponse(
+					channelLike,
+					response,
+					false,
+					"/v1/chat/completions",
+				)
+			: response;
+		outcome = await parseModelTestResponse(normalized);
+	} catch (error) {
+		outcome = {
+			ok: false,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
+	return c.json({ ...outcome, elapsed: Date.now() - start });
 });
 
 /**

@@ -1,5 +1,16 @@
-import { useCallback, useMemo, useState } from "hono/jsx/dom";
-import type { Channel, ChannelApiFormat, ChannelForm } from "../core/types";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "hono/jsx/dom";
+import type {
+	Channel,
+	ChannelApiFormat,
+	ChannelForm,
+	ModelTestResult,
+} from "../core/types";
 import { buildPageItems } from "../core/utils";
 import type { ModelAliasesMap } from "../UserApp";
 import { Modal } from "./Modal";
@@ -230,6 +241,12 @@ type ChannelsViewProps = {
 	onFetchedSearchChange: (value: string) => void;
 	onToggleFetched: (modelId: string) => void;
 	onToggleAllFetched: (visible: string[], select: boolean) => void;
+	modelTestResults: Record<string, ModelTestResult>;
+	modelTestRunning: boolean;
+	modelTestPrompt: string;
+	onRunModelTests: (models: string[], text: string) => Promise<void>;
+	onStopModelTests: () => void;
+	onRetryModelTest: (model: string, text: string) => Promise<void>;
 };
 
 const pageSizeOptions = [10, 20, 50];
@@ -291,6 +308,12 @@ export const ChannelsView = ({
 	onFetchedSearchChange,
 	onToggleFetched,
 	onToggleAllFetched,
+	modelTestResults,
+	modelTestRunning,
+	modelTestPrompt,
+	onRunModelTests,
+	onStopModelTests,
+	onRetryModelTest,
 }: ChannelsViewProps) => {
 	const isEditing = Boolean(editingChannel);
 	const pageItems = buildPageItems(channelPage, channelTotalPages);
@@ -299,6 +322,26 @@ export const ChannelsView = ({
 	const [expandedAliasModels, setExpandedAliasModels] = useState<Set<string>>(
 		new Set(),
 	);
+
+	// —— 模型测试区块本地状态（纯展示 + 回调，不发请求） ——
+	const [modelTestExpanded, setModelTestExpanded] = useState(false);
+	const [modelTestText, setModelTestText] = useState(modelTestPrompt);
+	const [selectedTestModels, setSelectedTestModels] = useState<Set<string>>(
+		() => new Set<string>(),
+	);
+	const [testSearch, setTestSearch] = useState("");
+	// 弹窗打开沿重置：文本回 settings 默认、清空勾选与搜索（运行中可临时改，
+	// 不写回设置）
+	const wasModalOpenRef = useRef(false);
+	useEffect(() => {
+		if (isChannelModalOpen && !wasModalOpenRef.current) {
+			setModelTestText(modelTestPrompt);
+			setSelectedTestModels(new Set());
+			setTestSearch("");
+			setModelTestExpanded(false);
+		}
+		wasModalOpenRef.current = isChannelModalOpen;
+	}, [isChannelModalOpen, modelTestPrompt]);
 
 	// Parse model IDs from the pipe-delimited models text
 	const parsedModelIds = useMemo(
@@ -338,6 +381,67 @@ export const ChannelsView = ({
 			[...selectedFetched].filter((id) => !existingModelIdSet.has(id)).length,
 		[selectedFetched, existingModelIdSet],
 	);
+
+	// —— 模型测试派生状态 ——
+	const visibleTestModels = useMemo(
+		() =>
+			parsedModelIds.filter((m) =>
+				m.toLowerCase().includes(testSearch.toLowerCase()),
+			),
+		[parsedModelIds, testSearch],
+	);
+	// 保持候选列表顺序，避免勾选顺序影响测试顺序
+	const selectedTestList = useMemo(
+		() => parsedModelIds.filter((id) => selectedTestModels.has(id)),
+		[parsedModelIds, selectedTestModels],
+	);
+	const hasTestTarget =
+		channelForm.base_url.trim() !== "" && channelForm.api_key.trim() !== "";
+	const testDisabledHint = !hasTestTarget
+		? "请先填写 Base URL 与 API Key"
+		: selectedTestList.length === 0
+			? "请先勾选要测试的模型"
+			: "";
+	// 结果按候选模型顺序排列（不在候选中的残留结果排在末尾）
+	const testResultEntries = useMemo(() => {
+		const order = new Map(parsedModelIds.map((id, index) => [id, index]));
+		return Object.entries(modelTestResults).sort(
+			([a], [b]) =>
+				(order.get(a) ?? Number.MAX_SAFE_INTEGER) -
+					(order.get(b) ?? Number.MAX_SAFE_INTEGER) || a.localeCompare(b),
+		);
+	}, [modelTestResults, parsedModelIds]);
+	const testSuccessCount = testResultEntries.filter(
+		([, result]) => result.status === "success",
+	).length;
+
+	const toggleTestModel = useCallback((modelId: string) => {
+		setSelectedTestModels((prev) => {
+			const next = new Set(prev);
+			if (next.has(modelId)) next.delete(modelId);
+			else next.add(modelId);
+			return next;
+		});
+	}, []);
+
+	const selectAllVisibleTest = useCallback(() => {
+		setSelectedTestModels((prev) => {
+			const next = new Set(prev);
+			for (const id of visibleTestModels) next.add(id);
+			return next;
+		});
+	}, [visibleTestModels]);
+
+	const invertVisibleTest = useCallback(() => {
+		setSelectedTestModels((prev) => {
+			const next = new Set(prev);
+			for (const id of visibleTestModels) {
+				if (next.has(id)) next.delete(id);
+				else next.add(id);
+			}
+			return next;
+		});
+	}, [visibleTestModels]);
 
 	const toggleAliasExpanded = useCallback((modelId: string) => {
 		setExpandedAliasModels((prev) => {
@@ -1008,6 +1112,218 @@ export const ChannelsView = ({
 							对所有 API
 							格式生效。同名头覆盖系统设置中的全局注入头与内置鉴权头。
 						</p>
+					</div>
+					{/* 模型测试：内嵌折叠区块，展示 + 回调，请求由 AdminApp 统一发起 */}
+					<div class="rounded-lg border border-stone-200 bg-stone-50">
+						<button
+							type="button"
+							class="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+							onClick={() => setModelTestExpanded((prev) => !prev)}
+						>
+							<span class="text-xs text-stone-400">
+								{modelTestExpanded ? "▼" : "▶"}
+							</span>
+							<span class="flex-1 text-xs font-medium uppercase tracking-widest text-stone-400">
+								模型测试
+							</span>
+							{modelTestRunning && (
+								<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+									测试中…
+								</span>
+							)}
+							{!modelTestRunning && testResultEntries.length > 0 && (
+								<span
+									class={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+										testSuccessCount === testResultEntries.length
+											? "bg-emerald-100 text-emerald-700"
+											: "bg-stone-200 text-stone-600"
+									}`}
+								>
+									{testSuccessCount}/{testResultEntries.length} 成功
+								</span>
+							)}
+						</button>
+						{modelTestExpanded && (
+							<div class="border-t border-stone-100 px-3 py-3">
+								{parsedModelIds.length === 0 ? (
+									<p class="py-2 text-center text-sm text-stone-400">
+										请先在上方填写模型列表
+									</p>
+								) : (
+									<div class="space-y-2.5">
+										<div>
+											<div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+												<p class="text-xs text-stone-500">
+													选择要测试的模型（{selectedTestList.length}/
+													{parsedModelIds.length}）
+												</p>
+												<div class="flex items-center gap-1.5">
+													<input
+														type="text"
+														placeholder="搜索模型…"
+														value={testSearch}
+														onInput={(e) =>
+															setTestSearch(
+																(e.currentTarget as HTMLInputElement).value,
+															)
+														}
+														class="w-32 rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
+													/>
+													<button
+														type="button"
+														onClick={selectAllVisibleTest}
+														class="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
+													>
+														全选
+													</button>
+													<button
+														type="button"
+														onClick={invertVisibleTest}
+														class="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
+													>
+														反选
+													</button>
+												</div>
+											</div>
+											<div class="max-h-40 space-y-0.5 overflow-y-auto rounded border border-stone-200 bg-white p-1.5">
+												{visibleTestModels.length === 0 ? (
+													<p class="py-2 text-center text-xs text-stone-400">
+														无匹配模型
+													</p>
+												) : (
+													visibleTestModels.map((modelId) => (
+														<label
+															key={modelId}
+															class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm transition-colors hover:bg-stone-50"
+														>
+															<input
+																type="checkbox"
+																checked={selectedTestModels.has(modelId)}
+																onChange={() => toggleTestModel(modelId)}
+																class="accent-amber-500"
+															/>
+															<span class="min-w-0 break-all font-mono text-xs text-stone-700">
+																{modelId}
+															</span>
+														</label>
+													))
+												)}
+											</div>
+										</div>
+										<div>
+											<label
+												class="mb-1 block text-xs uppercase tracking-widest text-stone-400"
+												for="channel-test-prompt"
+											>
+												测试文本
+											</label>
+											<textarea
+												id="channel-test-prompt"
+												rows={2}
+												value={modelTestText}
+												onInput={(e) =>
+													setModelTestText(
+														(e.currentTarget as HTMLTextAreaElement).value,
+													)
+												}
+												class="w-full rounded border border-stone-200 bg-white px-2 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
+											/>
+											<p class="mt-1 text-xs text-stone-400">
+												初始取系统设置中的「模型测试文本」，此处修改仅影响当次测试。
+											</p>
+										</div>
+										<div class="flex flex-wrap items-center gap-2">
+											{modelTestRunning ? (
+												<button
+													type="button"
+													onClick={onStopModelTests}
+													class="h-8 rounded-full border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
+												>
+													停止
+												</button>
+											) : (
+												<button
+													type="button"
+													disabled={testDisabledHint !== ""}
+													onClick={() =>
+														onRunModelTests(selectedTestList, modelTestText)
+													}
+													class="h-8 rounded-full bg-stone-900 px-3 text-xs font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													开始测试
+												</button>
+											)}
+											{!modelTestRunning && testDisabledHint && (
+												<span class="text-xs text-stone-400">
+													{testDisabledHint}
+												</span>
+											)}
+										</div>
+										{testResultEntries.length > 0 && (
+											<div class="space-y-1">
+												{testResultEntries.map(([modelId, result]) => (
+													<div
+														key={modelId}
+														class="flex items-start gap-2 rounded border border-stone-100 bg-white px-2 py-1.5"
+													>
+														<span class="mt-1 shrink-0">
+															{result.status === "running" ? (
+																<span
+																	aria-hidden="true"
+																	class="block h-2.5 w-2.5 animate-spin rounded-full border-2 border-amber-400 border-t-transparent"
+																/>
+															) : (
+																<span
+																	aria-hidden="true"
+																	class={`block h-2.5 w-2.5 rounded-full ${
+																		result.status === "success"
+																			? "bg-emerald-500"
+																			: result.status === "failed"
+																				? "bg-red-500"
+																				: "bg-stone-300"
+																	}`}
+																/>
+															)}
+														</span>
+														<span class="w-2/5 shrink-0 truncate font-mono text-xs text-stone-700">
+															{modelId}
+														</span>
+														<span
+															class={`min-w-0 flex-1 break-all text-xs ${
+																result.status === "success"
+																	? "text-emerald-600"
+																	: result.status === "failed"
+																		? "text-red-600"
+																		: result.status === "running"
+																			? "text-amber-600"
+																			: "text-stone-400"
+															}`}
+														>
+															{result.status === "success" &&
+																`${result.elapsed}ms · ${result.content}`}
+															{result.status === "failed" && result.error}
+															{result.status === "running" && "测试中…"}
+															{result.status === "pending" && "待测试"}
+														</span>
+														{result.status === "failed" && (
+															<button
+																type="button"
+																onClick={() =>
+																	onRetryModelTest(modelId, modelTestText)
+																}
+																class="shrink-0 rounded border border-stone-200 bg-white px-1.5 py-0.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
+															>
+																重试
+															</button>
+														)}
+													</div>
+												))}
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+						)}
 					</div>
 					<div class="flex flex-wrap items-center justify-end gap-2 pt-2">
 						<button
