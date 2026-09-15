@@ -3,6 +3,7 @@ import type { AppEnv } from "../env";
 import { type TokenRecord, tokenAuth } from "../middleware/tokenAuth";
 import { extractModelIds } from "../services/channel-models";
 import { resolveChannelRoute } from "../services/channel-route";
+import type { ChannelApiFormat } from "../services/channel-types";
 import {
 	type ChannelRecord,
 	createWeightedOrder,
@@ -11,7 +12,10 @@ import {
 import {
 	anthropicToOpenaiResponse,
 	createAnthropicToOpenaiStreamTransform,
+	createResponsesToChatStreamTransform,
 	openaiToAnthropicRequest,
+	openaiToResponsesRequest,
+	responsesToChatResponse,
 } from "../services/format-converter";
 import {
 	loadAllChannelAliasesGrouped,
@@ -88,12 +92,46 @@ export function filterAllowedChannels(
 	return channels;
 }
 
-// Chat endpoint paths — only these are compatible with anthropic-format channels
+// Chat endpoint paths — inbound protocols that non-openai channels can serve
+// via request conversion (anthropic & responses channels both handle these)
 const CHAT_PATHS = ["/v1/chat/completions", "/v1/responses"];
 
 function isChatPath(path: string): boolean {
 	const lower = path.toLowerCase();
 	return CHAT_PATHS.some((p) => lower.startsWith(p));
+}
+
+/**
+ * Routing matrix (design.md §2): channel api_formats eligible for an inbound
+ * path. Returns null when every format is eligible (no filtering).
+ * - /v1/responses inbound → openai / responses / custom (anthropic excluded:
+ *   its converter cannot map `input` and would produce garbage upstream calls)
+ * - /v1/chat/completions inbound → all formats (responses channels converted)
+ * - other passthrough paths (embeddings etc.) → openai / responses / custom
+ *   (anthropic excluded; responses passes through like openai, design D4)
+ */
+export function allowedFormatsForPath(
+	path: string,
+): Set<ChannelApiFormat> | null {
+	const lower = path.toLowerCase();
+	if (lower.startsWith("/v1/responses")) {
+		return new Set<ChannelApiFormat>(["openai", "responses", "custom"]);
+	}
+	if (isChatPath(lower)) {
+		return null;
+	}
+	return new Set<ChannelApiFormat>(["openai", "responses", "custom"]);
+}
+
+/**
+ * Whether an inbound path triggers the chat↔responses request conversion.
+ * Only chat completions inbound is converted — /v1/responses is part of
+ * CHAT_PATHS but its body passes through untouched (R4), so its response
+ * must too.
+ */
+function isConvertedChatPath(path: string): boolean {
+	const lower = path.toLowerCase();
+	return isChatPath(lower) && !lower.startsWith("/v1/responses");
 }
 
 /**
@@ -138,6 +176,41 @@ export function buildChannelRequest(
 		return { target, headers, body: JSON.stringify(anthropicBody) };
 	}
 
+	if (apiFormat === "responses") {
+		// base_url keeps its version path (e.g. /v1), same rule as openai
+		const baseUrl = channel.base_url.replace(/\/+$/, "");
+		const lower = targetPath.toLowerCase();
+		let target: string;
+		let body: string | undefined;
+		if (lower.startsWith("/v1/responses")) {
+			// Responses inbound: pass through untouched (R4) — ZenAPI does not
+			// interpret store / previous_response_id etc.; state lives upstream
+			target = cfSafeUrl(`${baseUrl}/responses${querySuffix}`);
+			body = requestText || undefined;
+		} else if (isChatPath(lower)) {
+			// Chat inbound: convert the chat completion request into a Responses
+			// request (the converter drops stream_options and other unsupported
+			// fields; parsedBody already carries the alias-resolved model)
+			target = cfSafeUrl(`${baseUrl}/responses${querySuffix}`);
+			const responsesBody = parsedBody
+				? openaiToResponsesRequest(parsedBody)
+				: {};
+			if (isStream) {
+				(responsesBody as Record<string, unknown>).stream = true;
+			}
+			body = JSON.stringify(responsesBody);
+		} else {
+			// Non-chat passthrough paths follow the openai rules
+			const subPath = targetPath.replace(/^\/v1\b/, "");
+			target = cfSafeUrl(`${baseUrl}${subPath}${querySuffix}`);
+			body = requestText || undefined;
+		}
+		headers.set("Authorization", `Bearer ${effectiveKey}`);
+		headers.set("x-api-key", String(effectiveKey));
+		applyHeaderPolicy(headers, headerPolicy, channel.custom_headers_json);
+		return { target, headers, body };
+	}
+
 	if (apiFormat === "custom") {
 		// For custom format, base_url IS the full target URL
 		const target = cfSafeUrl(`${channel.base_url}${querySuffix}`);
@@ -160,13 +233,43 @@ export function buildChannelRequest(
 
 /**
  * Converts upstream response based on channel format back to OpenAI format.
+ * inboundPath is the path the upstream request was sent under: responses-format
+ * channels only convert when the request was a converted chat completion call —
+ * Responses-native (/v1/responses) and passthrough paths return as-is (R4).
  */
 export async function convertResponse(
 	channel: ChannelRecord,
 	response: Response,
 	isStream: boolean,
+	inboundPath: string,
 ): Promise<Response> {
 	const apiFormat = channel.api_format ?? "openai";
+
+	if (
+		apiFormat === "responses" &&
+		response.ok &&
+		isConvertedChatPath(inboundPath)
+	) {
+		if (isStream && response.body) {
+			const transform = createResponsesToChatStreamTransform();
+			const transformed = response.body.pipeThrough(transform);
+			return new Response(transformed, {
+				status: response.status,
+				headers: {
+					"content-type": "text/event-stream",
+					"cache-control": "no-cache",
+					connection: "keep-alive",
+				},
+			});
+		}
+
+		const responsesData = (await response.json()) as Record<string, unknown>;
+		const chatData = responsesToChatResponse(responsesData);
+		return new Response(JSON.stringify(chatData), {
+			status: 200,
+			headers: { "content-type": "application/json" },
+		});
+	}
 
 	if (apiFormat === "anthropic" && response.ok) {
 		if (isStream && response.body) {
@@ -190,7 +293,7 @@ export async function convertResponse(
 		});
 	}
 
-	// openai or custom: pass through as-is
+	// openai / custom / responses-native / passthrough: return as-is
 	return response;
 }
 
@@ -419,10 +522,12 @@ proxy.all("/*", tokenAuth, async (c) => {
 
 	const targetPath = c.req.path;
 
-	// Non-chat endpoints should not be routed to anthropic-format channels
-	if (!isChatPath(targetPath)) {
-		candidates = candidates.filter(
-			(ch) => (ch.api_format ?? "openai") !== "anthropic",
+	// Routing matrix (design.md §2): drop candidates whose api_format cannot
+	// serve this inbound protocol (null = every format eligible)
+	const allowedFormats = allowedFormatsForPath(targetPath);
+	if (allowedFormats) {
+		candidates = candidates.filter((ch) =>
+			allowedFormats.has(ch.api_format ?? "openai"),
 		);
 		if (candidates.length === 0) {
 			return jsonError(
@@ -537,7 +642,12 @@ proxy.all("/*", tokenAuth, async (c) => {
 					lastRequestPath = responsePath;
 					if (response.ok) {
 						// Convert response based on channel format
-						lastResponse = await convertResponse(channel, response, isStream);
+						lastResponse = await convertResponse(
+							channel,
+							response,
+							isStream,
+							responsePath,
+						);
 						selectedChannel = channel;
 						selectedModelName = channelModelName;
 						break;

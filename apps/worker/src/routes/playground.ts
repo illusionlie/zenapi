@@ -117,7 +117,12 @@ playground.post("/chat", async (c) => {
 					});
 
 					if (response.ok) {
-						lastResponse = await convertResponse(channel, response, isStream);
+						lastResponse = await convertResponse(
+							channel,
+							response,
+							isStream,
+							targetPath,
+						);
 						// Return immediately on success
 						if (isStream && lastResponse.body) {
 							return new Response(lastResponse.body, {

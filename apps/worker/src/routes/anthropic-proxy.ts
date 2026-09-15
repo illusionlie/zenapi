@@ -138,6 +138,15 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 		return jsonError(c, 503, "no_available_channels", "no_available_channels");
 	}
 
+	// responses-format channels cannot serve Anthropic inbound — there is no
+	// responses→anthropic conversion this phase (design.md D2/D5)
+	candidates = candidates.filter(
+		(ch) => (ch.api_format ?? "openai") !== "responses",
+	);
+	if (candidates.length === 0) {
+		return jsonError(c, 503, "no_available_channels", "no_available_channels");
+	}
+
 	// stream_only channels should not serve non-streaming requests
 	if (!isStream) {
 		candidates = candidates.filter((ch) => !ch.stream_only);

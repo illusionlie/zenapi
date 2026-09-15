@@ -100,7 +100,7 @@ function allowedFormatsForPath(path: string): Set<ChannelApiFormat> | null {
 
 签名扩展：`convertResponse(channel, response, isStream, inboundPath: string)`。
 
-- `apiFormat === "responses"` 且 inboundPath 是 CHAT_PATHS（即请求被转换过）：
+- `apiFormat === "responses"` 且 inboundPath 命中 `isConvertedChatPath()`（实施期修正：CHAT_PATHS 包含 `/v1/responses`，但该入站请求体是透传的（R4），响应也必须透传；因此转换条件收窄为 `isChatPath && !startsWith("/v1/responses")`）：
   - 流式 → `pipeThrough(createResponsesToChatStreamTransform())`，回 `text/event-stream` Response（与 anthropic 分支同构）。
   - 非流式 → `responsesToChatResponse(await response.json())`。
 - `apiFormat === "responses"` 且 inboundPath 为 `/v1/responses` 或透传路径 → 原样返回 response（R4）。
