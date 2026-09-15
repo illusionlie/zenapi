@@ -112,9 +112,12 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 - 按渠道**权重随机**排序选择，失败（5xx / 429）按 `PROXY_RETRY_ROUNDS` 轮询重试，间隔 `PROXY_RETRY_DELAY_MS`。
 - 单渠道多 API Key：随机打乱顺序，首个 Key 失败自动换下一个 Key，全部 Key 失败才换渠道。
 - 流式请求自动注入 `stream_options.include_usage = true`，并从 SSE / 响应头 / 非 JSON 体解析 usage。
-- `/v1/chat/completions` 上游返回 400/404 时回退到 `/v1/responses` 重试一次。
+- **路由矩阵按入站协议过滤候选渠道**：chat 入站全格式可用；`/v1/responses` 及其他 `/v1/*` 透传路径排除 anthropic；anthropic 入站排除 responses；过滤后无候选 → 503 `no_available_channels`（不发上游请求）。
+- **responses 渠道格式**（`api_format: "responses"`，OpenAI Responses API 上游）：chat 入站自动 Chat↔Responses 双向转换（含流式与 tool 往返）；`/v1/responses` 入站原样透传（`store` / `previous_response_id` 不解释，状态由上游承担）；连通性测试与 openai 同语义（`GET {base_url}/models` + Bearer）。
+- `/v1/responses` 入站 + openai 渠道上游返回 400/404 时，回退到去版本路径的 `{base}/responses` 重试一次（仅 openai 渠道；responses 渠道显式声明支持，无此回退）。
 - `base_url` 入库前规范化为无尾斜杠；空值返回空串避免崩溃。
 - usage 记录：输入/输出 tokens、首 token 延迟、流式标记、推理强度（取自请求体 `reasoning` / `reasoning_effort`）。
+- usage 解析兼容 Responses 格式：SSE `response.completed` 事件的 `response.usage` 路径；`input_tokens/output_tokens` 归一为 prompt/completion tokens。
 - **禁用的模型不参与路由匹配**，也不出现在 `/v1/models`。
 - **用户级可用模型白名单**：`users.allowed_models`（JSON 数组，空 = 不限制）；按请求模型名**精确匹配**，白名单外返回 403 `model_not_allowed`；`/v1/models` 与 `/api/u/models` 同步过滤；与令牌级 `allowed_channels` 相互独立、正交生效。
 

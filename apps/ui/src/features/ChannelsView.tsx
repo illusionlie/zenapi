@@ -747,6 +747,12 @@ export const ChannelsView = ({
 								OpenAI
 							</option>
 							<option
+								value="responses"
+								selected={channelForm.api_format === "responses"}
+							>
+								Responses (OpenAI /responses)
+							</option>
+							<option
 								value="anthropic"
 								selected={channelForm.api_format === "anthropic"}
 							>

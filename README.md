@@ -112,6 +112,7 @@ bun run dev:ui
 |------|------|
 | `openai` | 标准 OpenAI 兼容 API，请求直接转发 |
 | `anthropic` | Anthropic Messages API，自动进行 OpenAI ↔ Anthropic 格式互转 |
+| `responses` | OpenAI Responses API（`/responses`），chat 入站自动双向转换（含流式），`/v1/responses` 入站原样透传 |
 | `custom` | 自定义 API，`base_url` 作为完整地址，支持自定义请求头 |
 
 ### 多 API Key
