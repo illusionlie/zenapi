@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "后端质量门禁：check/typecheck/test 全绿、Biome 规则"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端 0-error 门禁与新增 UI 代码保持全绿"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "校验错误码形态是否符合 jsonError/snake_case 约定"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "校验新增测试区块的 a11y / 按钮语义 / Modal 约定"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "校验 settings 新键在 worker ↔ UI 类型 ↔ 表单 ↔ 默认值回退的跨层一致"}
+{"file": ".trellis/tasks/09-15-channel-model-test/prd.md", "reason": "验收标准清单（Acceptance Criteria）为检查基准"}
