@@ -9,7 +9,7 @@
 
 ### 1. Scope / Trigger
 
-- 任何需要修改"发往上游的请求头"的工作（`proxy.ts`、`anthropic-proxy.ts`、`playground.ts`）。
+- 任何需要修改"发往上游的请求头"的工作（`proxy.ts`、`anthropic-proxy.ts`、`playground.ts`、`model-testing.ts`；后两个是 `policy=null` 豁免消费者）。
 - 任何新增 settings 配置项的工作（本任务建立的标准链路，见 §8）。
 
 ### 2. Signatures
