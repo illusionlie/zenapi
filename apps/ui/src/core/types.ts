@@ -1,4 +1,4 @@
-export type ChannelApiFormat = "openai" | "anthropic" | "custom";
+export type ChannelApiFormat = "openai" | "anthropic" | "custom" | "responses";
 
 export type Channel = {
 	id: string;

@@ -344,7 +344,8 @@ newapi.put("/", async (c) => {
 		priority: parsed.priority ?? current.priority ?? 0,
 		metadata_json: mergedMetadata,
 		api_format:
-			(current.api_format as "openai" | "anthropic" | "custom") ?? "openai",
+			(current.api_format as "openai" | "anthropic" | "custom" | "responses") ??
+			"openai",
 		custom_headers_json: current.custom_headers_json ?? null,
 		updated_at: nowIso(),
 	});

@@ -238,18 +238,21 @@ const formatLabels: Record<ChannelApiFormat, string> = {
 	openai: "OpenAI",
 	anthropic: "Anthropic",
 	custom: "Custom",
+	responses: "Responses",
 };
 
 const formatBadgeColors: Record<ChannelApiFormat, string> = {
 	openai: "border-blue-100 bg-blue-50 text-blue-600",
 	anthropic: "border-orange-100 bg-orange-50 text-orange-600",
 	custom: "border-purple-100 bg-purple-50 text-purple-600",
+	responses: "border-teal-100 bg-teal-50 text-teal-600",
 };
 
 const baseUrlPlaceholders: Record<ChannelApiFormat, string> = {
 	openai: "https://api.openai.com/v1",
 	anthropic: "https://api.anthropic.com/anthropic",
 	custom: "https://example.com/v1/chat/completions",
+	responses: "https://api.openai.com/v1",
 };
 
 /**
