@@ -38,9 +38,56 @@ Questions to answer:
 
 ## Styling Patterns
 
-<!-- How styles are applied (CSS modules, styled-components, Tailwind, etc.) -->
+### 动效约定：motion tokens + 枚举过渡属性（09-15-ui-motion-polish 沉淀）
 
-(To be filled by the team)
+**What**: 全站过渡类禁止 `transition-all`，必须按实际过渡属性枚举；hover 位移类一律用 `ease-smooth-out`。
+
+**Why**: `transition-all` 让无关属性（color/border）蹭车过渡，且 `hover:shadow-*` 场景逐帧重绘开销大；`ease-in-out` 的语义是 icon/text swap，不是 hover 位移。token 单一事实源在 `apps/ui/src/styles.css`。
+
+**Token 位置**：
+- `@theme` 内：`--ease-smooth-out`（Tailwind v4 自动生成 `ease-smooth-out` utility）、`--animate-toast-*`（生成 `animate-toast-*`）
+- `:root` 内：`--modal-*` / `--dropdown-*` / `--panel-*`（t-* 片段变量，运行时 JS 用 `getComputedStyle` 读取保持同源）
+
+**Example**:
+
+```tsx
+// hover 位移 + 阴影（lift 类）
+class="transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg"
+// hover 纯变色
+class="transition-colors duration-200"
+// hover 变色 + 阴影
+class="transition-[color,background-color,border-color,box-shadow] duration-200"
+```
+
+**Reduced-motion**: 全局守卫在 styles.css 末尾（`prefers-reduced-motion: reduce` 时长归零），t-* 片段各自 guard 不得删。新增循环动画无需单独处理，但新增 t-* 片段必须连带其 guard。
+
+---
+
+## Modal 与进出场动画约定（09-15-ui-motion-polish 沉淀）
+
+### Convention: 模态一律用 features/Modal.tsx 壳
+
+**What**: 新增模态禁止手写 `fixed inset-0` 结构，用 `<Modal isOpen onClose sheet? backdropClass? panelClass?>`；容器持有 `isOpen` state、**常驻渲染**（不条件挂载），关闭动画由 Modal 内部状态机（closing → `--modal-close-dur` 后卸载）完成。
+
+**Why**: 条件挂载 `{cond && <Modal isOpen>}` 会让出场动画失效（卸载即消失）；Modal 壳统一提供 backdrop fade、Esc（栈顶优先，防叠层连关丢草稿）、bottom-sheet 断点适配。
+
+**移动端形态**：`sheet` prop（贴底 rise，`items-end md:items-center` 布局 + `.t-modal-sheet` 断点变换）；桌面居中 scale 走 `.t-modal` 原样。非 sheet 模态在移动端也会贴底（统一规格）。
+
+### Gotcha: hono/jsx/dom 的 data-* 布尔属性与 React 语义不同
+
+> **Warning**: `data-open={someBool}` 在 hono 4.x dom renderer 下 `true` 渲染为 `data-open=""`、`false` 直接移除属性 —— CSS 选择器 `[data-open="true"]` 永远不匹配，开关型动画静默失效。
+
+必须传字符串：`data-open={isOpen ? "true" : "false"}`（先例：AppLayout / UserApp 抽屉）。需要布尔属性语义的场合同理适用。
+
+### Gotcha: .t-modal 的 transform 会为 fixed 后代创建 containing block
+
+> **Warning**: `.t-modal` 恒有 `transform` + `will-change`，嵌套在它内部的 `fixed` 定位后代会被面板盒（含 `overflow-y-auto`）裁剪，不再是相对视口定位。
+
+叠层浮层（如模型选择器叠在编辑模态上）必须作为编辑模态的**兄弟节点**渲染，不能嵌套进 `<form>` / overflow 容器内（先例：ChannelsView 模型选择浮层从 form 内外提）。同理注意 closing 期容器 state 置 null 会导致内容空洞 —— 需在 children 加 guard（先例：ChannelsView `fetchedModels !== null`、UsersView `showEditModal && editingUser`）。
+
+### Convention: 关键帧动画 token 对齐 transitions.dev 口径
+
+toast 出入场（350ms/250ms + `cubic-bezier(0.22,1,0.36,1)` + 16px rise + cross-blur）是全站 toast 的既定节奏；新动效优先对齐 `@theme`/`:root` 既有 token，不要新造硬编码时长。入场可带 cross-blur，退场从简（只 fade + 回落）。
 
 ---
 
