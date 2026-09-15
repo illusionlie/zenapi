@@ -1,27 +1,232 @@
 @import "tailwindcss";
 
 @theme {
-	--animate-toast-in: toast-in 0.2s ease-out;
-	--animate-toast-out: toast-out 0.2s ease-in forwards;
+	--animate-toast-in: toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+	--animate-toast-out: toast-out 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	--ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes toast-in {
 	from {
 		opacity: 0;
-		transform: translateY(8px);
+		transform: translateY(16px) scale(0.97);
+		filter: blur(2px);
 	}
 	to {
 		opacity: 1;
-		transform: translateY(0);
+		transform: translateY(0) scale(1);
+		filter: blur(0);
 	}
 }
 
 @keyframes toast-out {
 	from {
 		opacity: 1;
+		transform: translateY(0) scale(1);
 	}
 	to {
 		opacity: 0;
-		transform: translateY(8px);
+		transform: translateY(16px) scale(0.97);
+	}
+}
+
+/* ===== 动效 token(:root 三组,与 transitions.dev reference 数值一致)===== */
+
+:root {
+	--modal-open-dur: 250ms;
+	--modal-close-dur: 150ms;
+	--modal-scale: 0.96;
+	--modal-scale-close: 0.96;
+	--modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+	--dropdown-open-dur: 250ms;
+	--dropdown-close-dur: 150ms;
+	--dropdown-pre-scale: 0.97;
+	--dropdown-closing-scale: 0.99;
+	--dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+	--panel-open-dur: 400ms;
+	--panel-close-dur: 350ms;
+	--panel-translate-y: 100px;
+	--panel-blur: 2px;
+	--panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ===== .t-modal(transitions.dev 06-modal.md 原文)===== */
+
+.t-modal {
+	transform-origin: center;
+	transform: scale(var(--modal-scale));
+	opacity: 0;
+	pointer-events: none;
+	transition:
+		transform var(--modal-open-dur) var(--modal-ease),
+		opacity var(--modal-open-dur) var(--modal-ease);
+	will-change: transform, opacity;
+}
+.t-modal.is-open {
+	transform: scale(1);
+	opacity: 1;
+	pointer-events: auto;
+}
+.t-modal.is-closing {
+	transform: scale(var(--modal-scale-close));
+	opacity: 0;
+	pointer-events: none;
+	transition:
+		transform var(--modal-close-dur) var(--modal-ease),
+		opacity var(--modal-close-dur) var(--modal-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.t-modal {
+		transition: none !important;
+	}
+}
+
+/* ===== .t-dropdown(transitions.dev 05-menu-dropdown.md 原文)===== */
+
+.t-dropdown {
+	transform-origin: top left;
+	transform: scale(var(--dropdown-pre-scale));
+	opacity: 0;
+	pointer-events: none;
+	transition:
+		transform var(--dropdown-open-dur) var(--dropdown-ease),
+		opacity var(--dropdown-open-dur) var(--dropdown-ease);
+	will-change: transform, opacity;
+}
+.t-dropdown[data-origin="top-right"] {
+	transform-origin: top right;
+}
+.t-dropdown[data-origin="top-center"] {
+	transform-origin: top center;
+}
+.t-dropdown[data-origin="bottom-left"] {
+	transform-origin: bottom left;
+}
+.t-dropdown[data-origin="bottom-center"] {
+	transform-origin: bottom center;
+}
+.t-dropdown[data-origin="bottom-right"] {
+	transform-origin: bottom right;
+}
+
+.t-dropdown.is-open {
+	transform: scale(1);
+	opacity: 1;
+	pointer-events: auto;
+}
+.t-dropdown.is-closing {
+	transform: scale(var(--dropdown-closing-scale));
+	opacity: 0;
+	pointer-events: none;
+	transition:
+		transform var(--dropdown-close-dur) var(--dropdown-ease),
+		opacity var(--dropdown-close-dur) var(--dropdown-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.t-dropdown {
+		transition: none !important;
+	}
+}
+
+/* ===== .t-panel-slide(transitions.dev 07-panel-reveal.md 原文)===== */
+
+.t-panel-slide {
+	transform: translateY(var(--panel-translate-y));
+	opacity: 0;
+	filter: blur(var(--panel-blur));
+	pointer-events: none;
+	transition:
+		transform var(--panel-close-dur) var(--panel-ease),
+		opacity var(--panel-close-dur) var(--panel-ease),
+		filter var(--panel-close-dur) var(--panel-ease);
+	will-change: transform, opacity, filter;
+}
+.t-panel-slide[data-open="true"] {
+	transform: translateY(0);
+	opacity: 1;
+	filter: blur(0);
+	pointer-events: auto;
+	transition:
+		transform var(--panel-open-dur) var(--panel-ease),
+		opacity var(--panel-open-dur) var(--panel-ease),
+		filter var(--panel-open-dur) var(--panel-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.t-panel-slide {
+		transition: none !important;
+	}
+}
+
+/* ===== 项目适配层(design.md §1.2 授权的两处变体 + 根容器规则)===== */
+
+/* 适配 A:X 轴抽屉(左侧滑入),结构复制自 .t-panel-slide,复用 --panel-* 变量 */
+.t-drawer {
+	transform: translateX(-100%);
+	opacity: 0;
+	filter: blur(var(--panel-blur));
+	pointer-events: none;
+	transition:
+		transform var(--panel-close-dur) var(--panel-ease),
+		opacity var(--panel-close-dur) var(--panel-ease),
+		filter var(--panel-close-dur) var(--panel-ease);
+	will-change: transform, opacity, filter;
+}
+.t-drawer[data-open="true"] {
+	transform: translateX(0);
+	opacity: 1;
+	filter: blur(0);
+	pointer-events: auto;
+	transition:
+		transform var(--panel-open-dur) var(--panel-ease),
+		opacity var(--panel-open-dur) var(--panel-ease),
+		filter var(--panel-open-dur) var(--panel-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.t-drawer {
+		transition: none !important;
+	}
+}
+
+/* 适配 B:bottom-sheet 断点变体(<=767px 从底部 rise;桌面走 .t-modal 原样 scale)。
+   必须置于 .t-modal 系列规则之后,同特异性下靠源顺序覆盖 transform */
+@media (max-width: 767px) {
+	.t-modal-sheet {
+		transform: translateY(100%);
+	}
+	.t-modal-sheet.is-open {
+		transform: translateY(0);
+	}
+	.t-modal-sheet.is-closing {
+		transform: translateY(100%);
+	}
+}
+
+/* 抽屉根容器:closed 态不可交互、不可聚焦,visibility 延迟到 close 动画结束 */
+.drawer-root {
+	visibility: hidden;
+	pointer-events: none;
+	transition: visibility 0s linear var(--panel-close-dur);
+}
+.drawer-root[data-open="true"] {
+	visibility: visible;
+	pointer-events: auto;
+	transition: none;
+}
+
+/* ===== 全局 reduced-motion 守卫:兜底覆盖 Tailwind 内置动画与所有过渡 ===== */
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
 	}
 }
