@@ -434,7 +434,18 @@ proxy.all("/*", tokenAuth, async (c) => {
 
 	const reasoningEffort = extractReasoningEffort(parsedBody);
 	let mutatedStreamOptions = false;
-	if (isStream && parsedBody && typeof parsedBody === "object") {
+	// /v1/responses inbound is a Responses-API passthrough (R4): that protocol
+	// has no stream_options parameter (usage arrives in the response.completed
+	// event), so the chat-only usage injection must not mutate its body.
+	const isResponsesInbound = c.req.path
+		.toLowerCase()
+		.startsWith("/v1/responses");
+	if (
+		isStream &&
+		parsedBody &&
+		typeof parsedBody === "object" &&
+		!isResponsesInbound
+	) {
 		const streamOptions = (parsedBody as Record<string, unknown>)
 			.stream_options;
 		if (!streamOptions || typeof streamOptions !== "object") {
@@ -802,8 +813,15 @@ proxy.all("/*", tokenAuth, async (c) => {
 				: "none";
 
 		if (isStream) {
-			const executionCtx = (c as { executionCtx?: ExecutionContextLike })
-				.executionCtx;
+			// Hono's executionCtx getter throws outside the Workers runtime
+			// (e.g. the vitest request harness); degrade to the fire-and-forget
+			// fallback below in that case instead of failing the request.
+			let executionCtx: ExecutionContextLike | undefined;
+			try {
+				executionCtx = c.executionCtx;
+			} catch {
+				executionCtx = undefined;
+			}
 			const task = parseUsageFromSse(lastResponse.clone())
 				.then((streamUsage) => {
 					const usageValue = immediateUsage ?? streamUsage.usage;

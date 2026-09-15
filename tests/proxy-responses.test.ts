@@ -81,6 +81,29 @@ function makeDb(
 }
 
 type RequestEnv = Parameters<typeof proxyApp.request>[2];
+type RequestCtx = Parameters<typeof proxyApp.request>[3];
+
+/**
+ * Mock Workers ExecutionContext: captures waitUntil tasks so tests can
+ * deterministically await background usage recording.
+ */
+function makeMockCtx(): {
+	ctx: RequestCtx;
+	awaitTasks: () => Promise<void>;
+} {
+	const tasks: Promise<unknown>[] = [];
+	return {
+		ctx: {
+			waitUntil: (p: Promise<unknown>) => {
+				tasks.push(p);
+			},
+			passThroughOnException: () => {},
+		} as RequestCtx,
+		awaitTasks: async () => {
+			await Promise.allSettled(tasks);
+		},
+	};
+}
 
 function makeEnv(channels: unknown[]): { env: RequestEnv; runs: Array<{ sql: string; args: unknown[] }> } {
 	const { db, runs } = makeDb({ channels });
@@ -556,6 +579,124 @@ describe("OpenAI proxy handler routing matrix (integration)", () => {
 		expect(insert?.args[5]).toBe(10);
 		expect(insert?.args[6]).toBe(4);
 		expect(insert?.args[7]).toBe(6);
+	});
+
+	it("streaming chat inbound + responses channel: converts SSE and records usage from the terminal chat chunk", async () => {
+		const sseUpstream = [
+			'{"type":"response.created","response":{"id":"resp_8","model":"test-model"}}',
+			'{"type":"response.output_text.delta","delta":"Hi"}',
+			'{"type":"response.completed","response":{"id":"resp_8","usage":{"input_tokens":7,"output_tokens":3,"total_tokens":10}}}',
+		]
+			.map((payload) => `data: ${payload}\n\n`)
+			.join("") + "data: [DONE]\n\n";
+		const fetchMock = vi.fn(async () =>
+			new Response(sseUpstream, {
+				status: 200,
+				headers: { "content-type": "text/event-stream" },
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const { env, runs } = makeEnv([makeChannel({ api_format: "responses" })]);
+		const mockCtx = makeMockCtx();
+		const res = await proxyApp.request(
+			"/v1/chat/completions",
+			{
+				method: "POST",
+				headers: {
+					authorization: "Bearer test-token",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({
+					model: "test-model",
+					stream: true,
+					messages: [{ role: "user", content: "hi" }],
+				}),
+			},
+			env,
+			mockCtx.ctx,
+		);
+		expect(res.status).toBe(200);
+		expect(res.headers.get("content-type")).toBe("text/event-stream");
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const [target, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		expect(target).toBe("https://upstream.example/v1/responses");
+		const upstreamBody = JSON.parse(String(init.body)) as Record<
+			string,
+			unknown
+		>;
+		expect(upstreamBody.stream).toBe(true);
+		// The Responses converter drops stream_options (chat-only field)
+		expect(upstreamBody.stream_options).toBeUndefined();
+		expect(upstreamBody.input).toEqual([
+			{ role: "user", content: [{ type: "input_text", text: "hi" }] },
+		]);
+
+		const text = await res.text();
+		expect(text).toContain("finish_reason\":\"stop\"");
+		expect(text.trimEnd()).toMatch(/data: \[DONE\]$/);
+
+		// Deterministically settle the background SSE usage task
+		await mockCtx.awaitTasks();
+		const insert = runs.find((r) =>
+			r.sql.includes("INSERT INTO usage_logs"),
+		);
+		expect(insert).toBeDefined();
+		expect(insert?.args[5]).toBe(10);
+		expect(insert?.args[6]).toBe(7);
+		expect(insert?.args[7]).toBe(3);
+	});
+
+	it("streaming responses inbound + responses channel: passes the body through untouched and records usage via response.usage", async () => {
+		const sseUpstream = [
+			'{"type":"response.created","response":{"id":"resp_9","model":"test-model"}}',
+			'{"type":"response.completed","response":{"id":"resp_9","usage":{"input_tokens":6,"output_tokens":4,"total_tokens":10}}}',
+			"data: [DONE]",
+		]
+			.map((payload) => `data: ${payload}\n\n`)
+			.join("");
+		const fetchMock = vi.fn(async () =>
+			new Response(sseUpstream, {
+				status: 200,
+				headers: { "content-type": "text/event-stream" },
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const { env, runs } = makeEnv([makeChannel({ api_format: "responses" })]);
+		const mockCtx = makeMockCtx();
+		const rawBody = JSON.stringify({
+			model: "test-model",
+			input: "hi",
+			stream: true,
+		});
+		const res = await proxyApp.request(
+			"/v1/responses",
+			{
+				method: "POST",
+				headers: {
+					authorization: "Bearer test-token",
+					"content-type": "application/json",
+				},
+				body: rawBody,
+			},
+			env,
+			mockCtx.ctx,
+		);
+		expect(res.status).toBe(200);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const [target, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		expect(target).toBe("https://upstream.example/v1/responses");
+		// R4 passthrough: byte-identical body, no stream_options injection
+		expect(String(init.body)).toBe(rawBody);
+
+		await res.text();
+		await mockCtx.awaitTasks();
+		const insert = runs.find((r) =>
+			r.sql.includes("INSERT INTO usage_logs"),
+		);
+		expect(insert).toBeDefined();
+		expect(insert?.args[5]).toBe(10);
+		expect(insert?.args[6]).toBe(6);
+		expect(insert?.args[7]).toBe(4);
 	});
 });
 

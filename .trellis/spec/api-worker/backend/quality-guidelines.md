@@ -14,6 +14,7 @@ bun run test         # Vitest，tests/*.test.ts 全绿
 
 - `bun run check` 判定：error 数为 **0 或 1**。唯一的 1 是 `.pi/extensions/trellis/index.ts` 的 `noSelfAssign`（Trellis 基建文件，来自上游 `trellis update`，**不修改、不要求覆盖**）。
 - `bun run check`（含 `--write`）会把 `.trellis/` 下 JSON 簿记文件（如 archive 的 task.json）重排为 tab，这类 diff 是必然产物，**随任务一并提交，不要回滚**。
+- 测试运行用 `bunx vitest run`（Node runtime）。**不要** `bunx --bun vitest run`：vitest 4.x worker fork 在 Bun runtime 下直接崩溃（`suppress-warnings.cjs failed to resolve`），存量测试同样崩，不是被测代码的问题（2026-09 responses 渠道任务实勘）。
 
 ---
 
@@ -27,6 +28,31 @@ bun run test         # Vitest，tests/*.test.ts 全绿
 
 - `strict: true`；禁用非空断言以外的取巧（存量 `!` 断言仅限 legacy，新代码用显式判空 + 提前 return）。
 - Hono 请求体解析惯例：`const body = (await c.req.json().catch(() => null)) as XxxPayload | null;` + 紧跟判空。不要让 JSON.parse 异常冒泡。
+
+### Gotcha: `c.executionCtx` 是会 throw 的 getter，不能靠类型断言安全访问
+
+**Symptom**：流式请求在非 Workers runtime（vitest、bun run dev 部分 Node 环境）直接 500，而代码里本有的 `task.catch()` 兜底永远走不到。
+
+**Cause**：Hono 的 `c.executionCtx` 无 ExecutionContext 时会 **throw**。类型断言 `(c as { executionCtx?: ExecutionContextLike }).executionCtx` 骗过编译器骗不过运行时，可选链写法在此处也不成立（断言后属性被视为存在）。
+
+#### Wrong
+```typescript
+const executionCtx = (c as { executionCtx?: ExecutionContextLike }).executionCtx;
+if (executionCtx?.waitUntil) { ... }
+```
+
+#### Correct
+```typescript
+let executionCtx: ExecutionContextLike | null = null;
+try {
+	executionCtx = c.executionCtx;
+} catch {
+	/* non-Workers runtime: fall through to direct await path */
+}
+if (executionCtx?.waitUntil) { ... }
+```
+
+**Prevention**：凡是对 Hono Context 上「getter 型」成员做可选访问，先确认其无值时是返回 undefined 还是 throw；throw 型必须 try/catch，不能用类型断言假装可选。
 
 ---
 
