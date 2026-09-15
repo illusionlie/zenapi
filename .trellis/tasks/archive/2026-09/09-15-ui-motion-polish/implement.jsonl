@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/api-worker-ui/frontend/index.md", "reason": "前端规范索引,作业前总览"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "组件/a11y/Tailwind 约定,新建 Modal 与改 8 处模态时参照"}
+{"file": ".trellis/spec/api-worker-ui/frontend/state-management.md", "reason": "容器持有状态 + props 单向下发,Modal 的 isOpen/onClose 归属设计依据"}
+{"file": ".trellis/spec/api-worker-ui/frontend/hook-guidelines.md", "reason": "无自定义 hook 约定,Modal 状态机须为组件内 useState/useEffect"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "类型定义惯例,ModalProps 定义位置参照"}
+{"file": ".trellis/spec/api-worker-ui/frontend/directory-structure.md", "reason": "features/core 分层约定,新增 Modal.tsx 落位"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "0-error 门禁要求,收尾必须 check/typecheck/test 全绿"}
+{"file": ".trellis/tasks/09-15-ui-motion-polish/research/transitions-snippets.md", "reason": "t-modal/t-dropdown/t-panel-slide verbatim 片段与两处授权适配,styles.css 与组件接入的唯一动效素材来源"}

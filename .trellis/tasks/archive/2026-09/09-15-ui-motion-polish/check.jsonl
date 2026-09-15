@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "0-error 门禁,check 阶段核验 check/typecheck/test"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "a11y 回归核验:aria/role/键盘行为不回退,closed 态无残留可聚焦元素"}
+{"file": ".trellis/spec/api-worker-ui/frontend/hook-guidelines.md", "reason": "核验未引入自定义 hook"}
+{"file": ".trellis/tasks/09-15-ui-motion-polish/research/transitions-snippets.md", "reason": "核验片段 verbatim、reduced-motion guard 未删、适配未越出 design 授权范围"}
