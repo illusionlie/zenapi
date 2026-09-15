@@ -166,3 +166,36 @@ Fixed ZenAPI to service-only mode: removed site_mode mechanism (17 backend ancho
 ### Status
 
 [OK] **Completed**（check/typecheck/test 全绿：74 用例、0 error；端到端冒烟 6 分支矩阵全 PASS，AC1–AC10 逐项达成；spec 沉淀至 api-worker/backend/proxy-headers.md + cross-layer guide checklist）
+
+---
+
+## Session 7 — 渠道模型测试（编辑弹窗内嵌真实请求测试 + 全局测试文本）
+
+**Date**: 2026-09-15
+**Task**: 09-15-channel-model-test（复杂任务：PRD + design + implement，规划→实施→检查→提交→归档）
+**Branch**: `main`
+
+### Summary
+
+渠道管理编辑弹窗内嵌「模型测试」区块：勾选表单解析出的模型（搜索/全选/反选），以并发 4 的 worker-pool 逐模型调 `POST /api/channels/test-model` 发真实非流式对话请求，四态结果行（pending/running/success 耗时+摘要/failed 原因+重试）实时渲染，支持停止与单模型重试。后端复用 playground 已验证的 `buildChannelRequest`（policy=null 豁免全局头）+ `convertResponse`（仅 2xx 归一化，anthropic/responses 渠道才能 OpenAI 风格回显）+ `AbortSignal.timeout(30s)`；「表单即真相」body 覆盖语义让未保存渠道也能直接测试。全局测试文本 `model_test_prompt` 走 settings KV 九触点标准链路（无迁移），弹窗内覆盖仅当次生效。TDD 12 单测先行，实施派 trellis-implement ×2（后端/前端分治），核查派 trellis-check（补齐 README/AGENTS.md 文档同步）。
+
+### Key learnings
+
+1. **管理端真实请求探测的固定组合已沉淀为 spec**：buildChannelRequest(/v1/chat/completions, policy=null) → 仅 2xx 过 convertResponse → timeout 兜底、不写 usage；禁止重新实现按格式构建（anthropic/responses 不转换则 choices 提取必落空——本次实现代理自发的 convertResponse 补全正是这条铁律的实证）。
+2. **「表单即真相」一举两得**：探测类端点 body 显式配置覆盖库值，同时解决「脏表单测旧配置」与「未保存渠道不可测」；与 PATCH 部分覆盖语义同构，无心智负担。
+3. **批量上游探测拆前端逐项调用**：每请求独立 Worker invocation 仅 1 子请求，规避免费版 50 上限；附赠逐项实时结果与故障隔离。API 按单对象设计是关键前提。
+4. **前端并发池停止语义**：per-batch 闭包 stopped 标记 + 会话代次 runIdRef；全局共享 stop 标记会在「停止后立即重开批次」时让旧池误读新标记继续跑旧列表，runId 同时使关弹窗后在途请求写入失效。
+5. settings 新键九触点 checklist（cross-layer guide）照单执行零遗漏——spec 沉淀的复利直接兑现。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `43bbc34` | feat(worker,ui): 渠道模型测试——编辑弹窗内嵌真实请求测试 + 全局测试文本设置 |
+| `6bd89d8` | docs(spec): 沉淀管理端真实请求探测、表单即真相、前端逐项并发三条约定 |
+| `3335c51` | chore(task): Biome 格式化归档任务 task.json |
+| `1a18249` | chore(task): archive 09-15-channel-model-test |
+
+### Status
+
+[OK] **Completed**（check/typecheck/test 全绿：8 文件 143 用例、Biome 0 error；check 代理 PRD 七条 AC 逐项勾选通过；真实上游手工冒烟留待用户自验）
