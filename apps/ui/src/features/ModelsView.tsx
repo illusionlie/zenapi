@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "hono/jsx/dom";
+import type { Child } from "hono/jsx/dom";
+import { useEffect, useMemo, useRef, useState } from "hono/jsx/dom";
 import type { ModelItem } from "../core/types";
 import { buildPageItems } from "../core/utils";
+import { Modal } from "./Modal";
 
 type ModelsViewProps = {
 	models: ModelItem[];
@@ -215,6 +217,32 @@ const AliasEditModal = ({
 	const [aliasOnly, setAliasOnly] = useState(initialAliasOnly);
 	const [newAlias, setNewAlias] = useState("");
 	const [saving, setSaving] = useState(false);
+	const [closing, setClosing] = useState(false);
+	const closeTimerRef = useRef<number | null>(null);
+
+	useEffect(
+		() => () => {
+			if (closeTimerRef.current !== null) {
+				clearTimeout(closeTimerRef.current);
+			}
+		},
+		[],
+	);
+
+	// closing 包装：先播收场动画，结束后再交容器卸载（容器条件挂载 = state 天然重置）
+	const handleClose = () => {
+		if (closing) {
+			return;
+		}
+		setClosing(true);
+		const duration =
+			parseFloat(
+				getComputedStyle(document.documentElement).getPropertyValue(
+					"--modal-close-dur",
+				),
+			) || 150;
+		closeTimerRef.current = window.setTimeout(onClose, duration);
+	};
 
 	const handleAdd = () => {
 		const trimmed = newAlias.trim();
@@ -232,117 +260,120 @@ const AliasEditModal = ({
 		setSaving(true);
 		try {
 			await onSave(aliases, aliasOnly);
-			onClose();
+			handleClose();
 		} finally {
 			setSaving(false);
 		}
 	};
 
 	return (
-		<div class="fixed inset-0 z-50 flex items-end justify-center bg-stone-900/40 px-0 py-0 md:items-center md:px-4 md:py-8">
-			<div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-stone-200 bg-white p-6 shadow-2xl md:rounded-2xl">
-				<div class="flex items-start justify-between gap-3">
-					<div>
-						<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-							编辑别名
-						</h3>
-						<p class="break-all text-xs text-stone-500">模型：{modelId}</p>
-					</div>
-					<button
-						type="button"
-						class="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
-						onClick={onClose}
-					>
-						关闭
-					</button>
+		<Modal
+			isOpen={!closing}
+			onClose={handleClose}
+			sheet
+			panelClass="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-stone-200 bg-white p-6 shadow-2xl md:rounded-2xl"
+		>
+			<div class="flex items-start justify-between gap-3">
+				<div>
+					<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+						编辑别名
+					</h3>
+					<p class="break-all text-xs text-stone-500">模型：{modelId}</p>
 				</div>
-
-				<div class="mt-4 space-y-2">
-					{aliases.length === 0 && (
-						<p class="py-4 text-center text-sm text-stone-400">
-							暂无别名，在下方添加
-						</p>
-					)}
-					{aliases.map((alias, index) => (
-						<div
-							key={alias}
-							class="flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2"
-						>
-							<span class="flex-1 break-all font-mono text-sm text-stone-800">
-								{alias}
-							</span>
-							<button
-								type="button"
-								class="rounded-full px-2 py-0.5 text-xs text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
-								onClick={() => handleRemove(index)}
-							>
-								删除
-							</button>
-						</div>
-					))}
-				</div>
-
-				<div class="mt-4 flex gap-2">
-					<input
-						type="text"
-						class="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-						placeholder="输入别名..."
-						value={newAlias}
-						onInput={(e) =>
-							setNewAlias((e.currentTarget as HTMLInputElement)?.value ?? "")
-						}
-						onKeyDown={(e) => {
-							if (e.key === "Enter") {
-								e.preventDefault();
-								handleAdd();
-							}
-						}}
-					/>
-					<button
-						type="button"
-						class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50"
-						onClick={handleAdd}
-					>
-						添加
-					</button>
-				</div>
-
-				{aliases.length > 0 && (
-					<label class="mt-3 flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5">
-						<input
-							type="checkbox"
-							checked={aliasOnly}
-							onChange={(e) =>
-								setAliasOnly((e.currentTarget as HTMLInputElement).checked)
-							}
-							class="accent-amber-500"
-						/>
-						<span class="text-sm text-stone-700">仅限别名</span>
-						<span class="text-xs text-stone-400">
-							— 隐藏原始模型名，只能通过别名调用
-						</span>
-					</label>
-				)}
-
-				<div class="mt-5 flex items-center justify-end gap-2">
-					<button
-						type="button"
-						class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50"
-						onClick={onClose}
-					>
-						取消
-					</button>
-					<button
-						type="button"
-						class="rounded-lg border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-60"
-						disabled={saving}
-						onClick={handleSave}
-					>
-						{saving ? "保存中..." : "保存"}
-					</button>
-				</div>
+				<button
+					type="button"
+					class="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
+					onClick={handleClose}
+				>
+					关闭
+				</button>
 			</div>
-		</div>
+
+			<div class="mt-4 space-y-2">
+				{aliases.length === 0 && (
+					<p class="py-4 text-center text-sm text-stone-400">
+						暂无别名，在下方添加
+					</p>
+				)}
+				{aliases.map((alias, index) => (
+					<div
+						key={alias}
+						class="flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2"
+					>
+						<span class="flex-1 break-all font-mono text-sm text-stone-800">
+							{alias}
+						</span>
+						<button
+							type="button"
+							class="rounded-full px-2 py-0.5 text-xs text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+							onClick={() => handleRemove(index)}
+						>
+							删除
+						</button>
+					</div>
+				))}
+			</div>
+
+			<div class="mt-4 flex gap-2">
+				<input
+					type="text"
+					class="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+					placeholder="输入别名..."
+					value={newAlias}
+					onInput={(e) =>
+						setNewAlias((e.currentTarget as HTMLInputElement)?.value ?? "")
+					}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							e.preventDefault();
+							handleAdd();
+						}
+					}}
+				/>
+				<button
+					type="button"
+					class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50"
+					onClick={handleAdd}
+				>
+					添加
+				</button>
+			</div>
+
+			{aliases.length > 0 && (
+				<label class="mt-3 flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5">
+					<input
+						type="checkbox"
+						checked={aliasOnly}
+						onChange={(e) =>
+							setAliasOnly((e.currentTarget as HTMLInputElement).checked)
+						}
+						class="accent-amber-500"
+					/>
+					<span class="text-sm text-stone-700">仅限别名</span>
+					<span class="text-xs text-stone-400">
+						— 隐藏原始模型名，只能通过别名调用
+					</span>
+				</label>
+			)}
+
+			<div class="mt-5 flex items-center justify-end gap-2">
+				<button
+					type="button"
+					class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50"
+					onClick={handleClose}
+				>
+					取消
+				</button>
+				<button
+					type="button"
+					class="rounded-lg border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-60"
+					disabled={saving}
+					onClick={handleSave}
+				>
+					{saving ? "保存中..." : "保存"}
+				</button>
+			</div>
+		</Modal>
 	);
 };
 
@@ -379,6 +410,32 @@ const PriceEditModal = ({
 	const [batchInput, setBatchInput] = useState("");
 	const [batchOutput, setBatchOutput] = useState("");
 	const [saving, setSaving] = useState(false);
+	const [closing, setClosing] = useState(false);
+	const closeTimerRef = useRef<number | null>(null);
+
+	useEffect(
+		() => () => {
+			if (closeTimerRef.current !== null) {
+				clearTimeout(closeTimerRef.current);
+			}
+		},
+		[],
+	);
+
+	// closing 包装：先播收场动画，结束后再交容器卸载（容器条件挂载 = state 天然重置）
+	const handleClose = () => {
+		if (closing) {
+			return;
+		}
+		setClosing(true);
+		const duration =
+			parseFloat(
+				getComputedStyle(document.documentElement).getPropertyValue(
+					"--modal-close-dur",
+				),
+			) || 150;
+		closeTimerRef.current = window.setTimeout(onClose, duration);
+	};
 
 	const handleFieldChange = (
 		index: number,
@@ -409,84 +466,56 @@ const PriceEditModal = ({
 				output_price: p.output_price !== "" ? Number(p.output_price) : 0,
 			}));
 			await onSave(payload);
-			onClose();
+			handleClose();
 		} finally {
 			setSaving(false);
 		}
 	};
 
 	return (
-		<div class="fixed inset-0 z-50 flex items-end justify-center bg-stone-900/40 px-0 py-0 md:items-center md:px-4 md:py-8">
-			<div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-stone-200 bg-white p-6 shadow-2xl md:rounded-2xl">
-				<div class="flex items-start justify-between gap-3">
-					<div>
-						<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-							编辑价格
-						</h3>
-						<p class="break-all text-xs text-stone-500">模型：{modelId}</p>
-					</div>
-					<button
-						type="button"
-						class="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
-						onClick={onClose}
+		<Modal
+			isOpen={!closing}
+			onClose={handleClose}
+			sheet
+			panelClass="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-stone-200 bg-white p-6 shadow-2xl md:rounded-2xl"
+		>
+			<div class="flex items-start justify-between gap-3">
+				<div>
+					<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+						编辑价格
+					</h3>
+					<p class="break-all text-xs text-stone-500">模型：{modelId}</p>
+				</div>
+				<button
+					type="button"
+					class="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
+					onClick={handleClose}
+				>
+					关闭
+				</button>
+			</div>
+
+			<div class="mt-4 space-y-2">
+				<div class="grid grid-cols-[1fr_5rem_5rem] gap-2 text-xs font-medium text-stone-400">
+					<span>渠道</span>
+					<span class="text-center">输入价格</span>
+					<span class="text-center">输出价格</span>
+				</div>
+				{prices.map((p, index) => (
+					<div
+						key={p.channel_id}
+						class="grid grid-cols-[1fr_5rem_5rem] items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2"
 					>
-						关闭
-					</button>
-				</div>
-
-				<div class="mt-4 space-y-2">
-					<div class="grid grid-cols-[1fr_5rem_5rem] gap-2 text-xs font-medium text-stone-400">
-						<span>渠道</span>
-						<span class="text-center">输入价格</span>
-						<span class="text-center">输出价格</span>
-					</div>
-					{prices.map((p, index) => (
-						<div
-							key={p.channel_id}
-							class="grid grid-cols-[1fr_5rem_5rem] items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2"
-						>
-							<span class="truncate text-sm text-stone-700">{p.name}</span>
-							<input
-								type="number"
-								step="any"
-								class="w-full rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-								value={p.input_price}
-								onInput={(e) =>
-									handleFieldChange(
-										index,
-										"input_price",
-										(e.currentTarget as HTMLInputElement)?.value ?? "",
-									)
-								}
-							/>
-							<input
-								type="number"
-								step="any"
-								class="w-full rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-								value={p.output_price}
-								onInput={(e) =>
-									handleFieldChange(
-										index,
-										"output_price",
-										(e.currentTarget as HTMLInputElement)?.value ?? "",
-									)
-								}
-							/>
-						</div>
-					))}
-				</div>
-
-				<div class="mt-4 rounded-lg border border-dashed border-stone-300 bg-stone-50 p-3">
-					<p class="mb-2 text-xs font-medium text-stone-500">批量设置</p>
-					<div class="flex items-center gap-2">
+						<span class="truncate text-sm text-stone-700">{p.name}</span>
 						<input
 							type="number"
 							step="any"
-							class="w-24 rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-							placeholder="输入价格"
-							value={batchInput}
+							class="w-full rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							value={p.input_price}
 							onInput={(e) =>
-								setBatchInput(
+								handleFieldChange(
+									index,
+									"input_price",
 									(e.currentTarget as HTMLInputElement)?.value ?? "",
 								)
 							}
@@ -494,44 +523,71 @@ const PriceEditModal = ({
 						<input
 							type="number"
 							step="any"
-							class="w-24 rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-							placeholder="输出价格"
-							value={batchOutput}
+							class="w-full rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							value={p.output_price}
 							onInput={(e) =>
-								setBatchOutput(
+								handleFieldChange(
+									index,
+									"output_price",
 									(e.currentTarget as HTMLInputElement)?.value ?? "",
 								)
 							}
 						/>
-						<button
-							type="button"
-							class="rounded-lg border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50"
-							onClick={handleBatchApply}
-						>
-							应用全部
-						</button>
 					</div>
-				</div>
+				))}
+			</div>
 
-				<div class="mt-5 flex items-center justify-end gap-2">
+			<div class="mt-4 rounded-lg border border-dashed border-stone-300 bg-stone-50 p-3">
+				<p class="mb-2 text-xs font-medium text-stone-500">批量设置</p>
+				<div class="flex items-center gap-2">
+					<input
+						type="number"
+						step="any"
+						class="w-24 rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+						placeholder="输入价格"
+						value={batchInput}
+						onInput={(e) =>
+							setBatchInput((e.currentTarget as HTMLInputElement)?.value ?? "")
+						}
+					/>
+					<input
+						type="number"
+						step="any"
+						class="w-24 rounded-md border border-stone-200 bg-white px-2 py-1 text-center text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+						placeholder="输出价格"
+						value={batchOutput}
+						onInput={(e) =>
+							setBatchOutput((e.currentTarget as HTMLInputElement)?.value ?? "")
+						}
+					/>
 					<button
 						type="button"
-						class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50"
-						onClick={onClose}
+						class="rounded-lg border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50"
+						onClick={handleBatchApply}
 					>
-						取消
-					</button>
-					<button
-						type="button"
-						class="rounded-lg border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-60"
-						disabled={saving}
-						onClick={handleSave}
-					>
-						{saving ? "保存中..." : "保存"}
+						应用全部
 					</button>
 				</div>
 			</div>
-		</div>
+
+			<div class="mt-5 flex items-center justify-end gap-2">
+				<button
+					type="button"
+					class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-50"
+					onClick={handleClose}
+				>
+					取消
+				</button>
+				<button
+					type="button"
+					class="rounded-lg border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-60"
+					disabled={saving}
+					onClick={handleSave}
+				>
+					{saving ? "保存中..." : "保存"}
+				</button>
+			</div>
+		</Modal>
 	);
 };
 
