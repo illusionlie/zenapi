@@ -191,6 +191,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			announcement: settings.announcement ?? "",
 			proxy_extra_headers: settings.proxy_extra_headers ?? "",
 			proxy_remove_headers: settings.proxy_remove_headers ?? "",
+			proxy_retry_rounds: String(settings.proxy_retry_rounds ?? 2),
+			proxy_retry_delay_ms: String(settings.proxy_retry_delay_ms ?? 200),
 			model_test_prompt: settings.model_test_prompt ?? "",
 		});
 		if (settings.require_invite_code) {
@@ -552,6 +554,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				announcement: settingsForm.announcement,
 				proxy_extra_headers: settingsForm.proxy_extra_headers,
 				proxy_remove_headers: settingsForm.proxy_remove_headers,
+				proxy_retry_rounds: Number(settingsForm.proxy_retry_rounds),
+				proxy_retry_delay_ms: Number(settingsForm.proxy_retry_delay_ms),
 				model_test_prompt: settingsForm.model_test_prompt,
 			};
 			const password = settingsForm.admin_password.trim();

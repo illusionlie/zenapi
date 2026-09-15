@@ -64,5 +64,7 @@ export const initialSettingsForm: SettingsForm = {
 	announcement: "",
 	proxy_extra_headers: "",
 	proxy_remove_headers: "",
+	proxy_retry_rounds: "2",
+	proxy_retry_delay_ms: "200",
 	model_test_prompt: "",
 };

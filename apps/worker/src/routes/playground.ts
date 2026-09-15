@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { collectUniqueModelIds } from "../services/channel-models";
 import { type ChannelRecord, createWeightedOrder } from "../services/channels";
+import { loadProxyRetryConfig } from "../services/settings";
 import { jsonError } from "../utils/http";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
 import { isRetryableStatus, sleep } from "../utils/retry";
@@ -77,8 +78,12 @@ playground.post("/chat", async (c) => {
 
 	const ordered = createWeightedOrder(candidates);
 	const targetPath = "/v1/chat/completions";
-	const retryRounds = Math.max(1, Number(c.env.PROXY_RETRY_ROUNDS ?? "1"));
-	const retryDelayMs = Math.max(0, Number(c.env.PROXY_RETRY_DELAY_MS ?? "200"));
+	// 该路径无并行预载块，循环前单次读取重试配置（settings → env → 内置默认）
+	const { rounds: retryRounds, delayMs: retryDelayMs } =
+		await loadProxyRetryConfig(c.env.DB, {
+			rounds: c.env.PROXY_RETRY_ROUNDS,
+			delayMs: c.env.PROXY_RETRY_DELAY_MS,
+		});
 	let lastResponse: Response | null = null;
 
 	let round = 0;

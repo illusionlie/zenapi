@@ -387,6 +387,59 @@ export const SettingsView = ({
 							设置后，所有用户登录进入站点时会收到公告通知。清空公告内容即可关闭。
 						</p>
 					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="proxy-retry-rounds"
+						>
+							代理重试轮数
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="proxy-retry-rounds"
+							name="proxy_retry_rounds"
+							type="number"
+							min="1"
+							max="10"
+							value={settingsForm.proxy_retry_rounds}
+							onInput={(event) => {
+								const target = event.currentTarget as HTMLInputElement | null;
+								onFormChange({
+									proxy_retry_rounds: target?.value ?? "",
+								});
+							}}
+						/>
+						<p class="mt-1 text-xs text-stone-500">
+							上游失败（5xx/429）后的渠道轮换重试轮数，范围 1–10。
+						</p>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="proxy-retry-delay-ms"
+						>
+							重试间隔（毫秒）
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="proxy-retry-delay-ms"
+							name="proxy_retry_delay_ms"
+							type="number"
+							min="0"
+							max="60000"
+							value={settingsForm.proxy_retry_delay_ms}
+							onInput={(event) => {
+								const target = event.currentTarget as HTMLInputElement | null;
+								onFormChange({
+									proxy_retry_delay_ms: target?.value ?? "",
+								});
+							}}
+						/>
+						<p class="mt-1 text-xs text-stone-500">
+							每轮重试之间的等待间隔，范围 0–60000
+							毫秒。键缺失时回退环境变量与内置默认值。
+						</p>
+					</div>
 					<div class="lg:col-span-2">
 						<label
 							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"

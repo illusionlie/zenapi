@@ -109,7 +109,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 
 ## 8. 代理关键行为（改 `proxy.ts` 前必读）
 
-- 按渠道**权重随机**排序选择，失败（5xx / 429）按 `PROXY_RETRY_ROUNDS` 轮询重试，间隔 `PROXY_RETRY_DELAY_MS`。
+- 按渠道**权重随机**排序选择，失败（5xx / 429）按重试轮数轮询重试；重试参数存 `settings` 表（`proxy_retry_rounds` 1–10 / `proxy_retry_delay_ms` 0–60000ms，管理台可改），读取优先级为 settings → env（`PROXY_RETRY_ROUNDS` / `PROXY_RETRY_DELAY_MS`，兼容回退）→ 内置默认（2 轮 / 200ms），读取侧对越界脏值 clamp；三条代理路径统一经 `loadProxyRetryConfig` 读取（proxy / anthropic-proxy 并入现有 `Promise.all` 预载，playground 循环前单次读取）。
 - 单渠道多 API Key：随机打乱顺序，首个 Key 失败自动换下一个 Key，全部 Key 失败才换渠道。
 - 流式请求自动注入 `stream_options.include_usage = true`，并从 SSE / 响应头 / 非 JSON 体解析 usage。
 - **路由矩阵按入站协议过滤候选渠道**：chat 入站全格式可用；`/v1/responses` 及其他 `/v1/*` 透传路径排除 anthropic；anthropic 入站排除 responses；过滤后无候选 → 503 `no_available_channels`（不发上游请求）。
@@ -142,8 +142,8 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 |------|------|
 | `DB` | D1 绑定（wrangler 注入） |
 | `CORS_ORIGIN` | `/api/*` 允许来源，`*` 或逗号分隔列表 |
-| `PROXY_RETRY_ROUNDS` | 代理重试轮数（默认 2） |
-| `PROXY_RETRY_DELAY_MS` | 重试间隔毫秒（默认 200） |
+| `PROXY_RETRY_ROUNDS` | 代理重试轮数兼容回退（settings `proxy_retry_rounds` 优先，默认 2） |
+| `PROXY_RETRY_DELAY_MS` | 重试间隔毫秒兼容回退（settings `proxy_retry_delay_ms` 优先，默认 200） |
 | `LINUXDO_CLIENT_ID` / `LINUXDO_CLIENT_SECRET` | LinuxDO OAuth（如启用） |
 
 管理员密码、注册模式、会话时长、日志保留天数等**业务配置存 `settings` 表**，经管理台「系统设置」修改，非环境变量。

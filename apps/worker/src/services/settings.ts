@@ -383,3 +383,113 @@ export async function setModelTestPrompt(
 ): Promise<void> {
 	await upsertSetting(db, MODEL_TEST_PROMPT_KEY, text);
 }
+
+// Proxy retry rounds / delay (global retry behavior for the proxy paths)
+
+export const PROXY_RETRY_ROUNDS_KEY = "proxy_retry_rounds";
+export const PROXY_RETRY_DELAY_MS_KEY = "proxy_retry_delay_ms";
+export const DEFAULT_PROXY_RETRY_ROUNDS = 2;
+export const DEFAULT_PROXY_RETRY_DELAY_MS = 200;
+export const MIN_PROXY_RETRY_ROUNDS = 1;
+export const MAX_PROXY_RETRY_ROUNDS = 10;
+export const MIN_PROXY_RETRY_DELAY_MS = 0;
+export const MAX_PROXY_RETRY_DELAY_MS = 60000;
+
+export type ProxyRetryConfig = { rounds: number; delayMs: number };
+
+/** Raw env-var fallback (`PROXY_RETRY_ROUNDS` / `PROXY_RETRY_DELAY_MS`). */
+export type ProxyRetryEnvFallback = {
+	rounds?: string;
+	delayMs?: string;
+};
+
+/**
+ * Parses a stored/env-provided raw value into a bounded integer.
+ * Missing/blank/non-integer input returns null (= fall through the fallback
+ * chain); out-of-range integers are clamped into [min, max] instead of
+ * failing, so dirty stored values never break proxy requests.
+ */
+function parseBoundedRetryInt(
+	raw: string | null | undefined,
+	min: number,
+	max: number,
+): number | null {
+	if (raw === null || raw === undefined || raw === "") {
+		return null;
+	}
+	const parsed = Number(raw);
+	if (!Number.isInteger(parsed)) {
+		return null;
+	}
+	return Math.min(max, Math.max(min, parsed));
+}
+
+/**
+ * Loads the proxy retry configuration (rounds + delay ms) with the fallback
+ * chain: settings value → env var fallback → built-in default. Single SQL
+ * query with both keys bound (same per-request preheat pattern as
+ * loadProxyHeaderPolicy); out-of-range stored values are clamped on read.
+ */
+export async function loadProxyRetryConfig(
+	db: D1Database,
+	envFallback?: ProxyRetryEnvFallback,
+): Promise<ProxyRetryConfig> {
+	const result = await db
+		.prepare("SELECT key, value FROM settings WHERE key IN (?, ?)")
+		.bind(PROXY_RETRY_ROUNDS_KEY, PROXY_RETRY_DELAY_MS_KEY)
+		.all<{ key: string; value: string | null }>();
+	let roundsRaw: string | null = null;
+	let delayMsRaw: string | null = null;
+	for (const row of result.results ?? []) {
+		if (row.key === PROXY_RETRY_ROUNDS_KEY) {
+			roundsRaw = row.value ?? null;
+		} else if (row.key === PROXY_RETRY_DELAY_MS_KEY) {
+			delayMsRaw = row.value ?? null;
+		}
+	}
+	const rounds =
+		parseBoundedRetryInt(
+			roundsRaw,
+			MIN_PROXY_RETRY_ROUNDS,
+			MAX_PROXY_RETRY_ROUNDS,
+		) ??
+		parseBoundedRetryInt(
+			envFallback?.rounds,
+			MIN_PROXY_RETRY_ROUNDS,
+			MAX_PROXY_RETRY_ROUNDS,
+		) ??
+		DEFAULT_PROXY_RETRY_ROUNDS;
+	const delayMs =
+		parseBoundedRetryInt(
+			delayMsRaw,
+			MIN_PROXY_RETRY_DELAY_MS,
+			MAX_PROXY_RETRY_DELAY_MS,
+		) ??
+		parseBoundedRetryInt(
+			envFallback?.delayMs,
+			MIN_PROXY_RETRY_DELAY_MS,
+			MAX_PROXY_RETRY_DELAY_MS,
+		) ??
+		DEFAULT_PROXY_RETRY_DELAY_MS;
+	return { rounds, delayMs };
+}
+
+/**
+ * Updates the proxy retry rounds setting.
+ */
+export async function setProxyRetryRounds(
+	db: D1Database,
+	rounds: number,
+): Promise<void> {
+	await upsertSetting(db, PROXY_RETRY_ROUNDS_KEY, rounds.toString());
+}
+
+/**
+ * Updates the proxy retry delay (ms) setting.
+ */
+export async function setProxyRetryDelayMs(
+	db: D1Database,
+	delayMs: number,
+): Promise<void> {
+	await upsertSetting(db, PROXY_RETRY_DELAY_MS_KEY, delayMs.toString());
+}

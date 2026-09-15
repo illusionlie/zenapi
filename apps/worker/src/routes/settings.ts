@@ -17,6 +17,11 @@ import {
 	getRetentionDays,
 	getSessionTtlHours,
 	isAdminPasswordSet,
+	loadProxyRetryConfig,
+	MAX_PROXY_RETRY_DELAY_MS,
+	MAX_PROXY_RETRY_ROUNDS,
+	MIN_PROXY_RETRY_DELAY_MS,
+	MIN_PROXY_RETRY_ROUNDS,
 	type RegistrationMode,
 	setAdminPasswordHash,
 	setAnnouncement,
@@ -30,6 +35,8 @@ import {
 	setModelTestPrompt,
 	setProxyExtraHeaders,
 	setProxyRemoveHeaders,
+	setProxyRetryDelayMs,
+	setProxyRetryRounds,
 	setRegistrationMode,
 	setRequireInviteCode,
 	setRetentionDays,
@@ -61,6 +68,7 @@ settings.get("/", async (c) => {
 	const proxyExtraHeaders = await getProxyExtraHeaders(c.env.DB);
 	const proxyRemoveHeaders = await getProxyRemoveHeaders(c.env.DB);
 	const modelTestPrompt = await getModelTestPrompt(c.env.DB);
+	const proxyRetryConfig = await loadProxyRetryConfig(c.env.DB);
 	return c.json({
 		log_retention_days: retention,
 		session_ttl_hours: sessionTtlHours,
@@ -77,6 +85,8 @@ settings.get("/", async (c) => {
 		announcement: announcement,
 		proxy_extra_headers: proxyExtraHeaders,
 		proxy_remove_headers: proxyRemoveHeaders,
+		proxy_retry_rounds: proxyRetryConfig.rounds,
+		proxy_retry_delay_ms: proxyRetryConfig.delayMs,
 		model_test_prompt: modelTestPrompt,
 	});
 });
@@ -241,6 +251,42 @@ settings.put("/", async (c) => {
 			);
 		}
 		await setProxyRemoveHeaders(c.env.DB, raw);
+		touched = true;
+	}
+
+	if (body.proxy_retry_rounds !== undefined) {
+		const rounds = Number(body.proxy_retry_rounds);
+		if (
+			!Number.isInteger(rounds) ||
+			rounds < MIN_PROXY_RETRY_ROUNDS ||
+			rounds > MAX_PROXY_RETRY_ROUNDS
+		) {
+			return jsonError(
+				c,
+				400,
+				"invalid_proxy_retry_rounds",
+				"invalid_proxy_retry_rounds",
+			);
+		}
+		await setProxyRetryRounds(c.env.DB, rounds);
+		touched = true;
+	}
+
+	if (body.proxy_retry_delay_ms !== undefined) {
+		const delayMs = Number(body.proxy_retry_delay_ms);
+		if (
+			!Number.isInteger(delayMs) ||
+			delayMs < MIN_PROXY_RETRY_DELAY_MS ||
+			delayMs > MAX_PROXY_RETRY_DELAY_MS
+		) {
+			return jsonError(
+				c,
+				400,
+				"invalid_proxy_retry_delay_ms",
+				"invalid_proxy_retry_delay_ms",
+			);
+		}
+		await setProxyRetryDelayMs(c.env.DB, delayMs);
 		touched = true;
 	}
 

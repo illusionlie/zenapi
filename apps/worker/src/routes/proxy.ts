@@ -23,6 +23,7 @@ import {
 	loadChannelAliasOnlyMap,
 } from "../services/model-aliases";
 import { calculateCost, getModelPrice } from "../services/pricing";
+import { loadProxyRetryConfig } from "../services/settings";
 import { recordUsage } from "../services/usage";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
@@ -462,12 +463,16 @@ proxy.all("/*", tokenAuth, async (c) => {
 		requestText = JSON.stringify(parsedBody);
 	}
 
-	// 全局头策略与活跃渠道查询并行预载：每请求只读一次库，重试轮复用
-	const [channelResult, headerPolicy] = await Promise.all([
+	// 全局头策略、重试配置与活跃渠道查询并行预载：每请求只读两次库，重试轮复用
+	const [channelResult, headerPolicy, retryConfig] = await Promise.all([
 		c.env.DB.prepare("SELECT * FROM channels WHERE status = ?")
 			.bind("active")
 			.all(),
 		loadProxyHeaderPolicy(c.env.DB),
+		loadProxyRetryConfig(c.env.DB, {
+			rounds: c.env.PROXY_RETRY_ROUNDS,
+			delayMs: c.env.PROXY_RETRY_DELAY_MS,
+		}),
 	]);
 	const activeChannels = (channelResult.results ?? []) as ChannelRecord[];
 
@@ -569,8 +574,7 @@ proxy.all("/*", tokenAuth, async (c) => {
 	const querySuffix = c.req.url.includes("?")
 		? `?${c.req.url.split("?")[1]}`
 		: "";
-	const retryRounds = Math.max(1, Number(c.env.PROXY_RETRY_ROUNDS ?? "1"));
-	const retryDelayMs = Math.max(0, Number(c.env.PROXY_RETRY_DELAY_MS ?? "200"));
+	const { rounds: retryRounds, delayMs: retryDelayMs } = retryConfig;
 	let lastResponse: Response | null = null;
 	let lastChannel: ChannelRecord | null = null;
 	let lastRequestPath = targetPath;

@@ -144,6 +144,8 @@ export type Settings = {
 	announcement: string;
 	proxy_extra_headers: string;
 	proxy_remove_headers: string;
+	proxy_retry_rounds: number;
+	proxy_retry_delay_ms: number;
 	model_test_prompt: string;
 };
 
@@ -218,6 +220,8 @@ export type SettingsForm = {
 	announcement: string;
 	proxy_extra_headers: string;
 	proxy_remove_headers: string;
+	proxy_retry_rounds: string;
+	proxy_retry_delay_ms: string;
 	model_test_prompt: string;
 };
 
