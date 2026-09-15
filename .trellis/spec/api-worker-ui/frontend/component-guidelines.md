@@ -73,6 +73,23 @@ class="transition-[color,background-color,border-color,box-shadow] duration-200"
 
 **移动端形态**：`sheet` prop（贴底 rise，`items-end md:items-center` 布局 + `.t-modal-sheet` 断点变换）；桌面居中 scale 走 `.t-modal` 原样。非 sheet 模态在移动端也会贴底（统一规格）。
 
+**遗留条件挂载模态的迁移**：若模态内部 state 以 `useState(() => props初值)` 初始化、依赖容器条件挂载实现"打开时重置"（先例：ModelsView 编辑别名/价格），改容器常驻需引入边沿重置，得不偿失。标准迁移路径是**组件内 closing 包装**：容器/调用点零改动，state 语义不变 ——
+
+```tsx
+const [closing, setClosing] = useState(false);
+const closeTimerRef = useRef<number | null>(null);
+useEffect(() => () => {
+	if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
+}, []);
+const handleClose = () => {
+	if (closing) return;
+	setClosing(true);
+	const duration = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--modal-close-dur")) || 150;
+	closeTimerRef.current = window.setTimeout(onClose, duration);
+};
+// return <Modal isOpen={!closing} onClose={handleClose} ...>；组件内所有关闭入口（按钮/保存成功）统一走 handleClose
+```
+
 ### Gotcha: hono/jsx/dom 的 data-* 布尔属性与 React 语义不同
 
 > **Warning**: `data-open={someBool}` 在 hono 4.x dom renderer 下 `true` 渲染为 `data-open=""`、`false` 直接移除属性 —— CSS 选择器 `[data-open="true"]` 永远不匹配，开关型动画静默失效。
