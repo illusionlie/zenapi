@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/api-worker/backend/index.md", "reason": "后端规范索引：目录约定、命名、与 AGENTS.md 互补关系"}
+{"file": ".trellis/spec/api-worker/backend/directory-structure.md", "reason": "routes 薄壳 + services 下沉约定；转换器三件套必须放 services/format-converter.ts"}
+{"file": ".trellis/spec/api-worker/backend/proxy-headers.md", "reason": "buildChannelRequest 新分支必须走 applyHeaderPolicy（剔除→全局注入→渠道级）契约，不可绕过"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "jsonError 统一错误形态与 snake_case 错误码；路由过滤后无候选返回 503 no_available_channels 沿用现有路径"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "提交门禁（check/typecheck/test 全绿）、Biome 规则、禁则清单"}
+{"file": ".trellis/spec/api-worker/backend/logging-guidelines.md", "reason": "console.* 前缀标签惯例；usage 解析失败等静默降级场景的日志边界"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "worker 与 ui 两侧 ChannelApiFormat 类型必须同步；Record<ChannelApiFormat,…> 强制补全检查"}
