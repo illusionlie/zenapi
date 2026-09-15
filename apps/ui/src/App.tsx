@@ -5,6 +5,7 @@ import { createApiFetch } from "./core/api";
 import { toast } from "./core/toast";
 import type { RegistrationMode, User } from "./core/types";
 import { LoginView } from "./features/LoginView";
+import { Modal } from "./features/Modal";
 import { ToastHost } from "./features/ToastHost";
 import { PublicApp } from "./PublicApp";
 import { UserApp } from "./UserApp";
@@ -250,12 +251,11 @@ const AppRoutes = () => {
 					linuxdoEnabled={linuxdoEnabled}
 					onUserRefresh={handleUserRefresh}
 				/>
-				{showAnnouncement && announcement && (
-					<AnnouncementModal
-						text={announcement}
-						onClose={handleDismissAnnouncement}
-					/>
-				)}
+				<AnnouncementModal
+					isOpen={showAnnouncement && announcement !== ""}
+					text={announcement}
+					onClose={handleDismissAnnouncement}
+				/>
 			</div>
 		);
 	}
@@ -277,66 +277,64 @@ const AppRoutes = () => {
 				registrationMode={registrationMode}
 				requireInviteCode={requireInviteCode}
 			/>
-			{showAnnouncement && announcement && (
-				<AnnouncementModal
-					text={announcement}
-					onClose={handleDismissAnnouncement}
-				/>
-			)}
+			<AnnouncementModal
+				isOpen={showAnnouncement && announcement !== ""}
+				text={announcement}
+				onClose={handleDismissAnnouncement}
+			/>
 		</>
 	);
 };
 
 const AnnouncementModal = ({
+	isOpen,
 	text,
 	onClose,
 }: {
+	isOpen: boolean;
 	text: string;
 	onClose: () => void;
 }) => {
 	return (
-		<div class="fixed inset-0 z-50 flex items-center justify-center">
-			<button
-				type="button"
-				class="absolute inset-0 bg-black/40 backdrop-blur-sm"
-				aria-label="关闭公告"
-				onClick={onClose}
-			/>
-			<div class="relative z-10 mx-4 w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
-				<div class="mb-4 flex items-center gap-2">
-					<span class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-5 w-5"
-							viewBox="0 0 20 20"
-							fill="currentColor"
-							aria-hidden="true"
-						>
-							<path
-								fill-rule="evenodd"
-								d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-					</span>
-					<h3 class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900">
-						站点公告
-					</h3>
-				</div>
-				<div class="mb-5 whitespace-pre-wrap text-sm leading-relaxed text-stone-700">
-					{text}
-				</div>
-				<div class="flex justify-end">
-					<button
-						type="button"
-						class="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-						onClick={onClose}
+		<Modal
+			isOpen={isOpen}
+			onClose={onClose}
+			backdropClass="bg-black/40 backdrop-blur-sm"
+			panelClass="mx-4 w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl"
+		>
+			<div class="mb-4 flex items-center gap-2">
+				<span class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-5 w-5"
+						viewBox="0 0 20 20"
+						fill="currentColor"
+						aria-hidden="true"
 					>
-						我知道了
-					</button>
-				</div>
+						<path
+							fill-rule="evenodd"
+							d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+				</span>
+				<h3 class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900">
+					站点公告
+				</h3>
 			</div>
-		</div>
+			<div class="mb-5 whitespace-pre-wrap text-sm leading-relaxed text-stone-700">
+				{text}
+			</div>
+			<div class="flex justify-end">
+				<button
+					type="button"
+					class="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+					onClick={onClose}
+				>
+					我知道了
+				</button>
+			</div>
+		</Modal>
 	);
 };
 

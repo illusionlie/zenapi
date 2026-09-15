@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "hono/jsx/dom";
 import type { Channel, ChannelApiFormat, ChannelForm } from "../core/types";
 import { buildPageItems } from "../core/utils";
 import type { ModelAliasesMap } from "../UserApp";
+import { Modal } from "./Modal";
 
 type ParsedModel = {
 	id: string;
@@ -412,7 +413,7 @@ export const ChannelsView = ({
 							}
 						/>
 						<button
-							class="h-10 md:h-9 rounded-full bg-stone-900 px-4 text-xs font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+							class="h-10 md:h-9 rounded-full bg-stone-900 px-4 text-xs font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
 							type="button"
 							onClick={onCreate}
 						>
@@ -483,28 +484,28 @@ export const ChannelsView = ({
 										</div>
 										<div class="flex flex-wrap gap-2">
 											<button
-												class="h-9 rounded-full border border-stone-200 bg-stone-100 px-3 text-xs font-semibold text-stone-900 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+												class="h-9 rounded-full border border-stone-200 bg-stone-100 px-3 text-xs font-semibold text-stone-900 transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 												type="button"
 												onClick={() => onTest(channel.id)}
 											>
 												连通测试
 											</button>
 											<button
-												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 												type="button"
 												onClick={() => onToggle(channel.id, channel.status)}
 											>
 												{isActive ? "禁用" : "启用"}
 											</button>
 											<button
-												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 												type="button"
 												onClick={() => onEdit(channel)}
 											>
 												编辑
 											</button>
 											<button
-												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 												type="button"
 												onClick={() => onDelete(channel.id)}
 											>
@@ -574,28 +575,28 @@ export const ChannelsView = ({
 									</div>
 									<div class="mt-3 flex flex-wrap gap-2">
 										<button
-											class="h-10 rounded-full border border-stone-200 bg-stone-100 px-3 text-xs font-semibold text-stone-900 transition-all duration-200 ease-in-out hover:shadow-lg"
+											class="h-10 rounded-full border border-stone-200 bg-stone-100 px-3 text-xs font-semibold text-stone-900 transition-shadow duration-200 hover:shadow-lg"
 											type="button"
 											onClick={() => onTest(channel.id)}
 										>
 											连通测试
 										</button>
 										<button
-											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:text-stone-900 hover:shadow-lg"
+											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-[color,background-color,border-color,box-shadow] duration-200 hover:text-stone-900 hover:shadow-lg"
 											type="button"
 											onClick={() => onToggle(channel.id, channel.status)}
 										>
 											{isActive ? "禁用" : "启用"}
 										</button>
 										<button
-											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:text-stone-900 hover:shadow-lg"
+											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-[color,background-color,border-color,box-shadow] duration-200 hover:text-stone-900 hover:shadow-lg"
 											type="button"
 											onClick={() => onEdit(channel)}
 										>
 											编辑
 										</button>
 										<button
-											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:text-stone-900 hover:shadow-lg"
+											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500 transition-[color,background-color,border-color,box-shadow] duration-200 hover:text-stone-900 hover:shadow-lg"
 											type="button"
 											onClick={() => onDelete(channel.id)}
 										>
@@ -614,7 +615,7 @@ export const ChannelsView = ({
 							共 {channelTotal} 条 · {channelTotalPages} 页
 						</span>
 						<button
-							class="h-10 w-10 md:h-8 md:w-8 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+							class="h-10 w-10 md:h-8 md:w-8 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-600 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 							type="button"
 							disabled={channelPage <= 1}
 							onClick={() => onPageChange(Math.max(1, channelPage - 1))}
@@ -628,7 +629,7 @@ export const ChannelsView = ({
 								</span>
 							) : (
 								<button
-									class={`h-10 min-w-10 md:h-8 md:min-w-8 rounded-full border px-3 text-xs font-semibold transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+									class={`h-10 min-w-10 md:h-8 md:min-w-8 rounded-full border px-3 text-xs font-semibold transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
 										item === channelPage
 											? "border-stone-900 bg-stone-900 text-white shadow-md"
 											: "border-stone-200 bg-white text-stone-600 hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md"
@@ -642,7 +643,7 @@ export const ChannelsView = ({
 							),
 						)}
 						<button
-							class="h-10 w-10 md:h-8 md:w-8 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+							class="h-10 w-10 md:h-8 md:w-8 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-600 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 							type="button"
 							disabled={channelPage >= channelTotalPages}
 							onClick={() =>
@@ -672,449 +673,447 @@ export const ChannelsView = ({
 					</label>
 				</div>
 			</div>
-			{isChannelModalOpen && (
-				<div class="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-stone-900/40 px-0 md:px-4 py-0 md:py-8">
-					<div class="w-full max-w-3xl rounded-t-2xl md:rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-						<div class="flex flex-wrap items-start justify-between gap-3">
-							<div>
-								<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-									{isEditing ? "编辑渠道" : "新增渠道"}
-								</h3>
-								<p class="text-xs text-stone-500">
-									{isEditing
-										? `正在编辑：${editingChannel?.name ?? ""}`
-										: "填写渠道信息并保存。"}
-								</p>
-							</div>
-							<button
-								class="h-10 md:h-9 rounded-full border border-stone-200 bg-stone-50 px-3 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-								type="button"
-								onClick={onCloseModal}
+			<Modal
+				isOpen={isChannelModalOpen}
+				onClose={onCloseModal}
+				sheet
+				panelClass="w-full max-w-3xl rounded-t-2xl md:rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+			>
+				<div class="flex flex-wrap items-start justify-between gap-3">
+					<div>
+						<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+							{isEditing ? "编辑渠道" : "新增渠道"}
+						</h3>
+						<p class="text-xs text-stone-500">
+							{isEditing
+								? `正在编辑：${editingChannel?.name ?? ""}`
+								: "填写渠道信息并保存。"}
+						</p>
+					</div>
+					<button
+						class="h-10 md:h-9 rounded-full border border-stone-200 bg-stone-50 px-3 text-xs font-semibold text-stone-500 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+						type="button"
+						onClick={onCloseModal}
+					>
+						关闭
+					</button>
+				</div>
+				<form class="mt-4 grid gap-3.5" onSubmit={onSubmit}>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="channel-name"
+						>
+							名称
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="channel-name"
+							name="name"
+							value={channelForm.name}
+							required
+							onInput={(event) =>
+								onFormChange({
+									name: (event.currentTarget as HTMLInputElement).value,
+								})
+							}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="channel-format"
+						>
+							API 格式
+						</label>
+						<select
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="channel-format"
+							value={channelForm.api_format}
+							onChange={(event) =>
+								onFormChange({
+									api_format: (event.currentTarget as HTMLSelectElement)
+										.value as ChannelApiFormat,
+								})
+							}
+						>
+							<option
+								value="openai"
+								selected={channelForm.api_format === "openai"}
 							>
-								关闭
+								OpenAI
+							</option>
+							<option
+								value="anthropic"
+								selected={channelForm.api_format === "anthropic"}
+							>
+								Anthropic (Claude)
+							</option>
+							<option
+								value="custom"
+								selected={channelForm.api_format === "custom"}
+							>
+								Custom
+							</option>
+						</select>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="channel-base"
+						>
+							{channelForm.api_format === "custom"
+								? "完整请求 URL"
+								: "Base URL（含版本路径，如 /v1）"}
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="channel-base"
+							name="base_url"
+							placeholder={
+								baseUrlPlaceholders[channelForm.api_format] ??
+								baseUrlPlaceholders.openai
+							}
+							value={channelForm.base_url}
+							required
+							onInput={(event) =>
+								onFormChange({
+									base_url: (event.currentTarget as HTMLInputElement).value,
+								})
+							}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="channel-key"
+						>
+							API Key
+						</label>
+						<textarea
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 font-mono"
+							id="channel-key"
+							name="api_key"
+							rows={3}
+							placeholder={"每行一个 API Key（可留空）"}
+							value={channelForm.api_key}
+							onInput={(event) =>
+								onFormChange({
+									api_key: (event.currentTarget as HTMLTextAreaElement).value,
+								})
+							}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="channel-weight"
+						>
+							权重
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="channel-weight"
+							name="weight"
+							type="number"
+							min="0"
+							step="any"
+							value={channelForm.weight}
+							onInput={(event) =>
+								onFormChange({
+									weight: Number(
+										(event.currentTarget as HTMLInputElement).value || 0,
+									),
+								})
+							}
+						/>
+					</div>
+					<div>
+						<div class="mb-1.5 flex items-center justify-between gap-2">
+							<label
+								class="block text-xs uppercase tracking-widest text-stone-500"
+								for="channel-models"
+							>
+								模型列表
+							</label>
+							<button
+								type="button"
+								disabled={fetchingModels}
+								onClick={onFetchModels}
+								class="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+							>
+								{fetchingModels ? "拉取中…" : "拉取模型"}
 							</button>
 						</div>
-						<form class="mt-4 grid gap-3.5" onSubmit={onSubmit}>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="channel-name"
-								>
-									名称
-								</label>
-								<input
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="channel-name"
-									name="name"
-									value={channelForm.name}
-									required
-									onInput={(event) =>
-										onFormChange({
-											name: (event.currentTarget as HTMLInputElement).value,
-										})
-									}
-								/>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="channel-format"
-								>
-									API 格式
-								</label>
-								<select
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="channel-format"
-									value={channelForm.api_format}
-									onChange={(event) =>
-										onFormChange({
-											api_format: (event.currentTarget as HTMLSelectElement)
-												.value as ChannelApiFormat,
-										})
-									}
-								>
-									<option
-										value="openai"
-										selected={channelForm.api_format === "openai"}
-									>
-										OpenAI
-									</option>
-									<option
-										value="anthropic"
-										selected={channelForm.api_format === "anthropic"}
-									>
-										Anthropic (Claude)
-									</option>
-									<option
-										value="custom"
-										selected={channelForm.api_format === "custom"}
-									>
-										Custom
-									</option>
-								</select>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="channel-base"
-								>
-									{channelForm.api_format === "custom"
-										? "完整请求 URL"
-										: "Base URL（含版本路径，如 /v1）"}
-								</label>
-								<input
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="channel-base"
-									name="base_url"
-									placeholder={
-										baseUrlPlaceholders[channelForm.api_format] ??
-										baseUrlPlaceholders.openai
-									}
-									value={channelForm.base_url}
-									required
-									onInput={(event) =>
-										onFormChange({
-											base_url: (event.currentTarget as HTMLInputElement).value,
-										})
-									}
-								/>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="channel-key"
-								>
-									API Key
-								</label>
-								<textarea
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 font-mono"
-									id="channel-key"
-									name="api_key"
-									rows={3}
-									placeholder={"每行一个 API Key（可留空）"}
-									value={channelForm.api_key}
-									onInput={(event) =>
-										onFormChange({
-											api_key: (event.currentTarget as HTMLTextAreaElement)
-												.value,
-										})
-									}
-								/>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="channel-weight"
-								>
-									权重
-								</label>
-								<input
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="channel-weight"
-									name="weight"
-									type="number"
-									min="0"
-									step="any"
-									value={channelForm.weight}
-									onInput={(event) =>
-										onFormChange({
-											weight: Number(
-												(event.currentTarget as HTMLInputElement).value || 0,
-											),
-										})
-									}
-								/>
-							</div>
-							<div>
-								<div class="mb-1.5 flex items-center justify-between gap-2">
-									<label
-										class="block text-xs uppercase tracking-widest text-stone-500"
-										for="channel-models"
-									>
-										模型列表
-									</label>
-									<button
-										type="button"
-										disabled={fetchingModels}
-										onClick={onFetchModels}
-										class="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-									>
-										{fetchingModels ? "拉取中…" : "拉取模型"}
-									</button>
-								</div>
-								<textarea
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 font-mono"
-									id="channel-models"
-									rows={3}
-									placeholder="每行一个模型 ID，如：&#10;gpt-4o&#10;claude-sonnet-4-20250514"
-									value={channelForm.models}
-									onInput={(event) =>
-										onFormChange({
-											models: (event.currentTarget as HTMLTextAreaElement)
-												.value,
-										})
-									}
-								/>
-								<p class="mt-1 text-xs text-stone-400">
-									每行一个模型 ID，留空则由连通测试自动获取。
+						<textarea
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 font-mono"
+							id="channel-models"
+							rows={3}
+							placeholder="每行一个模型 ID，如：&#10;gpt-4o&#10;claude-sonnet-4-20250514"
+							value={channelForm.models}
+							onInput={(event) =>
+								onFormChange({
+									models: (event.currentTarget as HTMLTextAreaElement).value,
+								})
+							}
+						/>
+						<p class="mt-1 text-xs text-stone-400">
+							每行一个模型 ID，留空则由连通测试自动获取。
+						</p>
+						<ModelPricingEditor
+							models={channelForm.models}
+							onModelsChange={(value) => onFormChange({ models: value })}
+						/>
+						{/* Per-model alias editor */}
+						{parsedModelIds.length > 0 && (
+							<div class="mt-3 rounded-lg border border-stone-200 bg-stone-50 p-3">
+								<p class="mb-2 text-xs font-medium uppercase tracking-widest text-stone-400">
+									模型别名配置
 								</p>
-								{fetchedModels !== null && (
-									<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-										<div class="flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl">
-											<div class="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-												<h3 class="text-sm font-semibold text-stone-800">
-													选择模型
-													<span class="ml-1 text-xs font-normal text-stone-400">
-														共 {fetchedModels.length} 个
+								<div class="space-y-1">
+									{parsedModelIds.map((modelId) => {
+										const config = channelAliasState[modelId];
+										const aliasCount = config?.aliases?.length ?? 0;
+										const isExpanded = expandedAliasModels.has(modelId);
+										return (
+											<div class="rounded-lg border border-stone-200 bg-white">
+												<button
+													type="button"
+													class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50"
+													onClick={() => toggleAliasExpanded(modelId)}
+												>
+													<span class="text-xs text-stone-400">
+														{isExpanded ? "▼" : "▶"}
 													</span>
-												</h3>
-												<button
-													type="button"
-													onClick={onCancelFetched}
-													class="text-stone-400 hover:text-stone-600"
-												>
-													✕
+													<span class="flex-1 truncate font-mono text-xs text-stone-800">
+														{modelId}
+													</span>
+													{aliasCount > 0 && (
+														<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+															{aliasCount} 个别名
+														</span>
+													)}
 												</button>
-											</div>
-											<div class="flex items-center gap-2 border-b border-stone-100 px-4 py-2.5">
-												<input
-													type="text"
-													placeholder="搜索模型…"
-													value={fetchedSearch}
-													onInput={(e) =>
-														onFetchedSearchChange(
-															(e.currentTarget as HTMLInputElement).value,
-														)
-													}
-													class="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
-												/>
-												<button
-													type="button"
-													onClick={() =>
-														onToggleAllFetched(
-															visibleFetched,
-															!allVisibleFetchedSelected,
-														)
-													}
-													class="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-50"
-												>
-													{allVisibleFetchedSelected ? "取消全选" : "全选"}
-												</button>
-											</div>
-											<div class="flex-1 overflow-y-auto px-4 py-2">
-												{fetchedModels.length === 0 ? (
-													<p class="py-6 text-center text-sm text-stone-400">
-														上游未返回模型
-													</p>
-												) : visibleFetched.length === 0 ? (
-													<p class="py-6 text-center text-sm text-stone-400">
-														无匹配模型
-													</p>
-												) : (
-													<div class="space-y-0.5">
-														{visibleFetched.map((m) => (
-															<label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-stone-50">
+												{isExpanded && (
+													<div class="border-t border-stone-100 px-3 py-2.5">
+														{config?.aliases && config.aliases.length > 0 && (
+															<div class="mb-2 space-y-1.5">
+																{config.aliases.map((alias, index) => (
+																	<div class="flex items-center gap-2 rounded border border-stone-100 bg-stone-50 px-2 py-1.5">
+																		<span class="flex-1 break-all font-mono text-xs text-stone-700">
+																			{alias}
+																		</span>
+																		<button
+																			type="button"
+																			class="rounded px-1.5 py-0.5 text-xs text-red-400 hover:bg-red-50 hover:text-red-600"
+																			onClick={() =>
+																				removeAlias(modelId, index)
+																			}
+																		>
+																			删除
+																		</button>
+																	</div>
+																))}
+															</div>
+														)}
+														<div class="flex gap-1.5">
+															<input
+																type="text"
+																class="flex-1 rounded border border-stone-200 bg-white px-2 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
+																placeholder="输入别名..."
+																onKeyDown={(e) => {
+																	if (e.key === "Enter") {
+																		e.preventDefault();
+																		const input =
+																			e.currentTarget as HTMLInputElement;
+																		addAlias(modelId, input.value);
+																		input.value = "";
+																	}
+																}}
+															/>
+															<button
+																type="button"
+																class="rounded border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
+																onClick={(e) => {
+																	const input = (e.currentTarget as HTMLElement)
+																		.previousElementSibling as HTMLInputElement;
+																	addAlias(modelId, input.value);
+																	input.value = "";
+																}}
+															>
+																添加
+															</button>
+														</div>
+														{(config?.aliases?.length ?? 0) > 0 && (
+															<label class="mt-2 flex cursor-pointer items-center gap-2 rounded border border-stone-100 bg-stone-50 px-2 py-1.5">
 																<input
 																	type="checkbox"
-																	checked={selectedFetched.has(m)}
-																	onChange={() => onToggleFetched(m)}
+																	checked={config?.alias_only ?? false}
+																	onChange={(e) =>
+																		toggleAliasOnly(
+																			modelId,
+																			(e.currentTarget as HTMLInputElement)
+																				.checked,
+																		)
+																	}
 																	class="accent-amber-500"
 																/>
-																<span class="min-w-0 break-all font-mono text-xs text-stone-700">
-																	{m}
+																<span class="text-xs text-stone-700">
+																	仅限别名
 																</span>
-																{existingModelIdSet.has(m) && (
-																	<span class="ml-auto shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500">
-																		已存在
-																	</span>
-																)}
+																<span class="text-xs text-stone-400">
+																	— 隐藏原始模型名
+																</span>
 															</label>
-														))}
+														)}
 													</div>
 												)}
 											</div>
-											<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3">
-												<button
-													type="button"
-													onClick={onCancelFetched}
-													class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
-												>
-													取消
-												</button>
-												<button
-													type="button"
-													onClick={onConfirmFetched}
-													class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
-												>
-													确认加入（新增 {newSelectedCount}）
-												</button>
-											</div>
-										</div>
-									</div>
-								)}
-								<ModelPricingEditor
-									models={channelForm.models}
-									onModelsChange={(value) => onFormChange({ models: value })}
-								/>
-								{/* Per-model alias editor */}
-								{parsedModelIds.length > 0 && (
-									<div class="mt-3 rounded-lg border border-stone-200 bg-stone-50 p-3">
-										<p class="mb-2 text-xs font-medium uppercase tracking-widest text-stone-400">
-											模型别名配置
-										</p>
-										<div class="space-y-1">
-											{parsedModelIds.map((modelId) => {
-												const config = channelAliasState[modelId];
-												const aliasCount = config?.aliases?.length ?? 0;
-												const isExpanded = expandedAliasModels.has(modelId);
-												return (
-													<div class="rounded-lg border border-stone-200 bg-white">
-														<button
-															type="button"
-															class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50"
-															onClick={() => toggleAliasExpanded(modelId)}
-														>
-															<span class="text-xs text-stone-400">
-																{isExpanded ? "▼" : "▶"}
-															</span>
-															<span class="flex-1 truncate font-mono text-xs text-stone-800">
-																{modelId}
-															</span>
-															{aliasCount > 0 && (
-																<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
-																	{aliasCount} 个别名
-																</span>
-															)}
-														</button>
-														{isExpanded && (
-															<div class="border-t border-stone-100 px-3 py-2.5">
-																{config?.aliases &&
-																	config.aliases.length > 0 && (
-																		<div class="mb-2 space-y-1.5">
-																			{config.aliases.map((alias, index) => (
-																				<div class="flex items-center gap-2 rounded border border-stone-100 bg-stone-50 px-2 py-1.5">
-																					<span class="flex-1 break-all font-mono text-xs text-stone-700">
-																						{alias}
-																					</span>
-																					<button
-																						type="button"
-																						class="rounded px-1.5 py-0.5 text-xs text-red-400 hover:bg-red-50 hover:text-red-600"
-																						onClick={() =>
-																							removeAlias(modelId, index)
-																						}
-																					>
-																						删除
-																					</button>
-																				</div>
-																			))}
-																		</div>
-																	)}
-																<div class="flex gap-1.5">
-																	<input
-																		type="text"
-																		class="flex-1 rounded border border-stone-200 bg-white px-2 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
-																		placeholder="输入别名..."
-																		onKeyDown={(e) => {
-																			if (e.key === "Enter") {
-																				e.preventDefault();
-																				const input =
-																					e.currentTarget as HTMLInputElement;
-																				addAlias(modelId, input.value);
-																				input.value = "";
-																			}
-																		}}
-																	/>
-																	<button
-																		type="button"
-																		class="rounded border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
-																		onClick={(e) => {
-																			const input = (
-																				e.currentTarget as HTMLElement
-																			)
-																				.previousElementSibling as HTMLInputElement;
-																			addAlias(modelId, input.value);
-																			input.value = "";
-																		}}
-																	>
-																		添加
-																	</button>
-																</div>
-																{(config?.aliases?.length ?? 0) > 0 && (
-																	<label class="mt-2 flex cursor-pointer items-center gap-2 rounded border border-stone-100 bg-stone-50 px-2 py-1.5">
-																		<input
-																			type="checkbox"
-																			checked={config?.alias_only ?? false}
-																			onChange={(e) =>
-																				toggleAliasOnly(
-																					modelId,
-																					(e.currentTarget as HTMLInputElement)
-																						.checked,
-																				)
-																			}
-																			class="accent-amber-500"
-																		/>
-																		<span class="text-xs text-stone-700">
-																			仅限别名
-																		</span>
-																		<span class="text-xs text-stone-400">
-																			— 隐藏原始模型名
-																		</span>
-																	</label>
-																)}
-															</div>
-														)}
-													</div>
-												);
-											})}
-										</div>
-									</div>
-								)}
+										);
+									})}
+								</div>
 							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="channel-custom-headers"
-								>
-									自定义请求头 (JSON)
-								</label>
-								<textarea
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="channel-custom-headers"
-									rows={3}
-									placeholder={'{"X-Custom-Header": "value"}'}
-									value={channelForm.custom_headers}
-									onInput={(event) =>
-										onFormChange({
-											custom_headers: (
-												event.currentTarget as HTMLTextAreaElement
-											).value,
-										})
-									}
-								/>
-								<p class="mt-1 text-xs text-stone-500">
-									对所有 API
-									格式生效。同名头覆盖系统设置中的全局注入头与内置鉴权头。
-								</p>
-							</div>
-							<div class="flex flex-wrap items-center justify-end gap-2 pt-2">
-								<button
-									class="h-10 rounded-full border border-stone-200 bg-stone-50 px-4 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-									type="button"
-									onClick={onCloseModal}
-								>
-									取消
-								</button>
-								<button
-									class="h-10 rounded-full bg-stone-900 px-5 text-xs font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-									type="submit"
-								>
-									{isEditing ? "保存修改" : "创建渠道"}
-								</button>
-							</div>
-						</form>
+						)}
 					</div>
-				</div>
-			)}
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="channel-custom-headers"
+						>
+							自定义请求头 (JSON)
+						</label>
+						<textarea
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="channel-custom-headers"
+							rows={3}
+							placeholder={'{"X-Custom-Header": "value"}'}
+							value={channelForm.custom_headers}
+							onInput={(event) =>
+								onFormChange({
+									custom_headers: (event.currentTarget as HTMLTextAreaElement)
+										.value,
+								})
+							}
+						/>
+						<p class="mt-1 text-xs text-stone-500">
+							对所有 API
+							格式生效。同名头覆盖系统设置中的全局注入头与内置鉴权头。
+						</p>
+					</div>
+					<div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+						<button
+							class="h-10 rounded-full border border-stone-200 bg-stone-50 px-4 text-xs font-semibold text-stone-500 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+							type="button"
+							onClick={onCloseModal}
+						>
+							取消
+						</button>
+						<button
+							class="h-10 rounded-full bg-stone-900 px-5 text-xs font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+							type="submit"
+						>
+							{isEditing ? "保存修改" : "创建渠道"}
+						</button>
+					</div>
+				</form>
+			</Modal>
+			<Modal
+				isOpen={fetchedModels !== null}
+				onClose={onCancelFetched}
+				backdropClass="bg-black/40"
+				panelClass="flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl"
+			>
+				{/* fetchedModels 兼任开关与数据,closing 动画期间已置 null,children 必须 guard 防止解引用崩溃 */}
+				{fetchedModels !== null && (
+					<>
+						<div class="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+							<h3 class="text-sm font-semibold text-stone-800">
+								选择模型
+								<span class="ml-1 text-xs font-normal text-stone-400">
+									共 {fetchedModels.length} 个
+								</span>
+							</h3>
+							<button
+								type="button"
+								onClick={onCancelFetched}
+								class="text-stone-400 hover:text-stone-600"
+							>
+								✕
+							</button>
+						</div>
+						<div class="flex items-center gap-2 border-b border-stone-100 px-4 py-2.5">
+							<input
+								type="text"
+								placeholder="搜索模型…"
+								value={fetchedSearch}
+								onInput={(e) =>
+									onFetchedSearchChange(
+										(e.currentTarget as HTMLInputElement).value,
+									)
+								}
+								class="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
+							/>
+							<button
+								type="button"
+								onClick={() =>
+									onToggleAllFetched(visibleFetched, !allVisibleFetchedSelected)
+								}
+								class="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-50"
+							>
+								{allVisibleFetchedSelected ? "取消全选" : "全选"}
+							</button>
+						</div>
+						<div class="flex-1 overflow-y-auto px-4 py-2">
+							{fetchedModels.length === 0 ? (
+								<p class="py-6 text-center text-sm text-stone-400">
+									上游未返回模型
+								</p>
+							) : visibleFetched.length === 0 ? (
+								<p class="py-6 text-center text-sm text-stone-400">
+									无匹配模型
+								</p>
+							) : (
+								<div class="space-y-0.5">
+									{visibleFetched.map((m) => (
+										<label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-stone-50">
+											<input
+												type="checkbox"
+												checked={selectedFetched.has(m)}
+												onChange={() => onToggleFetched(m)}
+												class="accent-amber-500"
+											/>
+											<span class="min-w-0 break-all font-mono text-xs text-stone-700">
+												{m}
+											</span>
+											{existingModelIdSet.has(m) && (
+												<span class="ml-auto shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500">
+													已存在
+												</span>
+											)}
+										</label>
+									))}
+								</div>
+							)}
+						</div>
+						<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3">
+							<button
+								type="button"
+								onClick={onCancelFetched}
+								class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
+							>
+								取消
+							</button>
+							<button
+								type="button"
+								onClick={onConfirmFetched}
+								class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
+							>
+								确认加入（新增 {newSelectedCount}）
+							</button>
+						</div>
+					</>
+				)}
+			</Modal>
 		</div>
 	);
 };

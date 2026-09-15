@@ -32,7 +32,7 @@ export const AppLayout = ({
 		{/* Mobile top bar */}
 		<div class="sticky top-0 z-40 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-3 lg:hidden">
 			<button
-				class="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 transition-all hover:bg-stone-50 hover:text-stone-900"
+				class="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
 				type="button"
 				onClick={onToggleMobileMenu}
 				aria-label="Toggle menu"
@@ -72,61 +72,67 @@ export const AppLayout = ({
 			<div class="w-10" />
 		</div>
 
-		{/* Mobile overlay drawer */}
-		{isMobileMenuOpen && (
-			<div class="fixed inset-0 z-50 lg:hidden">
-				<button
-					type="button"
-					class="absolute inset-0 bg-stone-900/40"
-					tabIndex={-1}
-					onClick={onToggleMobileMenu}
-					onKeyDown={(e) => {
-						if ((e as KeyboardEvent).key === "Escape") onToggleMobileMenu();
-					}}
-				/>
-				<aside class="absolute left-0 top-0 h-full w-[280px] border-r border-stone-200 bg-white px-5 py-8 shadow-xl">
-					<div class="mb-8 flex flex-col gap-1.5">
+		{/* Mobile overlay drawer(常驻渲染:closing 动画期间保持挂载;closed 态可见性/命中由 .drawer-root 处理) */}
+		<div
+			class="fixed inset-0 z-50 lg:hidden drawer-root"
+			data-open={isMobileMenuOpen ? "true" : "false"}
+		>
+			<button
+				type="button"
+				class={`absolute inset-0 bg-stone-900/40 transition-opacity duration-[350ms] ${
+					isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+				}`}
+				tabIndex={-1}
+				onClick={onToggleMobileMenu}
+				onKeyDown={(e) => {
+					if ((e as KeyboardEvent).key === "Escape") onToggleMobileMenu();
+				}}
+			/>
+			<aside
+				class="t-drawer absolute left-0 top-0 h-full w-[280px] border-r border-stone-200 bg-white px-5 py-8 shadow-xl"
+				data-open={isMobileMenuOpen ? "true" : "false"}
+			>
+				<div class="mb-8 flex flex-col gap-1.5">
+					<button
+						type="button"
+						class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900 text-left"
+						onClick={() => onNavigate("/")}
+					>
+						ZenAPI
+					</button>
+					<span class="text-xs uppercase tracking-widest text-stone-500">
+						console
+					</span>
+				</div>
+				<nav class="flex flex-col gap-2.5">
+					{tabs.map((tab) => (
 						<button
+							class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+								activeTab === tab.id
+									? "bg-stone-100 text-stone-900"
+									: "text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+							}`}
 							type="button"
-							class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900 text-left"
-							onClick={() => onNavigate("/")}
+							onClick={() => {
+								onTabChange(tab.id);
+								onToggleMobileMenu();
+							}}
 						>
-							ZenAPI
+							{tab.label}
 						</button>
-						<span class="text-xs uppercase tracking-widest text-stone-500">
-							console
-						</span>
-					</div>
-					<nav class="flex flex-col gap-2.5">
-						{tabs.map((tab) => (
-							<button
-								class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
-									activeTab === tab.id
-										? "bg-stone-100 text-stone-900"
-										: "text-stone-500 hover:bg-stone-100 hover:text-stone-900"
-								}`}
-								type="button"
-								onClick={() => {
-									onTabChange(tab.id);
-									onToggleMobileMenu();
-								}}
-							>
-								{tab.label}
-							</button>
-						))}
-					</nav>
-					<div class="mt-8 border-t border-stone-200 pt-4">
-						<button
-							class="h-11 w-full rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-all hover:text-stone-900"
-							type="button"
-							onClick={onLogout}
-						>
-							退出
-						</button>
-					</div>
-				</aside>
-			</div>
-		)}
+					))}
+				</nav>
+				<div class="mt-8 border-t border-stone-200 pt-4">
+					<button
+						class="h-11 w-full rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-colors hover:text-stone-900"
+						type="button"
+						onClick={onLogout}
+					>
+						退出
+					</button>
+				</div>
+			</aside>
+		</div>
 
 		{/* Desktop sidebar */}
 		<aside class="hidden border-b border-stone-200 bg-white px-5 py-8 lg:sticky lg:top-0 lg:block lg:h-screen lg:border-b-0 lg:border-r">
@@ -145,7 +151,7 @@ export const AppLayout = ({
 			<nav class="flex flex-col gap-2.5">
 				{tabs.map((tab) => (
 					<button
-						class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+						class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
 							activeTab === tab.id
 								? "bg-stone-100 text-stone-900"
 								: "text-stone-500 hover:bg-stone-100 hover:text-stone-900"
@@ -173,7 +179,7 @@ export const AppLayout = ({
 						{token ? "已登录" : "未登录"}
 					</span>
 					<button
-						class="h-11 rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+						class="h-11 rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 						type="button"
 						onClick={onLogout}
 					>

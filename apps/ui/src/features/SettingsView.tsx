@@ -436,7 +436,7 @@ export const SettingsView = ({
 					</div>
 					<div class="flex items-end lg:col-span-2">
 						<button
-							class="h-11 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+							class="h-11 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 							type="submit"
 						>
 							保存设置
@@ -452,7 +452,7 @@ export const SettingsView = ({
 						</h3>
 						<button
 							type="button"
-							class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 hover:shadow-sm"
+							class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-[color,background-color,border-color,box-shadow] hover:border-stone-300 hover:shadow-sm"
 							onClick={onExportCodes}
 						>
 							导出可用码
@@ -521,7 +521,7 @@ export const SettingsView = ({
 						</div>
 						<button
 							type="button"
-							class="h-[34px] rounded-lg bg-stone-900 px-3 text-xs font-semibold text-white transition-all hover:shadow-lg"
+							class="h-[34px] rounded-lg bg-stone-900 px-3 text-xs font-semibold text-white transition-shadow hover:shadow-lg"
 							onClick={() =>
 								onGenerateCodes(
 									Number(genCount) || 10,

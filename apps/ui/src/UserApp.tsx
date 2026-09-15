@@ -332,7 +332,7 @@ export const UserApp = ({
 			{/* Mobile top bar */}
 			<div class="sticky top-0 z-40 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-3 lg:hidden">
 				<button
-					class="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 transition-all hover:bg-stone-50 hover:text-stone-900"
+					class="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
 					type="button"
 					aria-label="切换菜单"
 					onClick={toggleMobileMenu}
@@ -371,61 +371,67 @@ export const UserApp = ({
 				<div class="w-10" />
 			</div>
 
-			{/* Mobile overlay */}
-			{isMobileMenuOpen && (
-				<div class="fixed inset-0 z-50 lg:hidden">
-					<button
-						type="button"
-						class="absolute inset-0 bg-stone-900/40"
-						tabIndex={-1}
-						onClick={toggleMobileMenu}
-						onKeyDown={(e) => {
-							if ((e as KeyboardEvent).key === "Escape") toggleMobileMenu();
-						}}
-					/>
-					<aside class="absolute left-0 top-0 h-full w-[280px] border-r border-stone-200 bg-white px-5 py-8 shadow-xl">
-						<div class="mb-8 flex flex-col gap-1.5">
+			{/* Mobile overlay(常驻渲染:closing 动画期间保持挂载;closed 态可见性/命中由 .drawer-root 处理) */}
+			<div
+				class="fixed inset-0 z-50 lg:hidden drawer-root"
+				data-open={isMobileMenuOpen ? "true" : "false"}
+			>
+				<button
+					type="button"
+					class={`absolute inset-0 bg-stone-900/40 transition-opacity duration-[350ms] ${
+						isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+					}`}
+					tabIndex={-1}
+					onClick={toggleMobileMenu}
+					onKeyDown={(e) => {
+						if ((e as KeyboardEvent).key === "Escape") toggleMobileMenu();
+					}}
+				/>
+				<aside
+					class="t-drawer absolute left-0 top-0 h-full w-[280px] border-r border-stone-200 bg-white px-5 py-8 shadow-xl"
+					data-open={isMobileMenuOpen ? "true" : "false"}
+				>
+					<div class="mb-8 flex flex-col gap-1.5">
+						<button
+							type="button"
+							class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900 text-left"
+							onClick={() => onNavigate("/")}
+						>
+							ZenAPI
+						</button>
+						<span class="text-xs text-stone-500">
+							{user.name} ({user.email})
+						</span>
+					</div>
+					<nav class="flex flex-col gap-2.5">
+						{userTabs.map((tab) => (
 							<button
+								class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors ${
+									activeTab === tab.id
+										? "bg-stone-100 text-stone-900"
+										: "text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+								}`}
 								type="button"
-								class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-stone-900 text-left"
-								onClick={() => onNavigate("/")}
+								onClick={() => {
+									handleTabChange(tab.id);
+									toggleMobileMenu();
+								}}
 							>
-								ZenAPI
+								{tab.label}
 							</button>
-							<span class="text-xs text-stone-500">
-								{user.name} ({user.email})
-							</span>
-						</div>
-						<nav class="flex flex-col gap-2.5">
-							{userTabs.map((tab) => (
-								<button
-									class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-all ${
-										activeTab === tab.id
-											? "bg-stone-100 text-stone-900"
-											: "text-stone-500 hover:bg-stone-100 hover:text-stone-900"
-									}`}
-									type="button"
-									onClick={() => {
-										handleTabChange(tab.id);
-										toggleMobileMenu();
-									}}
-								>
-									{tab.label}
-								</button>
-							))}
-						</nav>
-						<div class="mt-8 border-t border-stone-200 pt-4">
-							<button
-								class="h-11 w-full rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-all hover:text-stone-900"
-								type="button"
-								onClick={handleLogout}
-							>
-								退出
-							</button>
-						</div>
-					</aside>
-				</div>
-			)}
+						))}
+					</nav>
+					<div class="mt-8 border-t border-stone-200 pt-4">
+						<button
+							class="h-11 w-full rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-colors hover:text-stone-900"
+							type="button"
+							onClick={handleLogout}
+						>
+							退出
+						</button>
+					</div>
+				</aside>
+			</div>
 
 			{/* Desktop sidebar */}
 			<aside class="hidden border-b border-stone-200 bg-white px-5 py-8 lg:sticky lg:top-0 lg:block lg:h-screen lg:border-b-0 lg:border-r">
@@ -444,7 +450,7 @@ export const UserApp = ({
 				<nav class="flex flex-col gap-2.5">
 					{userTabs.map((tab) => (
 						<button
-							class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-all ${
+							class={`flex h-11 w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors ${
 								activeTab === tab.id
 									? "bg-stone-100 text-stone-900"
 									: "text-stone-500 hover:bg-stone-100 hover:text-stone-900"
@@ -465,7 +471,7 @@ export const UserApp = ({
 						管理后台
 					</button>
 					<button
-						class="h-11 w-full rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-all hover:text-stone-900"
+						class="h-11 w-full rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-colors hover:text-stone-900"
 						type="button"
 						onClick={handleLogout}
 					>
@@ -489,7 +495,7 @@ export const UserApp = ({
 							{user.email}
 						</span>
 						<button
-							class="h-11 rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-all hover:text-stone-900"
+							class="h-11 rounded-lg border border-stone-200 bg-transparent px-4 py-2.5 text-sm font-semibold text-stone-500 transition-colors hover:text-stone-900"
 							type="button"
 							onClick={handleLogout}
 						>
@@ -499,13 +505,12 @@ export const UserApp = ({
 				</div>
 				<div key={activeTab}>{renderContent()}</div>
 			</main>
-			{secretModal && (
-				<SecretValueModal
-					title={secretModal.title}
-					value={secretModal.value}
-					onClose={() => setSecretModal(null)}
-				/>
-			)}
+			<SecretValueModal
+				isOpen={secretModal !== null}
+				title={secretModal?.title ?? ""}
+				value={secretModal?.value ?? ""}
+				onClose={() => setSecretModal(null)}
+			/>
 		</div>
 	);
 };

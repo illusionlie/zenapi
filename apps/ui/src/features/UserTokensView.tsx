@@ -1,6 +1,7 @@
 import { useState } from "hono/jsx/dom";
 import type { Token } from "../core/types";
 import { formatDateTime } from "../core/utils";
+import { Modal } from "./Modal";
 
 type UserTokensViewProps = {
 	tokens: Token[];
@@ -47,7 +48,7 @@ export const UserTokensView = ({
 					</span>
 				</div>
 				<button
-					class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-all hover:shadow-lg"
+					class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-shadow hover:shadow-lg"
 					type="button"
 					onClick={openCreate}
 				>
@@ -146,57 +147,50 @@ export const UserTokensView = ({
 			)}
 
 			{/* Create token modal */}
-			{showCreateModal && (
-				<div class="fixed inset-0 z-50 flex items-center justify-center">
-					<button
-						type="button"
-						class="absolute inset-0 bg-stone-900/40"
-						onClick={resetModal}
-					/>
-					<div class="relative z-10 w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-						<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-							创建令牌
-						</h3>
-						<form onSubmit={handleCreate}>
-							<div class="mb-4">
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="token-name"
-								>
-									令牌名称
-								</label>
-								<input
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="token-name"
-									type="text"
-									required
-									value={tokenName}
-									onInput={(e) =>
-										setTokenName(
-											(e.currentTarget as HTMLInputElement)?.value ?? "",
-										)
-									}
-								/>
-							</div>
-							<div class="flex justify-end gap-3">
-								<button
-									type="button"
-									class="h-10 rounded-lg border border-stone-200 px-4 text-sm text-stone-500 hover:text-stone-900"
-									onClick={resetModal}
-								>
-									取消
-								</button>
-								<button
-									type="submit"
-									class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-all hover:shadow-lg"
-								>
-									创建
-								</button>
-							</div>
-						</form>
+			<Modal
+				isOpen={showCreateModal}
+				onClose={resetModal}
+				panelClass="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
+			>
+				<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+					创建令牌
+				</h3>
+				<form onSubmit={handleCreate}>
+					<div class="mb-4">
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="token-name"
+						>
+							令牌名称
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="token-name"
+							type="text"
+							required
+							value={tokenName}
+							onInput={(e) =>
+								setTokenName((e.currentTarget as HTMLInputElement)?.value ?? "")
+							}
+						/>
 					</div>
-				</div>
-			)}
+					<div class="flex justify-end gap-3">
+						<button
+							type="button"
+							class="h-10 rounded-lg border border-stone-200 px-4 text-sm text-stone-500 hover:text-stone-900"
+							onClick={resetModal}
+						>
+							取消
+						</button>
+						<button
+							type="submit"
+							class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-shadow hover:shadow-lg"
+						>
+							创建
+						</button>
+					</div>
+				</form>
+			</Modal>
 		</div>
 	);
 };

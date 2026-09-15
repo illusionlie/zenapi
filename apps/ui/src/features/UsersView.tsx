@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "hono/jsx/dom";
 import type { User } from "../core/types";
 import { formatDateTime } from "../core/utils";
+import { Modal } from "./Modal";
 
 type UsersViewProps = {
 	users: User[];
@@ -170,7 +171,7 @@ export const UsersView = ({
 					</span>
 				</div>
 				<button
-					class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-all hover:shadow-lg"
+					class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-shadow hover:shadow-lg"
 					type="button"
 					onClick={() => setShowCreateModal(true)}
 				>
@@ -267,136 +268,129 @@ export const UsersView = ({
 			)}
 
 			{/* Create user modal */}
-			{showCreateModal && (
-				<div class="fixed inset-0 z-50 flex items-center justify-center">
-					<button
-						type="button"
-						class="absolute inset-0 bg-stone-900/40"
-						onClick={() => setShowCreateModal(false)}
-					/>
-					<div class="relative z-10 w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-						<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-							创建用户
-						</h3>
-						<form class="grid gap-4" onSubmit={handleCreate}>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									htmlFor="user-create-email"
-								>
-									邮箱
-								</label>
-								<input
-									id="user-create-email"
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									type="email"
-									required
-									value={createForm.email}
-									onInput={(e) =>
-										setCreateForm((p) => ({
-											...p,
-											email: (e.currentTarget as HTMLInputElement)?.value ?? "",
-										}))
-									}
-								/>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									htmlFor="user-create-name"
-								>
-									用户名
-								</label>
-								<input
-									id="user-create-name"
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									type="text"
-									required
-									value={createForm.name}
-									onInput={(e) =>
-										setCreateForm((p) => ({
-											...p,
-											name: (e.currentTarget as HTMLInputElement)?.value ?? "",
-										}))
-									}
-								/>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									htmlFor="user-create-password"
-								>
-									密码
-								</label>
-								<input
-									id="user-create-password"
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									type="password"
-									required
-									value={createForm.password}
-									onInput={(e) =>
-										setCreateForm((p) => ({
-											...p,
-											password:
-												(e.currentTarget as HTMLInputElement)?.value ?? "",
-										}))
-									}
-								/>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									htmlFor="user-create-balance"
-								>
-									初始余额
-								</label>
-								<input
-									id="user-create-balance"
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									type="number"
-									step="0.01"
-									value={createForm.balance}
-									onInput={(e) =>
-										setCreateForm((p) => ({
-											...p,
-											balance:
-												(e.currentTarget as HTMLInputElement)?.value ?? "0",
-										}))
-									}
-								/>
-							</div>
-							<div class="flex justify-end gap-3">
-								<button
-									type="button"
-									class="h-10 rounded-lg border border-stone-200 px-4 text-sm text-stone-500 hover:text-stone-900"
-									onClick={() => setShowCreateModal(false)}
-								>
-									取消
-								</button>
-								<button
-									type="submit"
-									class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-all hover:shadow-lg"
-								>
-									创建
-								</button>
-							</div>
-						</form>
+			<Modal
+				isOpen={showCreateModal}
+				onClose={() => setShowCreateModal(false)}
+				panelClass="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
+			>
+				<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+					创建用户
+				</h3>
+				<form class="grid gap-4" onSubmit={handleCreate}>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							htmlFor="user-create-email"
+						>
+							邮箱
+						</label>
+						<input
+							id="user-create-email"
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							type="email"
+							required
+							value={createForm.email}
+							onInput={(e) =>
+								setCreateForm((p) => ({
+									...p,
+									email: (e.currentTarget as HTMLInputElement)?.value ?? "",
+								}))
+							}
+						/>
 					</div>
-				</div>
-			)}
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							htmlFor="user-create-name"
+						>
+							用户名
+						</label>
+						<input
+							id="user-create-name"
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							type="text"
+							required
+							value={createForm.name}
+							onInput={(e) =>
+								setCreateForm((p) => ({
+									...p,
+									name: (e.currentTarget as HTMLInputElement)?.value ?? "",
+								}))
+							}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							htmlFor="user-create-password"
+						>
+							密码
+						</label>
+						<input
+							id="user-create-password"
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							type="password"
+							required
+							value={createForm.password}
+							onInput={(e) =>
+								setCreateForm((p) => ({
+									...p,
+									password: (e.currentTarget as HTMLInputElement)?.value ?? "",
+								}))
+							}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							htmlFor="user-create-balance"
+						>
+							初始余额
+						</label>
+						<input
+							id="user-create-balance"
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							type="number"
+							step="0.01"
+							value={createForm.balance}
+							onInput={(e) =>
+								setCreateForm((p) => ({
+									...p,
+									balance: (e.currentTarget as HTMLInputElement)?.value ?? "0",
+								}))
+							}
+						/>
+					</div>
+					<div class="flex justify-end gap-3">
+						<button
+							type="button"
+							class="h-10 rounded-lg border border-stone-200 px-4 text-sm text-stone-500 hover:text-stone-900"
+							onClick={() => setShowCreateModal(false)}
+						>
+							取消
+						</button>
+						<button
+							type="submit"
+							class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-shadow hover:shadow-lg"
+						>
+							创建
+						</button>
+					</div>
+				</form>
+			</Modal>
 
 			{/* Edit user modal */}
-			{showEditModal && editingUser && (
-				<div class="fixed inset-0 z-50 flex items-center justify-center">
-					<button
-						type="button"
-						class="absolute inset-0 bg-stone-900/40"
-						onClick={() => {
-							setShowEditModal(false);
-							setEditingUser(null);
-						}}
-					/>
-					<div class="relative z-10 w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
+			<Modal
+				isOpen={showEditModal && editingUser !== null}
+				onClose={() => {
+					setShowEditModal(false);
+					setEditingUser(null);
+				}}
+				panelClass="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
+			>
+				{/* onClose 同步置空 editingUser,closing 动画期间 children 引用 editingUser.email 必须 guard */}
+				{showEditModal && editingUser && (
+					<>
 						<h3 class="mb-4 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
 							编辑用户: {editingUser.email}
 						</h3>
@@ -540,102 +534,99 @@ export const UsersView = ({
 								</button>
 								<button
 									type="submit"
-									class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-all hover:shadow-lg"
+									class="h-10 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-shadow hover:shadow-lg"
 								>
 									保存
 								</button>
 							</div>
 						</form>
-					</div>
-				</div>
-			)}
+					</>
+				)}
+			</Modal>
 
 			{/* Allowed models picker modal */}
-			{modelPickerOpen && (
-				<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-					<div class="flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl">
-						<div class="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-							<h4 class="text-sm font-semibold text-stone-800">
-								选择可用模型
-								<span class="ml-1 text-xs font-normal text-stone-400">
-									未选择 = 不限制
-								</span>
-							</h4>
-							<button
-								type="button"
-								onClick={() => setModelPickerOpen(false)}
-								class="text-stone-400 hover:text-stone-600"
-							>
-								✕
-							</button>
-						</div>
-						<div class="flex items-center gap-2 border-b border-stone-100 px-4 py-2.5">
-							<input
-								type="text"
-								placeholder="搜索模型…"
-								value={modelSearch}
-								onInput={(e) =>
-									setModelSearch(
-										(e.currentTarget as HTMLInputElement)?.value ?? "",
-									)
-								}
-								class="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
-							/>
-							<button
-								type="button"
-								onClick={() =>
-									toggleAllDraftVisible(pickerModels, !allPickerVisibleSelected)
-								}
-								class="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-50"
-							>
-								{allPickerVisibleSelected ? "取消全选" : "全选"}
-							</button>
-						</div>
-						<div class="flex-1 overflow-y-auto px-4 py-2">
-							{pickerModels.length === 0 ? (
-								<p class="py-6 text-center text-sm text-stone-400">
-									暂无可用模型
-								</p>
-							) : (
-								<div class="space-y-0.5">
-									{pickerModels.map((m) => (
-										<label
-											key={m}
-											class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-stone-50"
-										>
-											<input
-												type="checkbox"
-												checked={draftModels.has(m)}
-												onChange={() => toggleDraftModel(m)}
-												class="accent-amber-500"
-											/>
-											<span class="min-w-0 break-all font-mono text-xs text-stone-700">
-												{m}
-											</span>
-										</label>
-									))}
-								</div>
-							)}
-						</div>
-						<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3">
-							<button
-								type="button"
-								onClick={() => setModelPickerOpen(false)}
-								class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
-							>
-								取消
-							</button>
-							<button
-								type="button"
-								onClick={confirmModelPicker}
-								class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
-							>
-								确认（已选 {draftModels.size}）
-							</button>
-						</div>
-					</div>
+			<Modal
+				isOpen={modelPickerOpen}
+				onClose={() => setModelPickerOpen(false)}
+				backdropClass="bg-black/40"
+				panelClass="flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl"
+			>
+				<div class="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+					<h4 class="text-sm font-semibold text-stone-800">
+						选择可用模型
+						<span class="ml-1 text-xs font-normal text-stone-400">
+							未选择 = 不限制
+						</span>
+					</h4>
+					<button
+						type="button"
+						onClick={() => setModelPickerOpen(false)}
+						class="text-stone-400 hover:text-stone-600"
+					>
+						✕
+					</button>
 				</div>
-			)}
+				<div class="flex items-center gap-2 border-b border-stone-100 px-4 py-2.5">
+					<input
+						type="text"
+						placeholder="搜索模型…"
+						value={modelSearch}
+						onInput={(e) =>
+							setModelSearch((e.currentTarget as HTMLInputElement)?.value ?? "")
+						}
+						class="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-200"
+					/>
+					<button
+						type="button"
+						onClick={() =>
+							toggleAllDraftVisible(pickerModels, !allPickerVisibleSelected)
+						}
+						class="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-50"
+					>
+						{allPickerVisibleSelected ? "取消全选" : "全选"}
+					</button>
+				</div>
+				<div class="flex-1 overflow-y-auto px-4 py-2">
+					{pickerModels.length === 0 ? (
+						<p class="py-6 text-center text-sm text-stone-400">暂无可用模型</p>
+					) : (
+						<div class="space-y-0.5">
+							{pickerModels.map((m) => (
+								<label
+									key={m}
+									class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-stone-50"
+								>
+									<input
+										type="checkbox"
+										checked={draftModels.has(m)}
+										onChange={() => toggleDraftModel(m)}
+										class="accent-amber-500"
+									/>
+									<span class="min-w-0 break-all font-mono text-xs text-stone-700">
+										{m}
+									</span>
+								</label>
+							))}
+						</div>
+					)}
+				</div>
+				<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3">
+					<button
+						type="button"
+						onClick={() => setModelPickerOpen(false)}
+						class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
+					>
+						取消
+					</button>
+					<button
+						type="button"
+						onClick={confirmModelPicker}
+						class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
+					>
+						确认（已选 {draftModels.size}）
+					</button>
+				</div>
+			</Modal>
 		</div>
 	);
 };

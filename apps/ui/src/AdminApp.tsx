@@ -1078,13 +1078,12 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			>
 				<div key={activeTab}>{renderContent()}</div>
 			</AppLayout>
-			{secretModal && (
-				<SecretValueModal
-					title={secretModal.title}
-					value={secretModal.value}
-					onClose={() => setSecretModal(null)}
-				/>
-			)}
+			<SecretValueModal
+				isOpen={secretModal !== null}
+				title={secretModal?.title ?? ""}
+				value={secretModal?.value ?? ""}
+				onClose={() => setSecretModal(null)}
+			/>
 		</>
 	);
 };

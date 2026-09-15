@@ -31,7 +31,7 @@ const ToastCard = ({ item }: { item: ToastItem }) => {
 	const visual = toastVisuals[item.type];
 	return (
 		<div
-			class={`pointer-events-auto flex items-start gap-2.5 rounded-xl border bg-white px-4 py-3 shadow-lg max-w-md w-full sm:w-auto ${visual.borderClass} ${
+			class={`pointer-events-auto flex items-start gap-2.5 rounded-xl border bg-white px-4 py-3 shadow-lg max-w-md w-full sm:w-auto will-change-transform ${visual.borderClass} ${
 				item.leaving ? "animate-toast-out" : "animate-toast-in"
 			}`}
 		>

@@ -76,7 +76,7 @@ export const UserLoginView = ({
 						/>
 					</div>
 					<button
-						class="h-11 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg"
+						class="h-11 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg"
 						type="submit"
 					>
 						登录
@@ -116,7 +116,7 @@ export const UserLoginView = ({
 						)}
 						<button
 							type="button"
-							class="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
+							class="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
 							onClick={() => {
 								const url =
 									requireInviteCode && inviteCode.trim()

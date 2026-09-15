@@ -126,7 +126,7 @@ export const UserDashboard = ({
 						<button
 							type="button"
 							disabled={checkinLoading}
-							class="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60"
+							class="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60"
 							onClick={handleCheckin}
 						>
 							{checkinLoading ? "签到中..." : "签到"}
@@ -170,7 +170,7 @@ export const UserDashboard = ({
 						<button
 							type="button"
 							disabled={rechargeLoading || !rechargeAmount}
-							class="h-[42px] rounded-lg bg-stone-900 px-5 text-sm font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+							class="h-[42px] rounded-lg bg-stone-900 px-5 text-sm font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
 							onClick={handleRecharge}
 						>
 							{rechargeLoading ? "处理中..." : "充值"}
@@ -244,7 +244,7 @@ export const UserDashboard = ({
 							{user.linuxdo_id ? (
 								<button
 									type="button"
-									class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition-all hover:border-red-200 hover:text-red-600"
+									class="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:border-red-200 hover:text-red-600"
 									onClick={onUnbind}
 								>
 									解除绑定
@@ -252,7 +252,7 @@ export const UserDashboard = ({
 							) : (
 								<a
 									href={`/api/u/auth/linuxdo/bind?token=${encodeURIComponent(token)}`}
-									class="inline-flex rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-all hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
+									class="inline-flex rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-[transform,box-shadow,color,background-color,border-color] ease-smooth-out hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
 								>
 									绑定 Linux DO
 								</a>

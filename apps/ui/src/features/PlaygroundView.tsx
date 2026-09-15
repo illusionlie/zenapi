@@ -7,6 +7,9 @@ import {
 } from "hono/jsx/dom";
 import { apiBase } from "../core/constants";
 
+/** 与 styles.css 的 --dropdown-close-dur 同源;CSS 变量读取失败时兜底 */
+const DROPDOWN_CLOSE_DURATION_FALLBACK_MS = 150;
+
 type ChatMessage = {
 	role: "user" | "assistant";
 	content: string;
@@ -21,6 +24,16 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 	const [selectedModel, setSelectedModel] = useState("");
 	const [modelSearch, setModelSearch] = useState("");
 	const [isModelDropdownOpen, setModelDropdownOpen] = useState(false);
+	// 下拉动画生命周期:closed(未挂载)→ mounted(pre-scale 态)→ open(is-open)
+	// → closing(is-closing)→ closed;phaseRef 镜像当前相位,竞态判定读 ref 而非
+	// render 闭包,避免 effect 依赖内部动画态导致 close 计时器被误清
+	const [dropdownMounted, setDropdownMounted] = useState(false);
+	const [dropdownOpen, setDropdownOpen] = useState(false);
+	const [dropdownClosing, setDropdownClosing] = useState(false);
+	const dropdownPhaseRef = useRef<"closed" | "mounted" | "open" | "closing">(
+		"closed",
+	);
+	const dropdownCloseTimerRef = useRef<number | null>(null);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [input, setInput] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
@@ -54,6 +67,65 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 		document.addEventListener("mousedown", handleClickOutside);
 		return () => document.removeEventListener("mousedown", handleClickOutside);
 	}, []);
+
+	// 下拉开/关状态机(竞态处理与 features/Modal.tsx 同范式):effect 重跑前
+	// 必先执行 cleanup,isOpen 翻 true 时清掉未触发的 close 计时器(closing 中
+	// 重开),同时取消未触发的入场 rAF(entering 中即关闭),防止迟到的 is-open
+	// 覆盖 closing 态
+	useEffect(() => {
+		let cancelOpenRafs: (() => void) | null = null;
+		if (isModelDropdownOpen) {
+			if (dropdownPhaseRef.current === "closed") {
+				// 首次打开:先挂载 pre-scale 态 DOM,双 rAF 保证先绘制一帧,
+				// 之后再加 is-open,transform/opacity 过渡才能生效
+				dropdownPhaseRef.current = "mounted";
+				setDropdownMounted(true);
+				let raf2 = 0;
+				const raf1 = requestAnimationFrame(() => {
+					raf2 = requestAnimationFrame(() => {
+						dropdownPhaseRef.current = "open";
+						setDropdownOpen(true);
+					});
+				});
+				cancelOpenRafs = () => {
+					cancelAnimationFrame(raf1);
+					cancelAnimationFrame(raf2);
+				};
+			} else {
+				// closing 中重开:计时器已被 cleanup 清除,直接回 is-open,
+				// 下拉从当前过渡位置原路返回,无跳变
+				dropdownPhaseRef.current = "open";
+				setDropdownClosing(false);
+				setDropdownOpen(true);
+			}
+		} else if (dropdownPhaseRef.current !== "closed") {
+			// 关闭:移除 is-open 加 is-closing,按时长计时后卸载
+			dropdownPhaseRef.current = "closing";
+			setDropdownOpen(false);
+			setDropdownClosing(true);
+			// 时长运行时读取,与 CSS 保持同源
+			const duration =
+				parseFloat(
+					getComputedStyle(document.documentElement).getPropertyValue(
+						"--dropdown-close-dur",
+					),
+				) || DROPDOWN_CLOSE_DURATION_FALLBACK_MS;
+			dropdownCloseTimerRef.current = window.setTimeout(() => {
+				dropdownCloseTimerRef.current = null;
+				dropdownPhaseRef.current = "closed";
+				setDropdownOpen(false);
+				setDropdownClosing(false);
+				setDropdownMounted(false);
+			}, duration);
+		}
+		return () => {
+			cancelOpenRafs?.();
+			if (dropdownCloseTimerRef.current !== null) {
+				clearTimeout(dropdownCloseTimerRef.current);
+				dropdownCloseTimerRef.current = null;
+			}
+		};
+	}, [isModelDropdownOpen]);
 
 	// Load available models
 	useEffect(() => {
@@ -235,8 +307,13 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 								setModelDropdownOpen(true);
 							}}
 						/>
-						{isModelDropdownOpen && (
-							<div class="absolute left-0 top-full z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg">
+						{dropdownMounted && (
+							<div
+								class={`t-dropdown absolute left-0 top-full z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg${
+									dropdownOpen ? " is-open" : ""
+								}${dropdownClosing ? " is-closing" : ""}`}
+								data-origin="top-left"
+							>
 								{filteredModels.length === 0 ? (
 									<div class="px-3 py-2 text-xs text-stone-400">
 										{models.length === 0 ? "无可用模型" : "未找到匹配模型"}
@@ -266,7 +343,7 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 					</div>
 					<button
 						type="button"
-						class="h-9 rounded-full border border-stone-200 px-4 text-xs font-medium text-stone-600 transition-all duration-200 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2"
+						class="h-9 rounded-full border border-stone-200 px-4 text-xs font-medium text-stone-600 transition-colors duration-200 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2"
 						onClick={handleClear}
 					>
 						清空对话
@@ -364,7 +441,7 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 						/>
 						<button
 							type="button"
-							class="h-10 self-end rounded-full bg-stone-900 px-5 text-xs font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+							class="h-10 self-end rounded-full bg-stone-900 px-5 text-xs font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
 							onClick={handleSend}
 							disabled={isLoading || !selectedModel || !input.trim()}
 						>

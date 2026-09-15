@@ -1,5 +1,6 @@
 import type { Token } from "../core/types";
 import { buildPageItems, formatDateTime } from "../core/utils";
+import { Modal } from "./Modal";
 
 type TokensViewProps = {
 	pagedTokens: Token[];
@@ -54,7 +55,7 @@ export const TokensView = ({
 					</div>
 					<div class="flex flex-wrap items-center gap-2">
 						<button
-							class="h-10 md:h-9 rounded-full bg-stone-900 px-4 text-xs font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+							class="h-10 md:h-9 rounded-full bg-stone-900 px-4 text-xs font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
 							type="button"
 							onClick={onCreate}
 						>
@@ -126,21 +127,21 @@ export const TokensView = ({
 										</div>
 										<div class="flex flex-wrap gap-2">
 											<button
-												class="h-9 rounded-full border border-stone-200 bg-stone-100 px-3 text-xs font-semibold text-stone-900 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+												class="h-9 rounded-full border border-stone-200 bg-stone-100 px-3 text-xs font-semibold text-stone-900 transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 												type="button"
 												onClick={() => onReveal(tokenItem.id)}
 											>
 												复制
 											</button>
 											<button
-												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 												type="button"
 												onClick={() => onToggle(tokenItem.id, tokenItem.status)}
 											>
 												切换
 											</button>
 											<button
-												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+												class="h-9 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 												type="button"
 												onClick={() => onDelete(tokenItem.id)}
 											>
@@ -206,21 +207,21 @@ export const TokensView = ({
 									</div>
 									<div class="mt-3 flex flex-wrap gap-2">
 										<button
-											class="h-10 rounded-full border border-stone-200 bg-stone-100 px-3 text-xs font-semibold text-stone-900 transition-all duration-200 ease-in-out hover:shadow-lg"
+											class="h-10 rounded-full border border-stone-200 bg-stone-100 px-3 text-xs font-semibold text-stone-900 transition-shadow duration-200 hover:shadow-lg"
 											type="button"
 											onClick={() => onReveal(tokenItem.id)}
 										>
 											复制
 										</button>
 										<button
-											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:text-stone-900 hover:shadow-lg"
+											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition-[color,background-color,border-color,box-shadow] duration-200 hover:text-stone-900 hover:shadow-lg"
 											type="button"
 											onClick={() => onToggle(tokenItem.id, tokenItem.status)}
 										>
 											切换
 										</button>
 										<button
-											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:text-stone-900 hover:shadow-lg"
+											class="h-10 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500 transition-[color,background-color,border-color,box-shadow] duration-200 hover:text-stone-900 hover:shadow-lg"
 											type="button"
 											onClick={() => onDelete(tokenItem.id)}
 										>
@@ -239,7 +240,7 @@ export const TokensView = ({
 							共 {tokenTotal} 条 · {tokenTotalPages} 页
 						</span>
 						<button
-							class="h-10 w-10 md:h-8 md:w-8 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+							class="h-10 w-10 md:h-8 md:w-8 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-600 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 							type="button"
 							disabled={tokenPage <= 1}
 							onClick={() => onPageChange(Math.max(1, tokenPage - 1))}
@@ -253,7 +254,7 @@ export const TokensView = ({
 								</span>
 							) : (
 								<button
-									class={`h-10 min-w-10 md:h-8 md:min-w-8 rounded-full border px-3 text-xs font-semibold transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+									class={`h-10 min-w-10 md:h-8 md:min-w-8 rounded-full border px-3 text-xs font-semibold transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
 										item === tokenPage
 											? "border-stone-900 bg-stone-900 text-white shadow-md"
 											: "border-stone-200 bg-white text-stone-600 hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md"
@@ -267,7 +268,7 @@ export const TokensView = ({
 							),
 						)}
 						<button
-							class="h-10 w-10 md:h-8 md:w-8 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-600 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+							class="h-10 w-10 md:h-8 md:w-8 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-600 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
 							type="button"
 							disabled={tokenPage >= tokenTotalPages}
 							onClick={() =>
@@ -297,76 +298,75 @@ export const TokensView = ({
 					</label>
 				</div>
 			</div>
-			{isTokenModalOpen && (
-				<div class="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-stone-900/40 px-0 md:px-4 py-0 md:py-8">
-					<div class="w-full max-w-xl rounded-t-2xl md:rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
-						<div class="flex flex-wrap items-start justify-between gap-3">
-							<div>
-								<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
-									生成令牌
-								</h3>
-								<p class="text-xs text-stone-500">
-									创建后可在列表中查看与管理。
-								</p>
-							</div>
-							<button
-								class="h-10 md:h-9 rounded-full border border-stone-200 bg-stone-50 px-3 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-								type="button"
-								onClick={onCloseModal}
-							>
-								关闭
-							</button>
-						</div>
-						<form class="mt-4 grid gap-3.5" onSubmit={onSubmit}>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="token-name"
-								>
-									名称
-								</label>
-								<input
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="token-name"
-									name="name"
-									required
-								/>
-							</div>
-							<div>
-								<label
-									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-									for="token-quota"
-								>
-									额度（可选）
-								</label>
-								<input
-									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									id="token-quota"
-									name="quota_total"
-									type="number"
-									min="0"
-									placeholder="留空表示无限"
-								/>
-							</div>
-							<div class="flex flex-wrap items-center justify-end gap-2 pt-2">
-								<button
-									class="h-10 rounded-full border border-stone-200 bg-stone-50 px-4 text-xs font-semibold text-stone-500 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-									type="button"
-									onClick={onCloseModal}
-								>
-									取消
-								</button>
-								<button
-									class="h-10 rounded-full bg-stone-900 px-5 text-xs font-semibold text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-									type="submit"
-								>
-									生成令牌
-								</button>
-							</div>
-						</form>
+			<Modal
+				isOpen={isTokenModalOpen}
+				onClose={onCloseModal}
+				sheet
+				panelClass="w-full max-w-xl rounded-t-2xl md:rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl"
+			>
+				<div class="flex flex-wrap items-start justify-between gap-3">
+					<div>
+						<h3 class="mb-1 font-['Space_Grotesk'] text-lg tracking-tight text-stone-900">
+							生成令牌
+						</h3>
+						<p class="text-xs text-stone-500">创建后可在列表中查看与管理。</p>
 					</div>
+					<button
+						class="h-10 md:h-9 rounded-full border border-stone-200 bg-stone-50 px-3 text-xs font-semibold text-stone-500 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+						type="button"
+						onClick={onCloseModal}
+					>
+						关闭
+					</button>
 				</div>
-			)}
+				<form class="mt-4 grid gap-3.5" onSubmit={onSubmit}>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="token-name"
+						>
+							名称
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="token-name"
+							name="name"
+							required
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+							for="token-quota"
+						>
+							额度（可选）
+						</label>
+						<input
+							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+							id="token-quota"
+							name="quota_total"
+							type="number"
+							min="0"
+							placeholder="留空表示无限"
+						/>
+					</div>
+					<div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+						<button
+							class="h-10 rounded-full border border-stone-200 bg-stone-50 px-4 text-xs font-semibold text-stone-500 transition-[transform,box-shadow,color,background-color,border-color] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:text-stone-900 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+							type="button"
+							onClick={onCloseModal}
+						>
+							取消
+						</button>
+						<button
+							class="h-10 rounded-full bg-stone-900 px-5 text-xs font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+							type="submit"
+						>
+							生成令牌
+						</button>
+					</div>
+				</form>
+			</Modal>
 		</div>
 	);
 };
