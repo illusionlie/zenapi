@@ -6,6 +6,7 @@ import {
 	useState,
 } from "hono/jsx/dom";
 import { apiBase } from "../core/constants";
+import { DotLoader } from "./DotLoader";
 
 /** 与 styles.css 的 --dropdown-close-dur 同源;CSS 变量读取失败时兜底 */
 const DROPDOWN_CLOSE_DURATION_FALLBACK_MS = 150;
@@ -392,15 +393,7 @@ export const PlaygroundView = ({ token }: PlaygroundViewProps) => {
 						{isLoading && !streamingContent && (
 							<div class="flex justify-start">
 								<div class="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-400">
-									<span class="inline-flex gap-1">
-										<span class="animate-bounce">·</span>
-										<span class="animate-bounce" style="animation-delay: 0.1s">
-											·
-										</span>
-										<span class="animate-bounce" style="animation-delay: 0.2s">
-											·
-										</span>
-									</span>
+									<DotLoader />
 								</div>
 							</div>
 						)}

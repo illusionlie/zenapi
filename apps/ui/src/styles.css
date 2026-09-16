@@ -3,6 +3,7 @@
 @theme {
 	--animate-toast-in: toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 	--animate-toast-out: toast-out 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	--animate-skeleton-shimmer: skeleton-shimmer 1.4s ease-in-out infinite;
 	--ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -50,6 +51,11 @@
 	--panel-translate-y: 100px;
 	--panel-blur: 2px;
 	--panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+	/* 入场动画时长:250ms 对齐 --modal-open-dur;400ms 对齐 --panel-open-dur。
+	   缓动直接复用 @theme 输出的 --ease-smooth-out,不新造 */
+	--view-enter-dur: 250ms;
+	--page-enter-dur: 400ms;
 }
 
 /* ===== .t-modal(transitions.dev 06-modal.md 原文)===== */
@@ -217,6 +223,81 @@
 	visibility: visible;
 	pointer-events: auto;
 	transition: none;
+}
+
+/* ===== 入场动画 + 骨架屏(view-enter / page-enter / skeleton)===== */
+
+@keyframes view-enter {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+		filter: blur(2px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+		filter: blur(0);
+	}
+}
+
+@keyframes page-enter {
+	from {
+		opacity: 0;
+		transform: translateY(16px);
+		filter: blur(2px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+		filter: blur(0);
+	}
+}
+
+.t-view-enter {
+	animation: view-enter var(--view-enter-dur) var(--ease-smooth-out) both;
+}
+
+/* page-enter 用 backwards 而非 both:页面包裹层含 fixed 抽屉/模态后代
+   (AppLayout/UserApp 移动端抽屉、公告 Modal),both 会在动画结束后恒留
+   transform+filter,使其成为 fixed 后代的永久 containing block(spec gotcha);
+   backwards 在 delay=0 时首帧行为与 both 一致,结束后 transform/filter 回落 none */
+.t-page-enter {
+	animation: page-enter var(--page-enter-dur) var(--ease-smooth-out) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.t-view-enter,
+	.t-page-enter {
+		animation: none !important;
+	}
+}
+
+/* 骨架屏基础类:灰块占位 + ::after 白光扫过(shimmer 走 transform,合成器动画);
+   注意本类为非分层规则,background-color/border-radius 不被工具类覆盖,变体只传尺寸/间距 */
+.skeleton {
+	position: relative;
+	overflow: hidden;
+	background-color: var(--color-stone-200);
+	border-radius: 0.5rem;
+}
+.skeleton::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	transform: translateX(-100%);
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgb(255 255 255 / 0.55),
+		transparent
+	);
+	animation: var(--animate-skeleton-shimmer);
+}
+
+@keyframes skeleton-shimmer {
+	to {
+		transform: translateX(100%);
+	}
 }
 
 /* ===== 全局 reduced-motion 守卫:兜底覆盖 Tailwind 内置动画与所有过渡 ===== */

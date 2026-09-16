@@ -24,6 +24,8 @@ import { UserDashboard } from "./features/UserDashboard";
 import { UserModelsView } from "./features/UserModelsView";
 import { UserTokensView } from "./features/UserTokensView";
 import { UserUsageView } from "./features/UserUsageView";
+import type { SkeletonVariant } from "./features/ViewSkeleton";
+import { ViewSkeleton } from "./features/ViewSkeleton";
 
 export type ModelAliasConfig = {
 	aliases: string[];
@@ -60,6 +62,15 @@ const userPathToTab: Record<string, UserTabId> = {
 	"/user/models": "models",
 	"/user/tokens": "tokens",
 	"/user/usage": "usage",
+};
+
+// tab → 骨架屏变体:按内容布局归类(与 userTabToPath 同层,两端 tab 集合不同故不做全局常量)
+const userTabToSkeletonVariant: Record<UserTabId, SkeletonVariant> = {
+	dashboard: "stats",
+	monitoring: "generic",
+	models: "table",
+	tokens: "table",
+	usage: "table",
 };
 
 export const UserApp = ({
@@ -373,9 +384,9 @@ export const UserApp = ({
 	const renderContent = () => {
 		if (loading) {
 			return (
-				<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
-					加载中...
-				</div>
+				<ViewSkeleton
+					variant={userTabToSkeletonVariant[activeTab] ?? "generic"}
+				/>
 			);
 		}
 		if (activeTab === "dashboard") {
@@ -587,7 +598,10 @@ export const UserApp = ({
 			<main class="px-4 pt-4 pb-16 sm:px-6 sm:pt-6 md:px-10 md:pt-8">
 				<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div>
-						<h1 class="font-['Space_Grotesk'] text-xl md:text-2xl tracking-tight text-stone-900">
+						<h1
+							key={activeLabel}
+							class="t-view-enter font-['Space_Grotesk'] text-xl md:text-2xl tracking-tight text-stone-900"
+						>
 							{activeLabel}
 						</h1>
 						<p class="text-sm text-stone-500">
@@ -607,7 +621,9 @@ export const UserApp = ({
 						</button>
 					</div>
 				</div>
-				<div key={activeTab}>{renderContent()}</div>
+				<div key={activeTab} class="t-view-enter">
+					{renderContent()}
+				</div>
 			</main>
 			<SecretValueModal
 				isOpen={secretModal !== null}

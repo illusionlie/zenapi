@@ -169,13 +169,19 @@ const AppRoutes = () => {
 	if (path.startsWith("/admin")) {
 		if (!adminToken) {
 			return (
-				<div class="min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased">
+				<div
+					key="admin-login"
+					class="t-page-enter min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased"
+				>
 					<LoginView onSubmit={handleAdminLogin} onNavigate={navigateTo} />
 				</div>
 			);
 		}
 		return (
-			<div class="min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased">
+			<div
+				key="admin-app"
+				class="t-page-enter min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased"
+			>
 				<AdminApp
 					token={adminToken}
 					updateToken={updateAdminToken}
@@ -214,13 +220,15 @@ const AppRoutes = () => {
 			history.replaceState(null, "", "/login");
 			setPath("/login");
 			return (
-				<PublicApp
-					onUserLogin={handleUserLogin}
-					onNavigate={navigateTo}
-					linuxdoEnabled={linuxdoEnabled}
-					registrationMode={registrationMode}
-					requireInviteCode={requireInviteCode}
-				/>
+				<div key="public" class="t-page-enter">
+					<PublicApp
+						onUserLogin={handleUserLogin}
+						onNavigate={navigateTo}
+						linuxdoEnabled={linuxdoEnabled}
+						registrationMode={registrationMode}
+						requireInviteCode={requireInviteCode}
+					/>
+				</div>
 			);
 		}
 		if (!userChecked) {
@@ -232,17 +240,22 @@ const AppRoutes = () => {
 			history.replaceState(null, "", "/login");
 			setPath("/login");
 			return (
-				<PublicApp
-					onUserLogin={handleUserLogin}
-					onNavigate={navigateTo}
-					linuxdoEnabled={linuxdoEnabled}
-					registrationMode={registrationMode}
-					requireInviteCode={requireInviteCode}
-				/>
+				<div key="public" class="t-page-enter">
+					<PublicApp
+						onUserLogin={handleUserLogin}
+						onNavigate={navigateTo}
+						linuxdoEnabled={linuxdoEnabled}
+						registrationMode={registrationMode}
+						requireInviteCode={requireInviteCode}
+					/>
+				</div>
 			);
 		}
 		return (
-			<div class="min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased">
+			<div
+				key="user-app"
+				class="t-page-enter min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased"
+			>
 				<UserApp
 					token={userToken}
 					user={userRecord}
@@ -269,7 +282,7 @@ const AppRoutes = () => {
 	}
 
 	return (
-		<>
+		<div key="public" class="t-page-enter">
 			<PublicApp
 				onUserLogin={handleUserLogin}
 				onNavigate={navigateTo}
@@ -282,7 +295,7 @@ const AppRoutes = () => {
 				text={announcement}
 				onClose={handleDismissAnnouncement}
 			/>
-		</>
+		</div>
 	);
 };
 

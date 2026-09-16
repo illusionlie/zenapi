@@ -167,7 +167,10 @@ export const AppLayout = ({
 		<main class="flex flex-col overflow-hidden px-4 pt-4 sm:px-6 sm:pt-6 md:px-10 md:pt-8">
 			<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
 				<div>
-					<h1 class="font-['Space_Grotesk'] text-xl md:text-2xl tracking-tight text-stone-900">
+					<h1
+						key={activeLabel}
+						class="t-view-enter font-['Space_Grotesk'] text-xl md:text-2xl tracking-tight text-stone-900"
+					>
 						{activeLabel}
 					</h1>
 					<p class="text-sm text-stone-500">

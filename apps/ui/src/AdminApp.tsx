@@ -43,6 +43,8 @@ import { SettingsView } from "./features/SettingsView";
 import { TokensView } from "./features/TokensView";
 import { UsageView } from "./features/UsageView";
 import { UsersView } from "./features/UsersView";
+import type { SkeletonVariant } from "./features/ViewSkeleton";
+import { ViewSkeleton } from "./features/ViewSkeleton";
 import type { ModelAliasesMap } from "./UserApp";
 
 type AdminAppProps = {
@@ -78,6 +80,19 @@ const adminPathToTab: Record<string, TabId> = {
 	"/admin/settings": "settings",
 	"/admin/users": "users",
 	"/admin/playground": "playground",
+};
+
+// tab → 骨架屏变体:按内容布局归类(与 adminTabToPath 同层,两端 tab 集合不同故不做全局常量)
+const tabToSkeletonVariant: Record<TabId, SkeletonVariant> = {
+	dashboard: "stats",
+	monitoring: "generic",
+	channels: "table",
+	models: "table",
+	tokens: "table",
+	usage: "table",
+	settings: "form",
+	users: "table",
+	playground: "generic",
 };
 
 // 模型测试并发上限：每模型一次独立 API 调用（各自一个 Worker invocation，
@@ -1142,9 +1157,7 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	const renderContent = () => {
 		if (loading) {
 			return (
-				<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
-					加载中...
-				</div>
+				<ViewSkeleton variant={tabToSkeletonVariant[activeTab] ?? "generic"} />
 			);
 		}
 		if (activeTab === "dashboard") {
@@ -1292,7 +1305,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				onLogout={handleLogout}
 				onNavigate={onNavigate}
 			>
-				<div key={activeTab}>{renderContent()}</div>
+				<div key={activeTab} class="t-view-enter">
+					{renderContent()}
+				</div>
 			</AppLayout>
 			<SecretValueModal
 				isOpen={secretModal !== null}

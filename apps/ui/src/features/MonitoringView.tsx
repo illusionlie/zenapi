@@ -7,6 +7,8 @@ import type {
 	MonitoringErrorDetail,
 	MonitoringSlotModel,
 } from "../core/types";
+import { DotLoader } from "./DotLoader";
+import { SkeletonBlock } from "./ViewSkeleton";
 
 type MonitoringViewProps = {
 	monitoring: MonitoringData | null;
@@ -276,7 +278,11 @@ const ChannelBar = ({
 						</button>
 					</div>
 					{loadingDetails ? (
-						<div class="text-xs text-stone-400">加载中...</div>
+						<div class="space-y-1.5" aria-hidden="true">
+							<SkeletonBlock class="h-3 w-full" />
+							<SkeletonBlock class="h-3 w-5/6" />
+							<SkeletonBlock class="h-3 w-2/3" />
+						</div>
 					) : (
 						<>
 							{/* Model summary table */}
@@ -451,7 +457,7 @@ export const MonitoringView = ({
 						{RANGE_LABELS[r]}
 					</button>
 				))}
-				{loading && <span class="text-xs text-stone-400">加载中...</span>}
+				{loading && <DotLoader class="text-stone-400" />}
 			</div>
 
 			{/* Overall status banner (always based on last 15 minutes) */}

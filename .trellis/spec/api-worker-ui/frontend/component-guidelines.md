@@ -45,8 +45,8 @@ Questions to answer:
 **Why**: `transition-all` 让无关属性（color/border）蹭车过渡，且 `hover:shadow-*` 场景逐帧重绘开销大；`ease-in-out` 的语义是 icon/text swap，不是 hover 位移。token 单一事实源在 `apps/ui/src/styles.css`。
 
 **Token 位置**：
-- `@theme` 内：`--ease-smooth-out`（Tailwind v4 自动生成 `ease-smooth-out` utility）、`--animate-toast-*`（生成 `animate-toast-*`）
-- `:root` 内：`--modal-*` / `--dropdown-*` / `--panel-*`（t-* 片段变量，运行时 JS 用 `getComputedStyle` 读取保持同源）
+- `@theme` 内：`--ease-smooth-out`（Tailwind v4 自动生成 `ease-smooth-out` utility）、`--animate-toast-*` / `--animate-skeleton-shimmer`（生成 `animate-toast-*` / `animate-skeleton-shimmer`）
+- `:root` 内：`--modal-*` / `--dropdown-*` / `--panel-*`（t-* 片段变量，运行时 JS 用 `getComputedStyle` 读取保持同源）、`--view-enter-dur` / `--page-enter-dur`（视图/页面入场动画时长）
 
 **Example**:
 
@@ -105,6 +105,42 @@ const handleClose = () => {
 ### Convention: 关键帧动画 token 对齐 transitions.dev 口径
 
 toast 出入场（350ms/250ms + `cubic-bezier(0.22,1,0.36,1)` + 16px rise + cross-blur）是全站 toast 的既定节奏；新动效优先对齐 `@theme`/`:root` 既有 token，不要新造硬编码时长。入场可带 cross-blur，退场从简（只 fade + 回落）。
+
+### Convention: 视图/页面级切换过渡 = key 重挂载 + CSS animation（09-17-ui-tab-transitions-skeleton 沉淀）
+
+**What**: 无退场需求的切换过渡（tab 切换、登录态分支跨越）标准做法是：容器 `key` 表达切换语义 + 元素挂 `.t-view-enter`（内容区/标题，250ms + 4px）或 `.t-page-enter`（整页分支，400ms + 16px）入场动画类。CSS `@keyframes` animation 在元素插入 DOM 时自动播放，key 变化重挂载时自动重播，零 JS 参与。
+
+**Why**: key 重挂载（即时替换、无退场）场景下不需要 Modal 那套 transition + phase 状态机（`closed → entering → open → closing` + 双 rAF）——状态机的存在意义是退场动画，enter-only 绕开全部复杂度。快速连点无残影（旧节点直接销毁）。
+
+**Example**:
+```tsx
+// 内容区包裹层（AdminApp/UserApp）
+<div key={activeTab} class="t-view-enter">{renderContent()}</div>
+// 页面标题（label 唯一映射 tab，key 用 activeLabel）
+<h1 key={activeLabel} class="... t-view-enter">{activeLabel}</h1>
+// 页面级分支（App.tsx，key 表见任务 design §4.5）
+<div key="admin-app" class="... t-page-enter">...</div>
+```
+
+**边界**: key 必须表达「分支跨越」语义——同分支内 `setPath` 重渲染时 key 不变、动画不重播，这正是预期；hono dom renderer 对 `key !== undefined` 要求 key+tag 双匹配才复用节点（已实证 `dom/render.js`）。全站范围：不要给已有退场语义的组件（Modal/Drawer）改用此模式。
+
+### Gotcha: .t-view-enter / .t-page-enter 的恒留 transform 会为 fixed/absolute 后代创建 containing block
+
+> **Warning**: 入场动画类走 `transform + filter`，`fill-mode` 决定动画结束后是否恒留终帧：`.t-view-enter` 用 `both`（结束后保留 `transform/filter`），`.t-page-enter` 用 `backwards`（结束即释放）。恒留 transform 会使嵌套的 `fixed` 后代被包裹盒裁剪（`.t-modal` 同款问题），也会成为 `absolute` 后代的新锚点、创建 stacking context。
+
+**fill-mode 选择规则**：包裹层子树内有 `fixed` 后代（抽屉/模态/ToastHost 等）→ 必须 `backwards`（先例：App.tsx 各页面分支，内含 Modal 壳与 AppLayout 固定抽屉）；确认子树无 fixed/absolute 外锚后代才可用 `both`（先例：renderContent 输出子树——浮层均已 portal 或为 AppLayout 兄弟节点）。新增动画类时先 grep 子树 `fixed` 再定 fill-mode。
+
+**规范**：`.t-view-enter` 子树内禁止直接写 `fixed` 浮层——浮层走 portal（先例：ModelAllowlistPicker）或提升为包裹层兄弟节点。若未来需要在动画子树内加 fixed 元素，必须同时把包裹层 fill-mode 改为 `backwards` 并评估退场闪烁。
+
+### Convention: 加载态三件套，禁止再内联手写（09-17-ui-tab-transitions-skeleton 沉淀）
+
+**What**: 整页加载骨架用 `features/ViewSkeleton.tsx`（`variant: "stats" | "table" | "form" | "generic"`，映射表见 AdminApp/UserApp 的 `tabToSkeletonVariant`）；局部小加载用 `features/DotLoader.tsx`（三点 bounce，`role="status" aria-label="加载中"`，无色、调用方传 `class` 配色）；迷你骨架行直接组装 `ViewSkeleton` 导出的 `SkeletonBlock`（自带 `aria-hidden` 与 `.skeleton` shimmer 基类）。
+
+**Why**: 三者收拢后 shimmer/bounce 节奏与 a11y 语义（live region 不嵌套：整页骨架套 `role="status"`、局部装饰块仅 `aria-hidden`）全站单一实现；新增加载态先查这三件，不要平行造轮子。
+
+**边界**：`.skeleton` 是非分层规则，`background-color` / `border-radius` 不可被 Tailwind 工具类覆盖（会压过 utilities 层）——变体骨架块只传尺寸/间距类；`.t-view-enter` 恒留 transform 同时是脚枪，见上条 Warning。
+
+**已知边缘遗留**：`UserDashboard.tsx` 的 `!data` 空值守卫仍有一处「加载中...」静态文字（正常流程触达不了，仅 dashboard 加载失败边缘态），清偿时换 `ViewSkeleton variant="stats"`。
 
 ---
 
