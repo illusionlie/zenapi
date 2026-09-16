@@ -240,41 +240,51 @@ Session summary was not supplied.
 - PUT 路由层校验暂无单测（需先解决 adminAuth mock 成本），属独立改进
 
 
-## Session 4: 令牌管理增强（长度 / 令牌级模型白名单 / 额度编辑）
+## Session 4: 令牌管理增强：长度提升 / 令牌级模型白名单 / 额度编辑
 
 **Date**: 2026-09-16
-**Task**: 09-16-token-management-enhancements
+**Task**: 令牌管理增强：长度提升 / 令牌级模型白名单 / 额度编辑
 **Branch**: `main`
 
 ### Summary
 
-三项令牌管理增强：新生成令牌随机部分 24→32 字节（参数化 generateToken，仅两处 API 令牌调用点传 32，其余 9 处会话/渠道ID/OAuth state 输出不变）；新增令牌级 allowed_models 白名单（迁移 0020 + tokenAuth 注入 + proxy/anthropic-proxy 逐清单独立校验取 AND + /v1/models 双过滤，管理台与用户端均可配置，用户端 PATCH 拒绝 quota/status/渠道字段 field_not_editable）；管理台令牌编辑模态（额度总额可清回无限、已用可清零），PATCH 改走 services/token-update.ts 纯函数三态语义（undefined=保留/null=清除/值=设置），废除 NaN/null 静默回退。
+新生成令牌 32 字节（generateToken 参数化，其余随机串用途不变）；新增令牌级 allowed_models 白名单，与用户级取交集（逐清单独立校验 AND，迁移 0020）；管理台令牌编辑模态 + PATCH 三态语义纯函数（token-update.ts），废除 null/NaN 静默回退。
 
 ### Main Changes
 
-- generateToken(prefix, byteLength=24) 参数化；serializeAllowedModels 从 admin-users.ts 下沉为 utils/model-allowlist.ts 的 serializeAllowlist
-- 设计关键决策：双白名单**不计算交集数组**（空交集会被 fail-open 误判为不限制 → 全放行的安全反转），逐清单独立校验 AND（isModelAllowedByAll）
-- UI：共享 ModelAllowlistPicker（UsersView 白名单选择器抽取，portal 规避 .t-modal transform 裁剪），管理台/用户端创建+编辑四处复用；两视图加「模型限制」徽章列
-- 顺带修正 tokens.ts POST 的 allowed_channels 缺省入库字面量 "null" 字符串问题（改存 SQL NULL）
+**Task**: 09-16-token-management-enhancements
+
+### Main Changes
+
+- `generateToken(prefix, byteLength=24)` 参数化：仅 tokens.ts / user-api.ts 两处 API 令牌传 32（新令牌总长 46），其余 9 处调用（会话/渠道ID/OAuth state/随机密码）输出不变；存量令牌按 key_hash 校验零影响
+- 令牌级白名单：迁移 0020 + schema.sql 同步；tokenAuth SELECT 加列并注入解析后的 token_allowed_models；proxy / anthropic-proxy 改 isModelAllowedByAll 逐清单独立校验取 AND；/v1/models 链式双过滤
+- 设计关键决策：**不计算交集数组**——空交集会被 isModelAllowed 的 fail-open 语义误判为「不限制」→ 全放行（安全反转），已在 spec error-handling.md 沉淀为 Don't 禁则
+- PATCH 三态语义（undefined=保留 / null=清除 / 值=设置）抽为 services/token-update.ts 纯函数并全量单测；非法值 400（invalid_*），废除 NaN/null 静默回退存量 bug
+- serializeAllowedModels 从 admin-users.ts 下沉为 utils/model-allowlist.ts 的 serializeAllowlist；UI 抽取共享 ModelAllowlistPicker（portal 规避 .t-modal transform 裁剪），管理台/用户端创建+编辑四处复用
+- 用户端边界：可配自己令牌的白名单（收窄语义），PATCH 出现 quota/status/渠道字段即 400 field_not_editable；UI 两视图加「模型限制」徽章列与编辑模态
+
+### Testing
+
+- [OK] 新增 tests/crypto-token.test.ts（46/32/35 长度+charset 回归）、tests/token-update.test.ts（三态矩阵全字段）、model-allowlist.test.ts 追加 isModelAllowedByAll 7 组用例；全量 11 文件 189 例全绿
+- [OK] trellis-check 全量核查 9 项 PASS 零修复；check/typecheck 0 error（22 warning 均为未触碰存量文件）
+
+### Status
+
+[OK] **Completed**（AC1–AC9 自动化可验部分全过；implement.md §V 手工验证 V1–V5 留待用户本地 dev 冒烟；部署注意：存量环境需先跑迁移 0020）
+
+### Next Steps
+
+- 后续可考虑给 allowed_channels 补 UI 编辑（后端三态已支持 null 清除）
+- 令牌长度提升仅影响新令牌；存量轮换如需另立任务
+
 
 ### Git Commits
 
 | Hash | Message |
 |------|---------|
-| `fa0ea68` | feat(worker,ui): 令牌管理增强 |
-| `9e0bacc` | docs(spec): PATCH 三态语义 + 多白名单禁则 |
-| `861712d` | chore(task): archive |
-
-### Testing
-
-- [OK] 新增 tests/crypto-token.test.ts（46/32/35 长度回归）、tests/token-update.test.ts（三态矩阵）、model-allowlist.test.ts 追加 isModelAllowedByAll 7 组用例；全量 11 文件 189 例全绿
-- [OK] trellis-check 全量核查 9 项全 PASS，零修复；check/typecheck 0 error（22 warning 均为未触碰存量文件）
+| `fa0ea68` | (see git log) |
+| `9e0bacc` | (see git log) |
 
 ### Status
 
-[OK] **Completed**（AC1–AC9 中自动化可验部分全过；implement.md §V 手工验证清单 V1–V5 留待用户本地 dev 环境/self-host 冒烟）
-
-### Next Steps
-
-- 用户可考虑后续给 allowed_channels 补 UI 编辑（后端三态已支持 null 清除）
-- 令牌长度提升仅影响新令牌，如需存量轮换需另立任务
+[OK] **Completed**
