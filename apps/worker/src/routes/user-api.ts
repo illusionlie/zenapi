@@ -15,6 +15,7 @@ import { jsonError } from "../utils/http";
 import {
 	filterModelsByAllowlist,
 	parseAllowlist,
+	serializeAllowlist,
 } from "../utils/model-allowlist";
 import { nowIso } from "../utils/time";
 
@@ -104,11 +105,29 @@ userApi.get("/models", async (c) => {
 userApi.get("/tokens", async (c) => {
 	const userId = c.get("userId") as string;
 	const result = await c.env.DB.prepare(
-		"SELECT id, name, key_prefix, quota_total, quota_used, status, allowed_channels, created_at, updated_at FROM tokens WHERE user_id = ? ORDER BY created_at DESC",
+		"SELECT id, name, key_prefix, quota_total, quota_used, status, allowed_channels, allowed_models, created_at, updated_at FROM tokens WHERE user_id = ? ORDER BY created_at DESC",
 	)
 		.bind(userId)
 		.all();
-	return c.json({ tokens: result.results ?? [] });
+	const rows = (result.results ?? []) as Array<{
+		id: string;
+		name: string;
+		key_prefix: string;
+		quota_total: number | null;
+		quota_used: number;
+		status: string;
+		allowed_channels: string | null;
+		allowed_models: string | null;
+		created_at: string;
+		updated_at: string;
+	}>;
+	return c.json({
+		tokens: rows.map((row) => ({
+			...row,
+			// Expose the parsed array (or null) so the frontend can consume it directly
+			allowed_models: parseAllowlist(row.allowed_models),
+		})),
+	});
 });
 
 /**
@@ -121,14 +140,24 @@ userApi.post("/tokens", async (c) => {
 		return jsonError(c, 400, "name_required", "name_required");
 	}
 
-	const rawToken = generateToken("sk-");
+	const rawToken = generateToken("sk-", 32);
 	const tokenHash = await sha256Hex(rawToken);
 	const id = crypto.randomUUID();
 	const now = nowIso();
 	const keyPrefix = rawToken.slice(0, 8);
 
+	const allowedModels = serializeAllowlist(body.allowed_models ?? null);
+	if (!allowedModels.ok) {
+		return jsonError(
+			c,
+			400,
+			"invalid_allowed_models",
+			"invalid_allowed_models",
+		);
+	}
+
 	await c.env.DB.prepare(
-		"INSERT INTO tokens (id, name, key_hash, key_prefix, token_plain, quota_total, quota_used, status, allowed_channels, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO tokens (id, name, key_hash, key_prefix, token_plain, quota_total, quota_used, status, allowed_channels, allowed_models, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	)
 		.bind(
 			id,
@@ -140,6 +169,7 @@ userApi.post("/tokens", async (c) => {
 			0,
 			"active",
 			null,
+			allowedModels.value,
 			userId,
 			now,
 			now,
@@ -150,7 +180,7 @@ userApi.post("/tokens", async (c) => {
 });
 
 /**
- * Updates a user's token (name).
+ * Updates a user's token (name / model allowlist only).
  */
 userApi.patch("/tokens/:id", async (c) => {
 	const userId = c.get("userId") as string;
@@ -160,11 +190,26 @@ userApi.patch("/tokens/:id", async (c) => {
 		return jsonError(c, 400, "missing_body", "missing_body");
 	}
 
+	// Quota / status / channel fields are admin-only; users may only edit
+	// name and allowed_models (design.md D5.3)
+	const forbiddenFields = [
+		"quota_total",
+		"quota_used",
+		"status",
+		"allowed_channels",
+	];
+	if (
+		typeof body === "object" &&
+		forbiddenFields.some((field) => field in body)
+	) {
+		return jsonError(c, 400, "field_not_editable", "field_not_editable");
+	}
+
 	const existing = await c.env.DB.prepare(
-		"SELECT id, name FROM tokens WHERE id = ? AND user_id = ?",
+		"SELECT id, name, allowed_models FROM tokens WHERE id = ? AND user_id = ?",
 	)
 		.bind(tokenId, userId)
-		.first<{ id: string; name: string }>();
+		.first<{ id: string; name: string; allowed_models: string | null }>();
 
 	if (!existing) {
 		return jsonError(c, 404, "token_not_found", "token_not_found");
@@ -175,10 +220,28 @@ userApi.patch("/tokens/:id", async (c) => {
 			? body.name.trim()
 			: existing.name;
 
+	// allowed_models: undefined = keep, null = clear (unrestricted),
+	// array of non-empty strings = replace (same three-state as admin PATCH)
+	let nextAllowedModels = existing.allowed_models;
+	if (body.allowed_models === null) {
+		nextAllowedModels = null;
+	} else if (body.allowed_models !== undefined) {
+		const serialized = serializeAllowlist(body.allowed_models);
+		if (!serialized.ok) {
+			return jsonError(
+				c,
+				400,
+				"invalid_allowed_models",
+				"invalid_allowed_models",
+			);
+		}
+		nextAllowedModels = serialized.value;
+	}
+
 	await c.env.DB.prepare(
-		"UPDATE tokens SET name = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+		"UPDATE tokens SET name = ?, allowed_models = ?, updated_at = ? WHERE id = ? AND user_id = ?",
 	)
-		.bind(newName, nowIso(), tokenId, userId)
+		.bind(newName, nextAllowedModels, nowIso(), tokenId, userId)
 		.run();
 
 	return c.json({ ok: true });

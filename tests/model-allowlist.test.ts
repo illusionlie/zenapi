@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	filterModelsByAllowlist,
 	isModelAllowed,
+	isModelAllowedByAll,
 	parseAllowlist,
 } from "../apps/worker/src/utils/model-allowlist";
 
@@ -107,5 +108,64 @@ describe("filterModelsByAllowlist", () => {
 
 	it("returns an empty array when nothing matches", () => {
 		expect(filterModelsByAllowlist(items, ["gemini"])).toEqual([]);
+	});
+});
+
+describe("isModelAllowedByAll", () => {
+	it("allows when every list is unrestricted (null/undefined)", () => {
+		expect(isModelAllowedByAll([null, null], "gpt-4o")).toBe(true);
+		expect(isModelAllowedByAll([undefined, undefined], "gpt-4o")).toBe(true);
+		expect(isModelAllowedByAll([null, undefined], "gpt-4o")).toBe(true);
+		expect(isModelAllowedByAll([], "gpt-4o")).toBe(true);
+	});
+
+	it("blocks when a single list rejects the model", () => {
+		expect(isModelAllowedByAll([["gpt-4o"], null], "claude-3")).toBe(false);
+		expect(isModelAllowedByAll([null, ["gpt-4o"]], "claude-3")).toBe(false);
+	});
+
+	it("blocks when the two lists allow different models (intersection semantics)", () => {
+		// Disjoint lists must NOT merge into an empty (fail-open) intersection
+		expect(
+			isModelAllowedByAll([["gpt-4o"], ["claude-sonnet-4"]], "gpt-4o"),
+		).toBe(false);
+		expect(
+			isModelAllowedByAll([["gpt-4o"], ["claude-sonnet-4"]], "claude-sonnet-4"),
+		).toBe(false);
+		expect(
+			isModelAllowedByAll([["gpt-4o"], ["claude-sonnet-4"]], "gemini"),
+		).toBe(false);
+	});
+
+	it("allows when both lists allow the same model", () => {
+		expect(
+			isModelAllowedByAll(
+				[["gpt-4o", "claude-sonnet-4"], ["gpt-4o"]],
+				"gpt-4o",
+			),
+		).toBe(true);
+	});
+
+	it("tolerates undefined entries among the lists", () => {
+		expect(
+			isModelAllowedByAll([undefined, ["gpt-4o"], null], "gpt-4o"),
+		).toBe(true);
+		expect(
+			isModelAllowedByAll([undefined, ["gpt-4o"], null], "claude-3"),
+		).toBe(false);
+	});
+
+	it("allows when the request carries no model name", () => {
+		expect(
+			isModelAllowedByAll([["gpt-4o"], ["claude-sonnet-4"]], null),
+		).toBe(true);
+		expect(isModelAllowedByAll([["gpt-4o"]], undefined)).toBe(true);
+		expect(isModelAllowedByAll([["gpt-4o"]], "")).toBe(true);
+	});
+
+	it("matches case-sensitively across lists", () => {
+		expect(isModelAllowedByAll([["gpt-4o"], ["gpt-4o"]], "GPT-4O")).toBe(
+			false,
+		);
 	});
 });

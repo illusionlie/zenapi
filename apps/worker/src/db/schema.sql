@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS tokens (
   quota_used INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'active',
   allowed_channels TEXT,
+  allowed_models TEXT,
   user_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

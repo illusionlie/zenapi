@@ -116,9 +116,11 @@ export function md5Hex(input: string): string {
 
 /**
  * Generates a URL-safe random token with an optional prefix.
+ * Defaults to 24 bytes (used by sessions / channel IDs / OAuth state);
+ * API tokens opt into a longer 32-byte random part explicitly.
  */
-export function generateToken(prefix = ""): string {
-	const bytes = crypto.getRandomValues(new Uint8Array(24));
+export function generateToken(prefix = "", byteLength = 24): string {
+	const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
 	const base = btoa(String.fromCharCode(...bytes))
 		.replace(/\+/g, "-")
 		.replace(/\//g, "_")

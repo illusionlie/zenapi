@@ -10,6 +10,7 @@ import {
 	initialChannelForm,
 	initialData,
 	initialSettingsForm,
+	initialTokenForm,
 	tabs,
 } from "./core/constants";
 import { toast } from "./core/toast";
@@ -26,6 +27,7 @@ import type {
 	SettingsForm,
 	TabId,
 	Token,
+	TokenForm,
 	UsageLog,
 	User,
 } from "./core/types";
@@ -122,6 +124,14 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	// 当前批次的停止函数（闭包持有本地 stopped 标记），stopModelTests 调用
 	const modelTestStopFnRef = useRef<(() => void) | null>(null);
 	const [isTokenModalOpen, setTokenModalOpen] = useState(false);
+	// 令牌编辑态(参照渠道编辑先例 editingChannel + channelForm)
+	const [editingToken, setEditingToken] = useState<Token | null>(null);
+	const [tokenForm, setTokenForm] = useState<TokenForm>(initialTokenForm);
+	// 创建模态的白名单选择(受控提升至容器,遵循 state-management 规范;
+	// openTokenCreate/提交成功时重置,等效「模态关闭时重置」)
+	const [tokenCreateModels, setTokenCreateModels] = useState<Set<string>>(
+		() => new Set<string>(),
+	);
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [users, setUsers] = useState<User[]>([]);
 	const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
@@ -336,7 +346,31 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 	}, []);
 
 	const openTokenCreate = useCallback(() => {
+		setTokenCreateModels(new Set());
 		setTokenModalOpen(true);
+	}, []);
+
+	const handleTokenCreateModelsChange = useCallback((next: Set<string>) => {
+		setTokenCreateModels(next);
+	}, []);
+
+	const openTokenEdit = useCallback((target: Token) => {
+		setEditingToken(target);
+		setTokenForm({
+			name: target.name,
+			quota_total: target.quota_total == null ? "" : String(target.quota_total),
+			quota_used: String(target.quota_used),
+			allowed_models: [...(target.allowed_models ?? [])],
+		});
+	}, []);
+
+	const closeTokenEdit = useCallback(() => {
+		setEditingToken(null);
+		setTokenForm({ ...initialTokenForm });
+	}, []);
+
+	const handleTokenFormChange = useCallback((patch: Partial<TokenForm>) => {
+		setTokenForm((prev) => ({ ...prev, ...patch }));
 	}, []);
 
 	const startChannelEdit = useCallback(
@@ -519,11 +553,16 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 						quota_total: payload.quota_total
 							? Number(payload.quota_total)
 							: null,
+						// 仅在选择模型时携带;缺省由服务端落 NULL(不限制)
+						...(tokenCreateModels.size > 0
+							? { allowed_models: [...tokenCreateModels] }
+							: {}),
 					}),
 				});
 				toast.success("令牌已创建");
 				setSecretModal({ title: "新令牌已创建", value: result.token });
 				form.reset();
+				setTokenCreateModels(new Set());
 				setTokenModalOpen(false);
 				setTokenPage(1);
 				await loadTokens();
@@ -531,7 +570,36 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				toast.error((error as Error).message);
 			}
 		},
-		[apiFetch, loadTokens],
+		[apiFetch, loadTokens, tokenCreateModels],
+	);
+
+	// 编辑提交:三态 PATCH —— 额度总额空串→null(清回无限),已用额度清空提交即归零,
+	// allowed_models 恒传数组(空数组 = 清回不限制)
+	const handleTokenEditSubmit = useCallback(
+		async (event: Event) => {
+			event.preventDefault();
+			if (!editingToken) return;
+			try {
+				await apiFetch(`/api/tokens/${editingToken.id}`, {
+					method: "PATCH",
+					body: JSON.stringify({
+						name: tokenForm.name.trim(),
+						quota_total:
+							tokenForm.quota_total.trim() === ""
+								? null
+								: Number(tokenForm.quota_total),
+						quota_used: Number(tokenForm.quota_used || 0),
+						allowed_models: tokenForm.allowed_models,
+					}),
+				});
+				toast.success("令牌已更新");
+				closeTokenEdit();
+				await loadTokens();
+			} catch (error) {
+				toast.error((error as Error).message);
+			}
+		},
+		[apiFetch, closeTokenEdit, editingToken, loadTokens, tokenForm],
 	);
 
 	const handleSettingsSubmit = useCallback(
@@ -1161,6 +1229,15 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					onReveal={handleTokenReveal}
 					onToggle={handleTokenToggle}
 					onDelete={handleTokenDelete}
+					editingToken={editingToken}
+					tokenForm={tokenForm}
+					onTokenFormChange={handleTokenFormChange}
+					createSelectedModels={tokenCreateModels}
+					onCreateModelsChange={handleTokenCreateModelsChange}
+					onEdit={openTokenEdit}
+					onCloseEditModal={closeTokenEdit}
+					onEditSubmit={handleTokenEditSubmit}
+					onFetchModelCandidates={loadModelCandidates}
 				/>
 			);
 		}

@@ -18,7 +18,7 @@ import { recordUsage } from "../services/usage";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
-import { isModelAllowed } from "../utils/model-allowlist";
+import { isModelAllowedByAll } from "../utils/model-allowlist";
 import {
 	applyHeaderPolicy,
 	loadProxyHeaderPolicy,
@@ -55,9 +55,15 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 			: null;
 	const isStream = parsedBody?.stream === true;
 
-	// User-level model allowlist (design.md D2): exact match on the requested
-	// model name before any channel routing work
-	if (!isModelAllowed(tokenRecord.user_allowed_models, model)) {
+	// Token-level and user-level model allowlists (design.md D3/D4): each list
+	// independently gates the requested model name (exact match, alias
+	// unresolved) before any channel routing work
+	if (
+		!isModelAllowedByAll(
+			[tokenRecord.token_allowed_models, tokenRecord.user_allowed_models],
+			model,
+		)
+	) {
 		return jsonError(c, 403, "model_not_allowed", "model_not_allowed");
 	}
 

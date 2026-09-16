@@ -54,6 +54,58 @@ export function isModelAllowed(
 }
 
 /**
+ * Whether `model` may be called under ALL of the given allowlists.
+ *
+ * Each list is checked independently with `isModelAllowed` semantics
+ * (null/empty = unrestricted). The lists are deliberately NOT merged into an
+ * intersection array: two disjoint allowlists (e.g. token limits `gpt-4o`,
+ * user limits `claude-3`) would intersect to an empty array, which
+ * `isModelAllowed` treats as unrestricted (fail-open) — a security
+ * inversion. Independent per-list checks keep each list's
+ * fail-open/fail-closed behavior intact.
+ */
+export function isModelAllowedByAll(
+	allowlists: (string[] | null | undefined)[],
+	model: string | null | undefined,
+): boolean {
+	return allowlists.every((list) => isModelAllowed(list, model));
+}
+
+/**
+ * Validates and serializes an `allowed_models`-style payload into the JSON
+ * string stored in a DB TEXT column (`users.allowed_models` /
+ * `tokens.allowed_models`).
+ * - null / [] → null (unrestricted)
+ * - array of non-empty strings → JSON string
+ * - anything else (non-array, non-string or whitespace-only element) → invalid
+ */
+export function serializeAllowlist(
+	input: unknown,
+): { ok: true; value: string | null } | { ok: false } {
+	if (input === null) {
+		return { ok: true, value: null };
+	}
+	if (!Array.isArray(input)) {
+		return { ok: false };
+	}
+	const models: string[] = [];
+	for (const item of input) {
+		if (typeof item !== "string") {
+			return { ok: false };
+		}
+		const trimmed = item.trim();
+		if (!trimmed) {
+			return { ok: false };
+		}
+		models.push(trimmed);
+	}
+	if (models.length === 0) {
+		return { ok: true, value: null };
+	}
+	return { ok: true, value: JSON.stringify(models) };
+}
+
+/**
  * Filters entries by the allowlist on their `id` (callable model name).
  * Null/empty allowlist returns the input array unchanged.
  */

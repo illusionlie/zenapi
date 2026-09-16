@@ -30,7 +30,7 @@ import { safeJsonParse } from "../utils/json";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
 import {
 	filterModelsByAllowlist,
-	isModelAllowed,
+	isModelAllowedByAll,
 } from "../utils/model-allowlist";
 import {
 	applyHeaderPolicy,
@@ -388,9 +388,10 @@ proxy.get("/models", tokenAuth, async (c) => {
 		}
 	}
 
-	// User-level model allowlist: only expose callable names the user may use
+	// Token-level then user-level model allowlists (design.md D3/D4): only
+	// expose callable names both lists permit (each list is fail-open when null)
 	const visibleModels = filterModelsByAllowlist(
-		modelData,
+		filterModelsByAllowlist(modelData, tokenRecord.token_allowed_models),
 		tokenRecord.user_allowed_models,
 	);
 
@@ -416,9 +417,15 @@ proxy.all("/*", tokenAuth, async (c) => {
 			: null;
 	const isStream = parsedBody?.stream === true;
 
-	// User-level model allowlist (design.md D2): exact match on the requested
-	// model name before any channel routing work
-	if (!isModelAllowed(tokenRecord.user_allowed_models, model)) {
+	// Token-level and user-level model allowlists (design.md D3/D4): each list
+	// independently gates the requested model name (exact match, alias
+	// unresolved) before any channel routing work
+	if (
+		!isModelAllowedByAll(
+			[tokenRecord.token_allowed_models, tokenRecord.user_allowed_models],
+			model,
+		)
+	) {
 		return jsonError(c, 403, "model_not_allowed", "model_not_allowed");
 	}
 

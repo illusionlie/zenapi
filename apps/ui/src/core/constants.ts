@@ -3,6 +3,7 @@ import type {
 	ChannelForm,
 	SettingsForm,
 	TabItem,
+	TokenForm,
 	UserTabItem,
 } from "./types";
 
@@ -46,6 +47,13 @@ export const initialChannelForm: ChannelForm = {
 	api_format: "openai",
 	custom_headers: "",
 	models: "",
+};
+
+export const initialTokenForm: TokenForm = {
+	name: "",
+	quota_total: "",
+	quota_used: "",
+	allowed_models: [],
 };
 
 export const initialSettingsForm: SettingsForm = {

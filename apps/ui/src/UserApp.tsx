@@ -86,6 +86,8 @@ export const UserApp = ({
 		title: string;
 		value: string;
 	} | null>(null);
+	// 令牌编辑态:仅名称 + 模型白名单(额度字段仅管理员可改,服务端拒绝)
+	const [editingToken, setEditingToken] = useState<Token | null>(null);
 
 	// Handle Linux DO bind callback parameters
 	useEffect(() => {
@@ -216,11 +218,17 @@ export const UserApp = ({
 	}, [apiFetch, onUserRefresh]);
 
 	const handleTokenCreate = useCallback(
-		async (name: string) => {
+		async (name: string, allowedModels: string[]) => {
 			try {
 				const result = await apiFetch<{ token: string }>("/api/u/tokens", {
 					method: "POST",
-					body: JSON.stringify({ name }),
+					body: JSON.stringify({
+						name,
+						// 仅在选择模型时携带;缺省由服务端落 NULL(不限制)
+						...(allowedModels.length > 0
+							? { allowed_models: allowedModels }
+							: {}),
+					}),
 				});
 				toast.success("令牌已创建");
 				setSecretModal({ title: "新令牌已创建", value: result.token });
@@ -231,6 +239,43 @@ export const UserApp = ({
 		},
 		[apiFetch, loadTokens],
 	);
+
+	// 编辑提交:仅名称 + 模型白名单
+	const openTokenEdit = useCallback((target: Token) => {
+		setEditingToken(target);
+	}, []);
+
+	const closeTokenEdit = useCallback(() => setEditingToken(null), []);
+
+	const handleTokenEditSubmit = useCallback(
+		async (data: { name: string; allowedModels: string[] }) => {
+			if (!editingToken) return;
+			try {
+				await apiFetch(`/api/u/tokens/${editingToken.id}`, {
+					method: "PATCH",
+					body: JSON.stringify({
+						name: data.name,
+						// 恒传数组:空数组 = 清回不限制
+						allowed_models: data.allowedModels,
+					}),
+				});
+				toast.success("令牌已更新");
+				closeTokenEdit();
+				await loadTokens();
+			} catch (error) {
+				toast.error((error as Error).message);
+			}
+		},
+		[apiFetch, closeTokenEdit, editingToken, loadTokens],
+	);
+
+	// 候选来源:/api/u/models 已按用户级白名单过滤,天然是安全候选池
+	const loadUserModelCandidates = useCallback(async (): Promise<string[]> => {
+		const result = await apiFetch<{ models: PublicModelItem[] }>(
+			"/api/u/models",
+		);
+		return result.models.map((m) => m.id);
+	}, [apiFetch]);
 
 	const handleTokenDelete = useCallback(
 		async (id: string) => {
@@ -318,6 +363,11 @@ export const UserApp = ({
 					onCreate={handleTokenCreate}
 					onDelete={handleTokenDelete}
 					onReveal={handleTokenReveal}
+					editingToken={editingToken}
+					onEdit={openTokenEdit}
+					onCloseEditModal={closeTokenEdit}
+					onEditSubmit={handleTokenEditSubmit}
+					onFetchModelCandidates={loadUserModelCandidates}
 				/>
 			);
 		}

@@ -80,7 +80,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 | `/api/channels` | `routes/channels.ts` | 渠道 CRUD、连通性测试（`/v1/models`）、单模型真实对话测试（`/test-model`）、模型拉取 |
 | `/api/models` | `routes/models.ts` | 模型广场聚合（仅启用渠道） |
 | `/api/model-aliases` | `routes/model-aliases.ts` | 模型别名映射 |
-| `/api/tokens` | `routes/tokens.ts` | API 令牌 CRUD、配额、`/reveal` 二次查看明文 |
+| `/api/tokens` | `routes/tokens.ts` | API 令牌 CRUD、令牌级模型白名单、额度编辑（三态 PATCH）、`/reveal` 二次查看明文 |
 | `/api/usage` | `routes/usage.ts` | 使用日志查询与保留清理 |
 | `/api/dashboard` | `routes/dashboard.ts` | 聚合统计 |
 | `/api/monitoring` | `routes/monitoring.ts` | 渠道健康 / 成功率 / 延迟（15m/1h/1d/7d/30d） |
@@ -93,7 +93,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 | `/api/playground` | `routes/playground.ts` | 对话测试（不记用量、不扣费） |
 | `/api/users` | `routes/admin-users.ts` | 用户管理 CRUD（含 `allowed_models` 可用模型白名单） |
 | `/api/u/auth` | `routes/user-auth.ts` | 用户注册 / 登录 / 登出 / me |
-| `/api/u` | `routes/user-api.ts` | 用户仪表盘 / 模型 / 令牌 / 日志 |
+| `/api/u` | `routes/user-api.ts` | 用户仪表盘 / 模型 / 令牌（含模型白名单配置，额度字段拒改） / 日志 |
 | `/api/recharge` | `routes/recharge.ts` | 充值订单 |
 | `/v1` | `routes/proxy.ts` | OpenAI 兼容代理（见 §8） |
 | `/anthropic/v1` | `routes/anthropic-proxy.ts` | Anthropic Messages 代理（含格式互转） |
@@ -120,6 +120,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 - usage 解析兼容 Responses 格式：SSE `response.completed` 事件的 `response.usage` 路径；`input_tokens/output_tokens` 归一为 prompt/completion tokens。
 - **禁用的模型不参与路由匹配**，也不出现在 `/v1/models`。
 - **用户级可用模型白名单**：`users.allowed_models`（JSON 数组，空 = 不限制）；按请求模型名**精确匹配**，白名单外返回 403 `model_not_allowed`；`/v1/models` 与 `/api/u/models` 同步过滤；与令牌级 `allowed_channels` 相互独立、正交生效。
+- **令牌级可用模型白名单**：`tokens.allowed_models`（JSON 数组，NULL/空 = 不限制），管理台与用户端均可配置；与用户级白名单**取交集生效**（逐清单独立校验后 AND，不合并数组，避免空交集 fail-open 反转），精确匹配、白名单外 403 `model_not_allowed`；`/v1/models` 同步双重过滤；与令牌级 `allowed_channels` 正交。
 
 ## 9. 静态资源 / SPA 回退
 
@@ -129,7 +130,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 
 `apps/worker/src/db/schema.sql` 定义全部表。核心域：
 
-- **代理**：`channels`、`tokens`、`usage_logs`、`model_aliases`、`channel_model_aliases`
+- **代理**：`channels`、`tokens`（含 `allowed_models` 令牌级白名单）、`usage_logs`、`model_aliases`、`channel_model_aliases`
 - **会话/设置**：`admin_sessions`、`settings`
 - **用户体系**：`users`（含 `allowed_models` 白名单）、`user_sessions`、`user_checkins`、`invite_codes`
 - **资金**：`recharge_orders`

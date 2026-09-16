@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
-import { parseAllowlist } from "../utils/model-allowlist";
+import { parseAllowlist, serializeAllowlist } from "../utils/model-allowlist";
 import { nowIso } from "../utils/time";
 
 const adminUsers = new Hono<AppEnv>();
@@ -18,39 +18,6 @@ type AdminUserRow = {
 	created_at: string;
 	updated_at: string;
 };
-
-/**
- * Validates and serializes an `allowed_models` payload into the JSON string
- * stored in `users.allowed_models`.
- * - null / [] → null (unrestricted)
- * - array of non-empty strings → JSON string
- * - anything else (non-array, non-string or empty element) → invalid
- */
-function serializeAllowedModels(
-	input: unknown,
-): { ok: true; value: string | null } | { ok: false } {
-	if (input === null) {
-		return { ok: true, value: null };
-	}
-	if (!Array.isArray(input)) {
-		return { ok: false };
-	}
-	const models: string[] = [];
-	for (const item of input) {
-		if (typeof item !== "string") {
-			return { ok: false };
-		}
-		const trimmed = item.trim();
-		if (!trimmed) {
-			return { ok: false };
-		}
-		models.push(trimmed);
-	}
-	if (models.length === 0) {
-		return { ok: true, value: null };
-	}
-	return { ok: true, value: JSON.stringify(models) };
-}
 
 /**
  * Lists all users.
@@ -95,7 +62,7 @@ adminUsers.post("/", async (c) => {
 		return jsonError(c, 409, "email_or_name_exists", "email_or_name_exists");
 	}
 
-	const allowedModels = serializeAllowedModels(body.allowed_models ?? null);
+	const allowedModels = serializeAllowlist(body.allowed_models ?? null);
 	if (!allowedModels.ok) {
 		return jsonError(
 			c,
@@ -170,7 +137,7 @@ adminUsers.patch("/:id", async (c) => {
 	// array of non-empty strings = replace
 	let nextAllowedModels = existing.allowed_models;
 	if (body.allowed_models !== undefined) {
-		const serialized = serializeAllowedModels(body.allowed_models);
+		const serialized = serializeAllowlist(body.allowed_models);
 		if (!serialized.ok) {
 			return jsonError(
 				c,

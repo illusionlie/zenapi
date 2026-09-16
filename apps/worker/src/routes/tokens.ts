@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
+import { resolveTokenUpdate } from "../services/token-update";
 import { generateToken, sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
-import { safeJsonParse } from "../utils/json";
+import { parseAllowlist, serializeAllowlist } from "../utils/model-allowlist";
 import { nowIso } from "../utils/time";
 
 const tokens = new Hono<AppEnv>();
@@ -15,6 +16,7 @@ type TokenRow = {
 	quota_used: number;
 	status: string;
 	allowed_channels: string | null;
+	allowed_models: string | null;
 	token_plain?: string | null;
 };
 
@@ -23,9 +25,22 @@ type TokenRow = {
  */
 tokens.get("/", async (c) => {
 	const result = await c.env.DB.prepare(
-		"SELECT tokens.id, tokens.name, tokens.key_prefix, tokens.quota_total, tokens.quota_used, tokens.status, tokens.allowed_channels, tokens.user_id, tokens.created_at, tokens.updated_at, users.name as user_name, users.email as user_email FROM tokens LEFT JOIN users ON users.id = tokens.user_id ORDER BY tokens.created_at DESC",
+		"SELECT tokens.id, tokens.name, tokens.key_prefix, tokens.quota_total, tokens.quota_used, tokens.status, tokens.allowed_channels, tokens.allowed_models, tokens.user_id, tokens.created_at, tokens.updated_at, users.name as user_name, users.email as user_email FROM tokens LEFT JOIN users ON users.id = tokens.user_id ORDER BY tokens.created_at DESC",
 	).all();
-	return c.json({ tokens: result.results ?? [] });
+	const rows = (result.results ?? []) as (TokenRow & {
+		user_id: string | null;
+		user_name: string | null;
+		user_email: string | null;
+		created_at: string;
+		updated_at: string;
+	})[];
+	return c.json({
+		tokens: rows.map((row) => ({
+			...row,
+			// Expose the parsed array (or null) so the frontend can consume it directly
+			allowed_models: parseAllowlist(row.allowed_models),
+		})),
+	});
 });
 
 /**
@@ -37,7 +52,7 @@ tokens.post("/", async (c) => {
 		return jsonError(c, 400, "name_required", "name_required");
 	}
 
-	const rawToken = generateToken("sk-");
+	const rawToken = generateToken("sk-", 32);
 	const tokenHash = await sha256Hex(rawToken);
 	const id = crypto.randomUUID();
 	const now = nowIso();
@@ -47,8 +62,25 @@ tokens.post("/", async (c) => {
 			? null
 			: Number(body.quota_total);
 
+	const allowedModels = serializeAllowlist(body.allowed_models ?? null);
+	if (!allowedModels.ok) {
+		return jsonError(
+			c,
+			400,
+			"invalid_allowed_models",
+			"invalid_allowed_models",
+		);
+	}
+
+	// Missing/null allowed_channels stores a SQL NULL (not the literal "null"
+	// string); only newly created tokens are affected
+	const allowedChannels =
+		body.allowed_channels === undefined || body.allowed_channels === null
+			? null
+			: JSON.stringify(body.allowed_channels);
+
 	await c.env.DB.prepare(
-		"INSERT INTO tokens (id, name, key_hash, key_prefix, token_plain, quota_total, quota_used, status, allowed_channels, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO tokens (id, name, key_hash, key_prefix, token_plain, quota_total, quota_used, status, allowed_channels, allowed_models, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	)
 		.bind(
 			id,
@@ -59,7 +91,8 @@ tokens.post("/", async (c) => {
 			Number.isNaN(quotaTotal) ? null : quotaTotal,
 			0,
 			body.status ?? "active",
-			JSON.stringify(body.allowed_channels ?? null),
+			allowedChannels,
+			allowedModels.value,
 			now,
 			now,
 		)
@@ -77,9 +110,6 @@ tokens.post("/", async (c) => {
 tokens.patch("/:id", async (c) => {
 	const id = c.req.param("id");
 	const body = await c.req.json().catch(() => null);
-	if (!body) {
-		return jsonError(c, 400, "missing_body", "missing_body");
-	}
 
 	const existing = await c.env.DB.prepare("SELECT * FROM tokens WHERE id = ?")
 		.bind(id)
@@ -88,25 +118,24 @@ tokens.patch("/:id", async (c) => {
 		return jsonError(c, 404, "token_not_found", "token_not_found");
 	}
 
-	const existingAllowed = safeJsonParse(existing.allowed_channels, null);
-	const quotaTotalUpdate =
-		body.quota_total === null || body.quota_total === undefined
-			? existing.quota_total
-			: Number(body.quota_total);
-	const quotaUsedUpdate =
-		body.quota_used === null || body.quota_used === undefined
-			? existing.quota_used
-			: Number(body.quota_used);
+	// Three-state resolution (design.md D5.2): undefined = keep, null = clear,
+	// invalid values → 400 instead of silently falling back to the old value
+	const resolved = resolveTokenUpdate(body, existing);
+	if (!resolved.ok) {
+		return jsonError(c, 400, resolved.error, resolved.error);
+	}
+	const values = resolved.values;
 
 	await c.env.DB.prepare(
-		"UPDATE tokens SET name = ?, quota_total = ?, quota_used = ?, status = ?, allowed_channels = ?, updated_at = ? WHERE id = ?",
+		"UPDATE tokens SET name = ?, quota_total = ?, quota_used = ?, status = ?, allowed_channels = ?, allowed_models = ?, updated_at = ? WHERE id = ?",
 	)
 		.bind(
-			body.name ?? existing.name,
-			Number.isNaN(quotaTotalUpdate) ? existing.quota_total : quotaTotalUpdate,
-			Number.isNaN(quotaUsedUpdate) ? existing.quota_used : quotaUsedUpdate,
-			body.status ?? existing.status,
-			JSON.stringify(body.allowed_channels ?? existingAllowed ?? null),
+			values.name,
+			values.quota_total,
+			values.quota_used,
+			values.status,
+			values.allowed_channels,
+			values.allowed_models,
 			nowIso(),
 			id,
 		)

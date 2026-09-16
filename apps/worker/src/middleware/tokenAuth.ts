@@ -13,9 +13,12 @@ export type TokenRecord = {
 	quota_used: number;
 	status: string;
 	allowed_channels: string | null;
+	allowed_models: string | null;
 	user_id: string | null;
 	/** User-level model allowlist (parsed); null/undefined = unrestricted. */
 	user_allowed_models?: string[] | null;
+	/** Token-level model allowlist (parsed from tokens.allowed_models); null/undefined = unrestricted. */
+	token_allowed_models?: string[] | null;
 };
 
 /**
@@ -29,7 +32,7 @@ export const tokenAuth = createMiddleware<AppEnv>(async (c, next) => {
 
 	const tokenHash = await sha256Hex(token);
 	const record = await c.env.DB.prepare(
-		"SELECT id, name, quota_total, quota_used, status, allowed_channels, user_id FROM tokens WHERE key_hash = ?",
+		"SELECT id, name, quota_total, quota_used, status, allowed_channels, allowed_models, user_id FROM tokens WHERE key_hash = ?",
 	)
 		.bind(tokenHash)
 		.first<TokenRecord>();
@@ -67,7 +70,7 @@ export const tokenAuth = createMiddleware<AppEnv>(async (c, next) => {
 				status: string;
 				allowed_models: string | null;
 			}>();
-		if (!user || user.status !== "active") {
+		if (user?.status !== "active") {
 			return jsonError(c, 403, "user_disabled", "user_disabled");
 		}
 		if (user.balance <= 0) {
@@ -80,6 +83,7 @@ export const tokenAuth = createMiddleware<AppEnv>(async (c, next) => {
 		...record,
 		quota_total: normalized.quotaTotal,
 		quota_used: normalized.quotaUsed,
+		token_allowed_models: parseAllowlist(record.allowed_models),
 		user_allowed_models: userAllowedModels,
 	});
 	await next();

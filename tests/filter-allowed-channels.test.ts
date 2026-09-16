@@ -23,6 +23,7 @@ function makeToken(allowedChannels: string | null): TokenRecord {
 		quota_used: 0,
 		status: "active",
 		allowed_channels: allowedChannels,
+		allowed_models: null,
 		user_id: null,
 	};
 }
