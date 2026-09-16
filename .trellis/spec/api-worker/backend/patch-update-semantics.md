@@ -78,3 +78,57 @@ await db.prepare("UPDATE tokens SET name=?, quota_total=?, ... WHERE id=?").bind
 ```
 
 **Why**: 三态语义集中在一个可单测的纯函数里，路由层零分支；非法值显式 400，杜绝「保存假成功」。
+
+---
+
+## Scenario: 低权限 PATCH 端点的子集 resolver 模式
+
+> 来源：2026-09 用户端「我的令牌」对齐任务（`resolveUserTokenUpdate` 先例）。
+
+### 1. Scope / Trigger
+
+- 触发：同一资源存在多个权限等级的 PATCH 端点（管理端全字段 / 用户端字段子集），且低权限端点需放开新字段时。
+- 问题：把全量 resolver 直接透传给低权限端点（或加 options 参数做字段过滤），会把权限边界散落到 resolver 参数里，新增管理端字段时容易漏掉低权限端的拦截。
+
+### 2. Signatures
+
+```typescript
+// services/<resource>-update.ts —— 与全量 resolver 同文件，独立纯函数
+export function resolveUserTokenUpdate(
+	body: unknown,
+	existing: { name: string; status: string; allowed_models: string | null }, // 仅子集字段
+): { ok: true; values: { name: string; status: string; allowed_models: string | null } }
+| { ok: false; error: "missing_body" | "invalid_name" | "invalid_status" | "invalid_allowed_models" };
+```
+
+路由层顺序固定：**forbidden 键存在性检查（`field_not_editable`）前置于 resolver**，resolver 只见过自己有权处理的字段。
+
+### 3. Contracts
+
+- forbidden 清单与 resolver 字段集**互斥且互补**：字段要么在 forbidden 清单（出现即 400），要么在 resolver 三态语义内。两端必须同步演进——放开一个字段 = 从 forbidden 清单移除 + resolver 增加该字段的三态分支 + 单测。
+- 子集 resolver 的三态语义与全量 resolver 逐字段同构（undefined 保留 / null 语义按字段定义 / 非法值 400 不静默回退），保证两端 UI 往返行为一致。
+- 决策变更（如 status 从 admin-only 放开为用户可编辑）必须在 PRD 显式记录「推翻既有决策」及权限影响分析，不能只改代码。
+
+### 4. Tests Required
+
+- 纯函数三态矩阵逐字段（含 `null` 在不同字段上的不对称语义：`status: null` = 保留，`allowed_models: null` = 清除）。
+- forbidden 字段路由级不测（无 D1 mock 基建），以纯函数测试 + 人工验收为准；错误码字符串精确匹配。
+
+### 5. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+// 管理端全量 resolver 透传给用户端 —— 权限边界失守
+const resolved = resolveTokenUpdate(body, existing); // 用户可改 quota/status/channels！
+```
+
+#### Correct
+
+```typescript
+// forbidden 前置 + 子集 resolver
+const forbiddenFields = ["quota_total", "quota_used", "allowed_channels"];
+if (forbiddenFields.some((f) => f in body)) return jsonError(c, 400, "field_not_editable", "field_not_editable");
+const resolved = resolveUserTokenUpdate(body, existing);
+if (!resolved.ok) return jsonError(c, 400, resolved.error, resolved.error);
+```

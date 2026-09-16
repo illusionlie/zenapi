@@ -32,7 +32,7 @@ type TokensViewProps = {
 const pageSizeOptions = [10, 20, 50];
 
 /** 「模型限制」单元格:无限制显示「全部」,有限制显示「N 个模型」徽章(title 列明细) */
-const renderModelLimit = (token: Token) => {
+export const renderModelLimit = (token: Token) => {
 	const models = token.allowed_models ?? [];
 	if (models.length === 0) {
 		return <span class="text-xs text-stone-400">全部</span>;

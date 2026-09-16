@@ -17,6 +17,7 @@ import type {
 	UserDashboardData,
 	UserTabId,
 } from "./core/types";
+import { toggleStatus } from "./core/utils";
 import { MonitoringView } from "./features/MonitoringView";
 import { SecretValueModal } from "./features/SecretValueModal";
 import { UserDashboard } from "./features/UserDashboard";
@@ -88,6 +89,9 @@ export const UserApp = ({
 	} | null>(null);
 	// 令牌编辑态:仅名称 + 模型白名单(额度字段仅管理员可改,服务端拒绝)
 	const [editingToken, setEditingToken] = useState<Token | null>(null);
+	// 令牌分页:与管理端同款前端切片模式(design D2)
+	const [tokenPage, setTokenPage] = useState(1);
+	const [tokenPageSize, setTokenPageSize] = useState(10);
 
 	// Handle Linux DO bind callback parameters
 	useEffect(() => {
@@ -313,6 +317,49 @@ export const UserApp = ({
 		[apiFetch],
 	);
 
+	// 令牌分页与管理端同款:全量列表 + 前端切片,删除后页码越界自动回退
+	const tokenTotal = tokens.length;
+	const tokenTotalPages = useMemo(
+		() => Math.max(1, Math.ceil(tokenTotal / tokenPageSize)),
+		[tokenTotal, tokenPageSize],
+	);
+	const pagedTokens = useMemo(() => {
+		const start = (tokenPage - 1) * tokenPageSize;
+		return tokens.slice(start, start + tokenPageSize);
+	}, [tokens, tokenPage, tokenPageSize]);
+
+	useEffect(() => {
+		setTokenPage((prev) => Math.min(prev, tokenTotalPages));
+	}, [tokenTotalPages]);
+
+	const handleTokenPageChange = useCallback(
+		(next: number) => setTokenPage(next),
+		[],
+	);
+
+	const handleTokenPageSizeChange = useCallback((next: number) => {
+		setTokenPageSize(next);
+		setTokenPage(1);
+	}, []);
+
+	// 启停自己的令牌:status 已对用户端 PATCH 放开(额度/渠道字段仍 admin-only)
+	const handleUserTokenToggle = useCallback(
+		async (id: string, status: string) => {
+			try {
+				const next = toggleStatus(status);
+				await apiFetch(`/api/u/tokens/${id}`, {
+					method: "PATCH",
+					body: JSON.stringify({ status: next }),
+				});
+				await loadTokens();
+				toast.success(`令牌已${next === "active" ? "启用" : "停用"}`);
+			} catch (error) {
+				toast.error((error as Error).message);
+			}
+		},
+		[apiFetch, loadTokens],
+	);
+
 	const toggleMobileMenu = useCallback(
 		() => setMobileMenuOpen((prev) => !prev),
 		[],
@@ -359,8 +406,15 @@ export const UserApp = ({
 		if (activeTab === "tokens") {
 			return (
 				<UserTokensView
-					tokens={tokens}
+					pagedTokens={pagedTokens}
+					tokenPage={tokenPage}
+					tokenPageSize={tokenPageSize}
+					tokenTotal={tokenTotal}
+					tokenTotalPages={tokenTotalPages}
 					onCreate={handleTokenCreate}
+					onPageChange={handleTokenPageChange}
+					onPageSizeChange={handleTokenPageSizeChange}
+					onToggle={handleUserTokenToggle}
 					onDelete={handleTokenDelete}
 					onReveal={handleTokenReveal}
 					editingToken={editingToken}

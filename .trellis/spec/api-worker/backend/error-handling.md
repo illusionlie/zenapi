@@ -48,7 +48,7 @@ Questions to answer:
 
 **What**: 资源更新端点（PATCH）的非法值错误码统一 `invalid_{key}`（如 `invalid_name` / `invalid_quota` / `invalid_status` / `invalid_allowed_models`），与 POST 共用同一套 key 命名；body 非法（非对象/缺 body）→ `missing_body`；目标资源不存在 → 404 `{resource}_not_found`（如 `token_not_found`）。**判定顺序：先查资源存在性（404），再校验 body（400）**——资源不存在时不需要暴露校验细节。
 
-**权限边界错误码**：低权限端点收到越权字段时用 `field_not_editable`（400），用「键存在性检查」（`key in body`）而非值判断——`JSON.stringify` 会丢弃 undefined 值，键出现即代表显式提交。先例：`/api/u/tokens/:id` 拒绝 `quota_total`/`quota_used`/`status`/`allowed_channels`（2026-09）。
+**权限边界错误码**：低权限端点收到越权字段时用 `field_not_editable`（400），用「键存在性检查」（`key in body`）而非值判断——`JSON.stringify` 会丢弃 undefined 值，键出现即代表显式提交。先例：`/api/u/tokens/:id` 拒绝 `quota_total`/`quota_used`/`allowed_channels`（status 已于 2026-09 用户端对齐任务放开为可编辑，见 patch-update-semantics.md 子集 resolver 模式）。
 
 ### Convention: JSON-in-TEXT 读取 fail-open，写入边界严格校验
 

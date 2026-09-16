@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { resolveTokenUpdate } from "../apps/worker/src/services/token-update";
-import type { ExistingToken } from "../apps/worker/src/services/token-update";
+import {
+	resolveTokenUpdate,
+	resolveUserTokenUpdate,
+} from "../apps/worker/src/services/token-update";
+import type {
+	ExistingToken,
+	UserExistingToken,
+} from "../apps/worker/src/services/token-update";
 
 const existing: ExistingToken = {
 	name: "old-name",
@@ -267,6 +273,161 @@ describe("resolveTokenUpdate", () => {
 			valuesOf({ name: "renamed", quota_total: null });
 			expect(existing.quota_total).toBe(100);
 			expect(existing.name).toBe("old-name");
+		});
+	});
+});
+
+const userExisting: UserExistingToken = {
+	name: "old-name",
+	status: "active",
+	allowed_models: '["gpt-4o"]',
+};
+
+const userValuesOf = (body: unknown) => {
+	const result = resolveUserTokenUpdate(body, userExisting);
+	if (!result.ok) {
+		throw new Error(`expected ok, got error: ${result.error}`);
+	}
+	return result.values;
+};
+
+describe("resolveUserTokenUpdate", () => {
+	describe("body validation", () => {
+		it("rejects array and primitive bodies with missing_body", () => {
+			expect(resolveUserTokenUpdate(null, userExisting)).toEqual({
+				ok: false,
+				error: "missing_body",
+			});
+			expect(resolveUserTokenUpdate(undefined, userExisting)).toEqual({
+				ok: false,
+				error: "missing_body",
+			});
+			expect(resolveUserTokenUpdate("str", userExisting)).toEqual({
+				ok: false,
+				error: "missing_body",
+			});
+			expect(resolveUserTokenUpdate([], userExisting)).toEqual({
+				ok: false,
+				error: "missing_body",
+			});
+		});
+	});
+
+	describe("undefined keeps existing values", () => {
+		it("returns every existing value for an empty body", () => {
+			expect(resolveUserTokenUpdate({}, userExisting)).toEqual({
+				ok: true,
+				values: { ...userExisting },
+			});
+		});
+	});
+
+	describe("name", () => {
+		it("keeps the existing name for undefined/null", () => {
+			expect(userValuesOf({}).name).toBe("old-name");
+			expect(userValuesOf({ name: null }).name).toBe("old-name");
+		});
+
+		it("rejects empty / whitespace-only / non-string names", () => {
+			expect(resolveUserTokenUpdate({ name: "" }, userExisting)).toEqual({
+				ok: false,
+				error: "invalid_name",
+			});
+			expect(resolveUserTokenUpdate({ name: "   " }, userExisting)).toEqual({
+				ok: false,
+				error: "invalid_name",
+			});
+			expect(resolveUserTokenUpdate({ name: 123 }, userExisting)).toEqual({
+				ok: false,
+				error: "invalid_name",
+			});
+		});
+	});
+
+	describe("status", () => {
+		it("accepts active and disabled", () => {
+			expect(userValuesOf({ status: "active" }).status).toBe("active");
+			expect(userValuesOf({ status: "disabled" }).status).toBe("disabled");
+		});
+
+		it("keeps the existing status for undefined/null", () => {
+			expect(userValuesOf({}).status).toBe("active");
+			expect(userValuesOf({ status: null }).status).toBe("active");
+		});
+
+		it("rejects any other value", () => {
+			expect(resolveUserTokenUpdate({ status: "enabled" }, userExisting)).toEqual({
+				ok: false,
+				error: "invalid_status",
+			});
+			expect(resolveUserTokenUpdate({ status: "paused" }, userExisting)).toEqual({
+				ok: false,
+				error: "invalid_status",
+			});
+			expect(resolveUserTokenUpdate({ status: 1 }, userExisting)).toEqual({
+				ok: false,
+				error: "invalid_status",
+			});
+		});
+	});
+
+	describe("allowed_models", () => {
+		it("keeps the existing value for undefined", () => {
+			expect(userValuesOf({}).allowed_models).toBe('["gpt-4o"]');
+		});
+
+		it("clears to NULL (unrestricted) for null", () => {
+			expect(userValuesOf({ allowed_models: null }).allowed_models).toBeNull();
+		});
+
+		it("serializes a valid array of non-empty strings", () => {
+			expect(userValuesOf({ allowed_models: ["m1"] }).allowed_models).toBe(
+				'["m1"]',
+			);
+			expect(
+				userValuesOf({ allowed_models: [" a ", "b"] }).allowed_models,
+			).toBe('["a","b"]');
+		});
+
+		it("rejects non-arrays, non-string elements and whitespace-only elements", () => {
+			expect(
+				resolveUserTokenUpdate({ allowed_models: "gpt-4o" }, userExisting),
+			).toEqual({
+				ok: false,
+				error: "invalid_allowed_models",
+			});
+			expect(resolveUserTokenUpdate({ allowed_models: [1] }, userExisting)).toEqual({
+				ok: false,
+				error: "invalid_allowed_models",
+			});
+			expect(
+				resolveUserTokenUpdate({ allowed_models: ["m1", ""] }, userExisting),
+			).toEqual({
+				ok: false,
+				error: "invalid_allowed_models",
+			});
+		});
+	});
+
+	describe("combined updates", () => {
+		it("applies name, status and allowed_models in one pass", () => {
+			const values = userValuesOf({
+				name: "renamed",
+				status: "disabled",
+				allowed_models: ["claude-sonnet-4"],
+			});
+			expect(values).toEqual({
+				name: "renamed",
+				status: "disabled",
+				allowed_models: '["claude-sonnet-4"]',
+			});
+		});
+
+		it("does not mutate the existing row", () => {
+			userValuesOf({ name: "renamed", status: "disabled" });
+			expect(userExisting.name).toBe("old-name");
+			expect(userExisting.status).toBe("active");
+			expect(userExisting.allowed_models).toBe('["gpt-4o"]');
 		});
 	});
 });

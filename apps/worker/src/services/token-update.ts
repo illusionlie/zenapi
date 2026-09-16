@@ -133,3 +133,92 @@ export function resolveTokenUpdate(
 		},
 	};
 }
+
+/**
+ * Shape of the token columns the user-facing PATCH endpoint reads and writes
+ * (quota / channel columns stay admin-only and are never part of this row).
+ */
+export type UserExistingToken = {
+	name: string;
+	status: string;
+	allowed_models: string | null;
+};
+
+/** Final column values to write back after a successful user-side update. */
+export type UserTokenUpdateValues = UserExistingToken;
+
+/** snake_case error codes aligned with the jsonError convention. */
+export type UserTokenUpdateError =
+	| "missing_body"
+	| "invalid_name"
+	| "invalid_status"
+	| "invalid_allowed_models";
+
+export type UserTokenUpdateResult =
+	| { ok: true; values: UserTokenUpdateValues }
+	| { ok: false; error: UserTokenUpdateError };
+
+/**
+ * Resolves a user-facing PATCH payload against an existing token row (pure
+ * function). Users may edit name / status / allowed_models only; quota and
+ * channel fields are rejected upstream (`field_not_editable`).
+ *
+ * Three-state semantics per field, aligned with `resolveTokenUpdate`:
+ * - `undefined`  → keep the existing value
+ * - `null`       → clear for allowed_models (unrestricted); treated as
+ *   undefined for name / status
+ * - concrete value → validate strictly; invalid input is rejected with 400
+ *   instead of silently falling back to the old value
+ *
+ * The body must be a plain object; anything else (null, primitives, arrays)
+ * yields `missing_body`.
+ */
+export function resolveUserTokenUpdate(
+	body: unknown,
+	existing: UserExistingToken,
+): UserTokenUpdateResult {
+	if (typeof body !== "object" || body === null || Array.isArray(body)) {
+		return { ok: false, error: "missing_body" };
+	}
+	const input = body as Record<string, unknown>;
+
+	let name = existing.name;
+	const rawName = input.name;
+	if (rawName !== undefined && rawName !== null) {
+		if (typeof rawName !== "string" || !rawName.trim()) {
+			return { ok: false, error: "invalid_name" };
+		}
+		name = rawName;
+	}
+
+	let status = existing.status;
+	const rawStatus = input.status;
+	if (rawStatus !== undefined && rawStatus !== null) {
+		if (rawStatus !== "active" && rawStatus !== "disabled") {
+			return { ok: false, error: "invalid_status" };
+		}
+		status = rawStatus;
+	}
+
+	let allowedModels = existing.allowed_models;
+	const rawAllowedModels = input.allowed_models;
+	if (rawAllowedModels === null) {
+		// null = unrestricted
+		allowedModels = null;
+	} else if (rawAllowedModels !== undefined) {
+		const serialized = serializeAllowlist(rawAllowedModels);
+		if (!serialized.ok) {
+			return { ok: false, error: "invalid_allowed_models" };
+		}
+		allowedModels = serialized.value;
+	}
+
+	return {
+		ok: true,
+		values: {
+			name,
+			status,
+			allowed_models: allowedModels,
+		},
+	};
+}

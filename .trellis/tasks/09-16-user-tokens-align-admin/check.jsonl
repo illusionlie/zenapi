@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/09-16-user-tokens-align-admin/prd.md", "reason": "验收标准 AC1-AC7 核对基准"}
+{"file": ".trellis/tasks/09-16-user-tokens-align-admin/design.md", "reason": "D4 三态语义与 forbidden 清单、D5 测试用例覆盖核对"}
+{"file": ".trellis/spec/api-worker/backend/patch-update-semantics.md", "reason": "核对 resolveUserTokenUpdate 三态语义与管理端契约一致"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "错误码命名与响应结构核对"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端质量检查基准"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "前后端契约一致性核对（props ↔ 路由 ↔ 测试）"}

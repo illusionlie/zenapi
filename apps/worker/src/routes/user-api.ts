@@ -10,6 +10,7 @@ import {
 	getLdcExchangeRate,
 	getLdcPaymentEnabled,
 } from "../services/settings";
+import { resolveUserTokenUpdate } from "../services/token-update";
 import { generateToken, sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
 import {
@@ -180,7 +181,7 @@ userApi.post("/tokens", async (c) => {
 });
 
 /**
- * Updates a user's token (name / model allowlist only).
+ * Updates a user's token (name / status / model allowlist).
  */
 userApi.patch("/tokens/:id", async (c) => {
 	const userId = c.get("userId") as string;
@@ -190,14 +191,9 @@ userApi.patch("/tokens/:id", async (c) => {
 		return jsonError(c, 400, "missing_body", "missing_body");
 	}
 
-	// Quota / status / channel fields are admin-only; users may only edit
-	// name and allowed_models (design.md D5.3)
-	const forbiddenFields = [
-		"quota_total",
-		"quota_used",
-		"status",
-		"allowed_channels",
-	];
+	// Quota / channel fields are admin-only; users may edit name, status and
+	// allowed_models (design.md D4)
+	const forbiddenFields = ["quota_total", "quota_used", "allowed_channels"];
 	if (
 		typeof body === "object" &&
 		forbiddenFields.some((field) => field in body)
@@ -206,42 +202,39 @@ userApi.patch("/tokens/:id", async (c) => {
 	}
 
 	const existing = await c.env.DB.prepare(
-		"SELECT id, name, allowed_models FROM tokens WHERE id = ? AND user_id = ?",
+		"SELECT id, name, status, allowed_models FROM tokens WHERE id = ? AND user_id = ?",
 	)
 		.bind(tokenId, userId)
-		.first<{ id: string; name: string; allowed_models: string | null }>();
+		.first<{
+			id: string;
+			name: string;
+			status: string;
+			allowed_models: string | null;
+		}>();
 
 	if (!existing) {
 		return jsonError(c, 404, "token_not_found", "token_not_found");
 	}
 
-	const newName =
-		typeof body.name === "string" && body.name.trim()
-			? body.name.trim()
-			: existing.name;
-
-	// allowed_models: undefined = keep, null = clear (unrestricted),
-	// array of non-empty strings = replace (same three-state as admin PATCH)
-	let nextAllowedModels = existing.allowed_models;
-	if (body.allowed_models === null) {
-		nextAllowedModels = null;
-	} else if (body.allowed_models !== undefined) {
-		const serialized = serializeAllowlist(body.allowed_models);
-		if (!serialized.ok) {
-			return jsonError(
-				c,
-				400,
-				"invalid_allowed_models",
-				"invalid_allowed_models",
-			);
-		}
-		nextAllowedModels = serialized.value;
+	// Three-state resolution (undefined = keep, null = clear where meaningful,
+	// invalid values → 400 instead of silently falling back to the old value)
+	const resolved = resolveUserTokenUpdate(body, existing);
+	if (!resolved.ok) {
+		return jsonError(c, 400, resolved.error, resolved.error);
 	}
+	const values = resolved.values;
 
 	await c.env.DB.prepare(
-		"UPDATE tokens SET name = ?, allowed_models = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+		"UPDATE tokens SET name = ?, status = ?, allowed_models = ?, updated_at = ? WHERE id = ? AND user_id = ?",
 	)
-		.bind(newName, nextAllowedModels, nowIso(), tokenId, userId)
+		.bind(
+			values.name,
+			values.status,
+			values.allowed_models,
+			nowIso(),
+			tokenId,
+			userId,
+		)
 		.run();
 
 	return c.json({ ok: true });
