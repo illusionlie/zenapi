@@ -155,30 +155,6 @@ export const UserLoginView = ({
 						</>
 					)}
 				</p>
-				<div class="mt-5 rounded-lg border border-stone-100 bg-stone-50 px-4 py-3 text-xs leading-relaxed text-stone-500">
-					<p>
-						<a
-							href="https://api-worker.metayuandao.workers.dev/"
-							class="text-stone-600 underline"
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							api-worker.metayuandao.workers.dev
-						</a>{" "}
-						无法直连，仅 API
-					</p>
-					<p class="mt-1">
-						<a
-							href="https://zenapi.top/"
-							class="text-stone-600 underline"
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							zenapi.top
-						</a>{" "}
-						全功能，可直连
-					</p>
-				</div>
 			</div>
 		</div>
 	);
