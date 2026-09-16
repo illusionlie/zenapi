@@ -201,7 +201,7 @@ Fixed ZenAPI to service-only mode: removed site_mode mechanism (17 backend ancho
 [OK] **Completed**（check/typecheck/test 全绿：8 文件 143 用例、Biome 0 error；check 代理 PRD 七条 AC 逐项勾选通过；真实上游手工冒烟留待用户自验）
 
 
-## Session 3: 代理重试参数迁入 settings（管理台可调）
+## Session 8: 代理重试参数迁入 settings（管理台可调）
 
 **Date**: 2026-09-16
 **Task**: 代理重试参数迁入 settings（管理台可调）
@@ -240,7 +240,7 @@ Session summary was not supplied.
 - PUT 路由层校验暂无单测（需先解决 adminAuth mock 成本），属独立改进
 
 
-## Session 4: 令牌管理增强：长度提升 / 令牌级模型白名单 / 额度编辑
+## Session 9: 令牌管理增强：长度提升 / 令牌级模型白名单 / 额度编辑
 
 **Date**: 2026-09-16
 **Task**: 令牌管理增强：长度提升 / 令牌级模型白名单 / 额度编辑
