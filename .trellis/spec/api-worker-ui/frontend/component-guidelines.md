@@ -124,13 +124,15 @@ toast 出入场（350ms/250ms + `cubic-bezier(0.22,1,0.36,1)` + 16px rise + cros
 
 **边界**: key 必须表达「分支跨越」语义——同分支内 `setPath` 重渲染时 key 不变、动画不重播，这正是预期；hono dom renderer 对 `key !== undefined` 要求 key+tag 双匹配才复用节点（已实证 `dom/render.js`）。全站范围：不要给已有退场语义的组件（Modal/Drawer）改用此模式。
 
-### Gotcha: .t-view-enter / .t-page-enter 的恒留 transform 会为 fixed/absolute 后代创建 containing block
+### Gotcha: 入场动画类的恒留 transform 会为 fixed/absolute 后代创建 containing block（09-17 回归教训）
 
-> **Warning**: 入场动画类走 `transform + filter`，`fill-mode` 决定动画结束后是否恒留终帧：`.t-view-enter` 用 `both`（结束后保留 `transform/filter`），`.t-page-enter` 用 `backwards`（结束即释放）。恒留 transform 会使嵌套的 `fixed` 后代被包裹盒裁剪（`.t-modal` 同款问题），也会成为 `absolute` 后代的新锚点、创建 stacking context。
+> **Warning**: 入场动画类走 `transform + filter`，`fill-mode: both/forwards` 会在动画结束后**恒留** `transform: translateY(0)` + `filter: blur(0)`——非 `none` 值持续为后代创建 containing block：嵌套的 `fixed` 后代被包裹盒裁剪（`.t-modal` 同款问题），`absolute` 后代被重新锚定，且创建 stacking context。
 
-**fill-mode 选择规则**：包裹层子树内有 `fixed` 后代（抽屉/模态/ToastHost 等）→ 必须 `backwards`（先例：App.tsx 各页面分支，内含 Modal 壳与 AppLayout 固定抽屉）；确认子树无 fixed/absolute 外锚后代才可用 `both`（先例：renderContent 输出子树——浮层均已 portal 或为 AppLayout 兄弟节点）。新增动画类时先 grep 子树 `fixed` 再定 fill-mode。
+**fill-mode 选择规则（09-17 回归后修正，勿再按子树排查）**：enter-only 动画若终帧 = 元素自然静止态（本项目 `.t-view-enter` / `.t-page-enter` 均如此），**一律用 `backwards`**——delay=0 时首帧行为与 `both` 完全一致，结束后释放 transform/filter，无条件安全。`both`/`forwards` 仅当终帧 ≠ 自然态、需要持久化终帧时才考虑，且届时必须先实证子树内无 fixed/absolute 外锚后代。
 
-**规范**：`.t-view-enter` 子树内禁止直接写 `fixed` 浮层——浮层走 portal（先例：ModelAllowlistPicker）或提升为包裹层兄弟节点。若未来需要在动画子树内加 fixed 元素，必须同时把包裹层 fill-mode 改为 `backwards` 并评估退场闪烁。
+**回归先例（为何规则收紧）**：09-17 首版 `.t-view-enter` 曾用 `both`，check 阶段按「子树 grep fixed」判定安全（理由：模态是 AppLayout 兄弟节点）——但漏看了 Modal 壳不走 portal、各 View 的编辑弹窗（ChannelsView/TokensView/UsersView 等）都渲染在 renderContent 子树内，导致弹窗被关进内容区盒子并被 `<main overflow-hidden>` 裁剪。教训：**子树排查不可靠（嵌套层级深、后续新增组件不受控），优先选结构性安全的写法**。
+
+**纵深防御**：即便 fill-mode 已用 `backwards`，动画播放期间（250ms 内）transform 仍存在——若需要在动画包裹层子树内加 fixed 浮层，优先 portal（先例：ToastHost、ModelAllowlistPicker）或提升为包裹层兄弟节点。
 
 ### Convention: 加载态三件套，禁止再内联手写（09-17-ui-tab-transitions-skeleton 沉淀）
 

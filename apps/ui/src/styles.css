@@ -253,14 +253,15 @@
 	}
 }
 
+/* enter-only 动画统一用 backwards 而非 both:终帧(opacity 1 / translateY(0) / blur 0)
+   即元素自然静止态,delay=0 时首帧行为与 both 一致,结束后 transform/filter 回落 none。
+   若用 both 则恒留 transform+filter,使包裹层成为 fixed/absolute 后代的永久 containing block
+   ——视图内弹窗(Modal 壳不走 portal,渲染在 renderContent 子树内)会被关进内容区盒子并被
+   overflow-hidden 裁剪(先例:ChannelsView/TokensView 编辑弹窗,spec gotcha) */
 .t-view-enter {
-	animation: view-enter var(--view-enter-dur) var(--ease-smooth-out) both;
+	animation: view-enter var(--view-enter-dur) var(--ease-smooth-out) backwards;
 }
 
-/* page-enter 用 backwards 而非 both:页面包裹层含 fixed 抽屉/模态后代
-   (AppLayout/UserApp 移动端抽屉、公告 Modal),both 会在动画结束后恒留
-   transform+filter,使其成为 fixed 后代的永久 containing block(spec gotcha);
-   backwards 在 delay=0 时首帧行为与 both 一致,结束后 transform/filter 回落 none */
 .t-page-enter {
 	animation: page-enter var(--page-enter-dur) var(--ease-smooth-out) backwards;
 }
