@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
+- **Total Sessions**: 11
 - **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~311 | Active |
+| `journal-1.md` | ~333 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-09-17 | UI 选项卡过渡动画与骨架屏加载态（含 containing block 回归修复） | `5c610be`, `9059f72` | `main` |
 | 10 | 2026-09-17 | 用户端我的令牌与管理端令牌管理完全对齐 | `19c4da0` | `main` |
 | 9 | 2026-09-16 | 令牌管理增强：长度提升 / 令牌级模型白名单 / 额度编辑 | `fa0ea68`, `9e0bacc` | `main` |
 | 8 | 2026-09-16 | 代理重试参数迁入 settings（管理台可调） | `5f26fa4`, `8c587c9` | `main` |

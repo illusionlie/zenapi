@@ -309,3 +309,25 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: UI 选项卡过渡动画与骨架屏加载态（含 containing block 回归修复）
+
+**Date**: 2026-09-17
+**Task**: UI 选项卡过渡动画与骨架屏加载态（含 containing block 回归修复）
+**Branch**: `main`
+
+### Summary
+
+为 Admin/User 两端补齐全套过渡动效：tab 切换入场动画（.t-view-enter，250ms fade+4px+blur）、登录态整页过渡（.t-page-enter，400ms+16px）、页面标题同步淡入、ViewSkeleton 骨架屏（stats/table/form/generic 四变体+shimmer）替换主加载态静态文字、DotLoader 收拢三点 bounce 并升级 MonitoringView 两处零散加载态。技术路线：key 重挂载 + CSS animation（enter-only），绕开 Modal phase 状态机复杂度；spec 沉淀三条约定（key 重挂载动画模式 / containing block 脚枪 / 加载态三件套）。回归教训：.t-view-enter 首版用 fill-mode both 恒留 transform+filter，使 Modal 壳（不走 portal）在各 View 内的编辑弹窗被关进内容区盒子并被 overflow-hidden 裁剪；check 阶段『子树 grep fixed』排查漏看 View 层嵌套而误判安全。修复为 backwards 并收紧 spec 规则：enter-only 且终帧=自然态一律 backwards，废除子树排查法。Playwright 实测动画全生命周期 transform 状态与 fixed 探针视口锚定闭环。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5c610be` | (see git log) |
+| `9059f72` | (see git log) |
+
+### Status
+
+[OK] **Completed**
