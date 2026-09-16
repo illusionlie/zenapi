@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/tasks/09-16-token-management-enhancements/prd.md", "reason": "验收标准 AC1-AC9 来源"}
+{"file": ".trellis/tasks/09-16-token-management-enhancements/design.md", "reason": "三态 PATCH/白名单交集/长度参数化契约核对基准"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "worker 侧检查基准"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端侧检查基准"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "跨层数据流核对（列→注入→消费→响应→类型→回填）"}

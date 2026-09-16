@@ -1,0 +1,13 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/tasks/09-16-token-management-enhancements/research/codebase-facts.md", "reason": "代码事实基线：所有行号引用与现状清单"}
+{"file": ".trellis/tasks/09-16-token-management-enhancements/design.md", "reason": "本任务技术设计：D1-D9 契约与取舍"}
+{"file": ".trellis/spec/api-worker/backend/index.md", "reason": "worker 层规范总纲"}
+{"file": ".trellis/spec/api-worker/backend/database-guidelines.md", "reason": "迁移编号/schema.sql 同步规则（0020 迁移遵循）"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "invalid_{key} 错误码命名惯例（resolveTokenUpdate 400 语义）"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "worker 质量规范"}
+{"file": ".trellis/spec/api-worker-ui/frontend/index.md", "reason": "前端层规范总纲"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "Token 类型扩展规范"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "ModelAllowlistPicker 新组件规范"}
+{"file": ".trellis/spec/api-worker-ui/frontend/state-management.md", "reason": "editingToken/tokenForm 编辑态 state 规范"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "serializeAllowlist 下沉与 picker 抽取的复用决策依据"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "DB列→tokenAuth→proxy→API→UI 跨层数据流检查"}
