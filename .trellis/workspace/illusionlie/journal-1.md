@@ -288,3 +288,24 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+
+## Session 10: 用户端我的令牌与管理端令牌管理完全对齐
+
+**Date**: 2026-09-17
+**Task**: 用户端我的令牌与管理端令牌管理完全对齐
+**Branch**: `main`
+
+### Summary
+
+重构 UserTokensView 为管理端 TokensView 同款（Grid 表格/移动端卡片/药丸按钮/分页/sheet 模态，renderModelLimit 共享导出）；UserApp 增加前端切片分页与启停回调；worker 端 PATCH /api/u/tokens/:id 放开 status（新纯函数 resolveUserTokenUpdate 三态语义对齐管理端，forbidden 缩为 quota×2+allowed_channels）；移除渠道限定存量列；新增 13 条单测（202 全过）。playwright+curl 实测 AC1-AC7 全通过（停用令牌 403 token_disabled、非法 status 400 invalid_status）。spec 沉淀低权限 PATCH 子集 resolver 模式，修正 error-handling.md 过时先例。决策变更：推翻旧 D5.3 status admin-only，用户可启停自有令牌。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `19c4da0` | (see git log) |
+
+### Status
+
+[OK] **Completed**

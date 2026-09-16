@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
-- **Last Active**: 2026-09-16
+- **Total Sessions**: 10
+- **Last Active**: 2026-09-17
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~290 | Active |
+| `journal-1.md` | ~311 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-09-17 | 用户端我的令牌与管理端令牌管理完全对齐 | `19c4da0` | `main` |
 | 9 | 2026-09-16 | 令牌管理增强：长度提升 / 令牌级模型白名单 / 额度编辑 | `fa0ea68`, `9e0bacc` | `main` |
 | 8 | 2026-09-16 | 代理重试参数迁入 settings（管理台可调） | `5f26fa4`, `8c587c9` | `main` |
 | 7 | 2026-09-15 | 渠道模型测试（编辑弹窗内嵌真实请求测试 + 全局测试文本） | `43bbc34`, `6bd89d8` | `main` |
