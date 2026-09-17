@@ -1,0 +1,13 @@
+{"file": ".trellis/spec/api-worker/backend/proxy-headers.md", "reason": "头策略契约:applyHeaderPolicy 唯一入口、应用顺序、Playground 豁免语义、channel-testing 不收敛警告——伪装头接入必读"}
+{"file": ".trellis/spec/api-worker/backend/index.md", "reason": "后端规范索引:routes 薄壳 + services 下沉、挂载点约定"}
+{"file": ".trellis/spec/api-worker/backend/database-guidelines.md", "reason": "迁移文件编号规则与 schema.sql 同步要求(0021 迁移)"}
+{"file": ".trellis/spec/api-worker/frontend/component-guidelines.md", "reason": "ChannelsView 表单组件与文案风格(伪装分组 UI)"}
+{"file": ".trellis/spec/api-worker/frontend/type-safety.md", "reason": "前端类型链路:Channel/ChannelForm 两处同步"}
+{"file": ".trellis/tasks/09-17-channel-client-disguise/research/client-fingerprint-vscode.md", "reason": "Cline/Kilo Code 指纹报告:预设头与提示词数据来源(UI Step 5)"}
+{"file": ".trellis/tasks/09-17-channel-client-disguise/research/client-fingerprint-codex.md", "reason": "Codex 指纹报告:预设数据来源"}
+{"file": ".trellis/tasks/09-17-channel-client-disguise/research/client-fingerprint-cherry.md", "reason": "Cherry Studio 指纹报告:预设数据来源(纯头部)"}
+{"file": ".trellis/tasks/09-17-channel-client-disguise/research/client-fingerprint-pi.md", "reason": "pi 指纹报告:预设数据来源"}
+{"file": ".trellis/tasks/09-17-channel-client-disguise/research/client-fingerprint-zcode.md", "reason": "ZCode 指纹报告:预设数据来源"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "UI 真实规范:ChannelsView 表单组件与文案风格(伪装分组)"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "UI 真实规范:Channel/ChannelForm 类型链路"}
+{"file": ".trellis/spec/api-worker-ui/frontend/state-management.md", "reason": "UI 真实规范:AdminApp 表单状态与提交链路"}

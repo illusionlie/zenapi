@@ -331,3 +331,24 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+## Session 12: 渠道客户端伪装(请求头+系统提示词注入)
+
+**Date**: 2026-09-17
+**Task**: 09-17-channel-client-disguise
+**Branch**: `main`
+
+### Summary
+
+渠道级客户端伪装:渠道新增 disguise_headers_json / disguise_system_prompt 两列(0021 迁移),伪装头经 applyHeaderPolicy 第 4 可选参接入唯一策略链(剔除→全局→伪装→渠道级,policy=null 时伪装仍生效),提示词经新建 utils/client-disguise.ts 三协议前置注入(openai messages / anthropic system / responses instructions,含 /v1/responses 透传;custom 仅头)。6 个预设(Cline/Kilo/pi/ZCode/Codex/Cherry Studio)由三个研究代理从本机实装与官方仓库锚定版本提取,ZCode/Codex 按用户 D5 决策带「（测试）」标注。关键教训:①注入必须重建数组而非原地 mutate,否则重试轮/共享 parsedBody 会累积注入(测试用同输入两次调用逐字节断言护栏);②CherryStudio/{version} UA 是遥测特征而非 API 特征,按旧特征伪装反而失真——指纹必须以真实请求路径证据为准。质检修复:ZCode UA 补 AI SDK 复合后缀、预设 note 渲染补齐、proxy-headers.md spec 升级四层契约。**发现存量缺陷待清偿**:custom_headers 提交链路 `|| undefined` 在 PATCH 下「清空保存」无法真正清除(undefined=保留现值),伪装字段已用「表单即真相」语义规避,custom_headers 修复另立任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| (see git log) | feat(channels): 渠道客户端伪装 |
+| (see git log) | chore(task): task artifacts |
+
+### Status
+
+[OK] **Completed**(手动冒烟:真实上游验证留待部署前)

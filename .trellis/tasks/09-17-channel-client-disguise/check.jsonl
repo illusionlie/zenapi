@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/api-worker/backend/proxy-headers.md", "reason": "检查头策略顺序契约与零回归基线(25 用例不回退)"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "后端质量门禁:check/typecheck/test"}
+{"file": ".trellis/spec/api-worker/frontend/quality-guidelines.md", "reason": "前端质量门禁与禁则"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "UI 真实质量门禁"}
