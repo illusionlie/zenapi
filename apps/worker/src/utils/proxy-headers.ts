@@ -96,22 +96,31 @@ export async function loadProxyHeaderPolicy(
 
 /**
  * Applies the header policy to an upstream request Headers object in a
- * fixed order: remove (client pass-through) → global inject → channel-level
- * custom headers. Later appliers win, so channel-level overrides global,
- * and global overrides built-in headers (Authorization / x-api-key / ...).
+ * fixed order: remove (client pass-through) → global inject → channel
+ * disguise headers → channel-level custom headers. Later appliers win, so
+ * channel-level overrides disguise, disguise overrides global, and global
+ * overrides built-in headers (Authorization / x-api-key / ...).
  * With policy === null both global steps are skipped (Playground exemption)
- * while channel-level headers still apply.
+ * while disguise and channel-level headers still apply.
+ * Malformed disguise JSON is treated as an empty config (fail-open, PRD AC7).
  */
 export function applyHeaderPolicy(
 	headers: Headers,
 	policy: ProxyHeaderPolicy | null,
 	channelCustomJson: string | null | undefined,
+	disguiseJson?: string | null,
 ): void {
 	if (policy) {
 		for (const name of policy.removeHeaders) {
 			headers.delete(name);
 		}
 		for (const [key, value] of Object.entries(policy.extraHeaders)) {
+			headers.set(key, value);
+		}
+	}
+	if (disguiseJson) {
+		const disguiseHeaders = parseExtraHeaders(disguiseJson) ?? {};
+		for (const [key, value] of Object.entries(disguiseHeaders)) {
 			headers.set(key, value);
 		}
 	}

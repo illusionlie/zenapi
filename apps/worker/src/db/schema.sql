@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS channels (
   response_time_ms INTEGER,
   api_format TEXT NOT NULL DEFAULT 'openai',
   custom_headers_json TEXT,
+  disguise_headers_json TEXT,
+  disguise_system_prompt TEXT,
   stream_only INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

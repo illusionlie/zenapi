@@ -1,4 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import { parseDisguiseHeaders } from "../utils/client-disguise";
 import { safeJsonParse } from "../utils/json";
 import { nowIso } from "../utils/time";
 import { normalizeBaseUrl } from "../utils/url";
@@ -22,12 +23,16 @@ export type ChannelTestResult = {
  * If the server responds (any status), the channel is considered reachable.
  * Models are only populated when the endpoint returns a valid list.
  * For custom format, probes the base_url directly.
+ * Disguise headers (D4/AC5) are sent for every format, but the global header
+ * policy never applies here (spec: the probe must not converge onto
+ * applyHeaderPolicy — that would leak global inject/remove into probes).
  */
 export async function fetchChannelModels(
 	baseUrl: string,
 	apiKey: string,
 	apiFormat?: ChannelApiFormat,
 	customHeadersJson?: string | null,
+	disguiseHeadersJson?: string | null,
 ): Promise<ChannelTestResult> {
 	const format = apiFormat ?? "openai";
 
@@ -52,6 +57,14 @@ export async function fetchChannelModels(
 	} else {
 		headers.Authorization = `Bearer ${apiKey}`;
 		headers["x-api-key"] = apiKey;
+	}
+
+	// Disguise headers first, channel-level custom headers after (same
+	// "later applier wins" order as the proxy chain); malformed disguise
+	// JSON is treated as empty config (fail-open).
+	const disguiseHeaders = parseDisguiseHeaders(disguiseHeadersJson);
+	for (const [key, value] of Object.entries(disguiseHeaders)) {
+		headers[key] = value;
 	}
 
 	if (format === "custom" && customHeadersJson) {

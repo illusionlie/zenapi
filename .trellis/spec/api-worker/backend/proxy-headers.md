@@ -27,11 +27,16 @@ export function applyHeaderPolicy(
 	headers: Headers,
 	policy: ProxyHeaderPolicy | null,
 	channelCustomJson: string | null | undefined,
+	disguiseJson?: string | null, // 渠道伪装头（09-17-channel-client-disguise），非法 JSON 按空配置
 ): void;
 
-// buildChannelRequest 第 9 参（可选，默认 null）
+// 系统提示词注入（同一任务的姊妹契约）：utils/client-disguise.ts
+// injectSystemPromptOpenAI / injectSystemPromptAnthropic / injectSystemPromptResponses
+// —— 均为 fail-open 纯函数（空 prompt no-op，未知形态不损坏请求）
+
+// buildChannelRequest 第 9 / 10 参（可选，默认 null）
 buildChannelRequest(channel, targetPath, querySuffix, incomingHeaders,
-	requestText, parsedBody, isStream, apiKey?, policy?)
+	requestText, parsedBody, isStream, apiKey?, policy?, disguisePrompt?)
 ```
 
 ### 3. Contracts
@@ -47,6 +52,13 @@ buildChannelRequest(channel, targetPath, querySuffix, incomingHeaders,
   `ui core/types.ts (Settings + SettingsForm)` → `core/constants.ts initialSettingsForm` →
   `AdminApp.tsx (loadSettings ?? "" 映射 + handleSettingsSubmit)` → `SettingsView.tsx` 表单。
 - KV 键常量单点定义于 `utils/proxy-headers.ts`，service/route 引用常量，不要散落字符串字面量。
+- 渠道伪装头（`channels.disguise_headers_json`，09-17 任务）：由 `applyHeaderPolicy` 第 4 参
+  统一注入，应用顺序固定为 **剔除 → 全局注入 → 伪装头 → 渠道级 custom_headers**（后应用者赢，
+  伪装可覆盖全局与内置头、可被渠道级覆盖）。非法 JSON 按空配置（fail-open），绝不阻断代理请求。
+  `policy === null`（Playground / test-model 豁免）时**伪装头与渠道级仍生效**，仅跳过全局两步。
+- 伪装提示词（`channels.disguise_system_prompt`）不在本契约内：经 `utils/client-disguise.ts`
+  三协议注入函数在 `buildChannelRequest` / `anthropic-proxy.ts` 各分支注入（**前置为首条 system**；
+  custom 格式不解释 body）；`/v1/models` 连通性测试无 body 不注入提示词。
 
 ### 4. Validation & Error Matrix
 
@@ -65,10 +77,14 @@ buildChannelRequest(channel, targetPath, querySuffix, incomingHeaders,
 
 ### 6. Tests Required
 
-`tests/proxy-headers.test.ts`（25 用例）断言点：
+`tests/proxy-headers.test.ts`（30 用例）断言点：
 - parse 容错矩阵（null / 空串 / 标量 / 值非字符串 / 非数组）。
-- `applyHeaderPolicy` 顺序：剔除 → 全局注入 → 渠道级；policy=null 仅渠道级；大小写不敏感删除。
-- `buildChannelRequest` 三格式 ×（policy 注入 + 渠道级覆盖）矩阵；不传 policy 的零回归基线。
+- `applyHeaderPolicy` 顺序：剔除 → 全局注入 → 伪装头 → 渠道级；policy=null 时伪装与渠道级仍生效；
+  伪装非法 JSON 容错；大小写不敏感删除。
+- `buildChannelRequest` 三格式 ×（policy 注入 + 渠道级覆盖）矩阵；不传 policy / 不传新参的零回归基线。
+
+伪装注入另有 `tests/client-disguise.test.ts`（21 用例）：三协议注入函数全分支、
+`buildChannelRequest` 八分支接线矩阵（含同输入两次调用逐字节一致的重试不累积断言）、零回归基线。
 
 ### 7. Wrong vs Correct
 
@@ -107,6 +123,17 @@ applyHeaderPolicy(headers, policy, channel.custom_headers_json);
 > **Warning：连通性测试 / 拉取模型（`channel-testing.ts`）不走本策略。**
 > `fetchChannelModels` 保持自己的 custom-only 渠道级 merge——若强行收敛到
 > `applyHeaderPolicy`，openai/anthropic 渠道的连通性测试会开始带渠道级头，属行为外溢。
+> 伪装头（09-17）是在其现有 merge 旁**内联新增**的（伪装先应用、custom 后应用），
+> 同样不收敛——`fetchChannelModels` 至今不调用 `applyHeaderPolicy` 是刻意的。
+
+> **Warning：`policy === null` 只豁免全局两步。**
+> 伪装头与渠道级 custom 在 policy=null 时照常生效（Playground / test-model 依赖此语义
+> 完整应用渠道伪装，D4 决策）；给豁免调用方新增「跳过伪装」语义前先查 PRD。
+
+> **Warning：伪装提示词注入不得原地修改共享 parsedBody。**
+> 同一 parsedBody 跨重试轮 / 跨渠道复用；openai 透传与 anthropic-proxy 各分支注入时
+> 必须浅拷贝（messages 数组一并克隆）或使用转换后的 fresh body，否则多轮重试会累积
+> 重复 system（client-disguise.test.ts 有同输入两次调用逐字节一致的守护断言）。
 
 ---
 

@@ -324,3 +324,75 @@ describe("buildChannelRequest header policy matrix", () => {
 		expect(headers.get("x-trace-id")).toBeNull();
 	});
 });
+
+describe("applyHeaderPolicy disguise headers (channel client disguise)", () => {
+	const policy: ProxyHeaderPolicy = {
+		extraHeaders: { "X-Trace-Id": "global" },
+		removeHeaders: [],
+	};
+
+	it("applies disguise between global and channel level (last wins, D3 order)", () => {
+		const headers = new Headers();
+		applyHeaderPolicy(
+			headers,
+			policy,
+			'{"X-Trace-Id":"channel","X-Channel":"1"}',
+			'{"X-Trace-Id":"disguise","X-Disguise":"1"}',
+		);
+		expect(headers.get("x-trace-id")).toBe("channel");
+		expect(headers.get("x-disguise")).toBe("1");
+		expect(headers.get("x-channel")).toBe("1");
+	});
+
+	it("disguise headers override built-in headers and global injection", () => {
+		const headers = new Headers({ authorization: "Bearer built-in" });
+		applyHeaderPolicy(
+			headers,
+			policy,
+			null,
+			'{"Authorization":"Bearer disguise","User-Agent":"cli/1"}',
+		);
+		expect(headers.get("authorization")).toBe("Bearer disguise");
+		expect(headers.get("user-agent")).toBe("cli/1");
+		expect(headers.get("x-trace-id")).toBe("global");
+	});
+
+	it("with null policy, disguise and channel-level headers still apply (AC3)", () => {
+		const headers = new Headers({ "user-agent": "client" });
+		applyHeaderPolicy(
+			headers,
+			null,
+			'{"X-Channel":"1"}',
+			'{"User-Agent":"disguise/1","X-Disguise":"1"}',
+		);
+		expect(headers.get("user-agent")).toBe("disguise/1");
+		expect(headers.get("x-disguise")).toBe("1");
+		expect(headers.get("x-channel")).toBe("1");
+		// global inject did not run under null policy
+		expect(headers.get("x-trace-id")).toBeNull();
+	});
+
+	it("ignores malformed disguise JSON without touching headers (AC7)", () => {
+		const headers = new Headers({ authorization: "Bearer x" });
+		applyHeaderPolicy(headers, null, null, "{");
+		applyHeaderPolicy(headers, null, null, "not-json");
+		applyHeaderPolicy(headers, null, null, "[1]");
+		applyHeaderPolicy(headers, null, null, '{"a":1}');
+		applyHeaderPolicy(headers, null, null, "");
+		applyHeaderPolicy(headers, null, null, null);
+		applyHeaderPolicy(headers, null, null, undefined);
+		expect(headers.get("authorization")).toBe("Bearer x");
+	});
+
+	it("fourth param omitted behaves exactly like before (zero regression)", () => {
+		const headers = new Headers({ "user-agent": "client" });
+		applyHeaderPolicy(
+			headers,
+			{ extraHeaders: { "X-Trace-Id": "global" }, removeHeaders: [] },
+			'{"X-Channel":"1"}',
+		);
+		expect(headers.get("x-trace-id")).toBe("global");
+		expect(headers.get("x-channel")).toBe("1");
+		expect(headers.get("user-agent")).toBe("client");
+	});
+});

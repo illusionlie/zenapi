@@ -46,6 +46,8 @@ export const initialChannelForm: ChannelForm = {
 	weight: 1,
 	api_format: "openai",
 	custom_headers: "",
+	disguise_headers: "",
+	disguise_system_prompt: "",
 	models: "",
 };
 

@@ -25,6 +25,11 @@ import {
 import { calculateCost, getModelPrice } from "../services/pricing";
 import { loadProxyRetryConfig } from "../services/settings";
 import { recordUsage } from "../services/usage";
+import {
+	injectSystemPromptAnthropic,
+	injectSystemPromptOpenAI,
+	injectSystemPromptResponses,
+} from "../utils/client-disguise";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
@@ -139,7 +144,11 @@ function isConvertedChatPath(path: string): boolean {
  * Builds per-channel fetch target and body based on channel api_format.
  * Returns the target URL, headers, and request body.
  * policy 为 null 时跳过全局注入/剔除（Playground 豁免），渠道级 custom_headers
- * 经 applyHeaderPolicy 统一在三种格式分支生效（剔除 → 全局注入 → 渠道级）。
+ * 与伪装头经 applyHeaderPolicy 统一在各格式分支生效（剔除 → 全局注入 →
+ * 伪装头 → 渠道级）。disguisePrompt 为渠道伪装系统提示词（design §3.1 矩阵）：
+ * openai 透传仅 chat 入站注入（messages 为数组时，mutate 后重新 stringify）；
+ * anthropic / responses 分支转换完成后注入；/v1/responses 透传注入
+ * instructions；custom 分支不解释 body 仅注入头。
  */
 export function buildChannelRequest(
 	channel: ChannelRecord,
@@ -151,6 +160,7 @@ export function buildChannelRequest(
 	isStream: boolean,
 	apiKey?: string,
 	policy?: ProxyHeaderPolicy | null,
+	disguisePrompt?: string | null,
 ): { target: string; headers: Headers; body: string | undefined } {
 	const effectiveKey = apiKey ?? channel.api_key;
 	const apiFormat = channel.api_format ?? "openai";
@@ -166,13 +176,27 @@ export function buildChannelRequest(
 		headers.set("anthropic-version", "2023-06-01");
 		headers.set("content-type", "application/json");
 		headers.delete("Authorization");
-		applyHeaderPolicy(headers, headerPolicy, channel.custom_headers_json);
+		applyHeaderPolicy(
+			headers,
+			headerPolicy,
+			channel.custom_headers_json,
+			channel.disguise_headers_json,
+		);
 
 		const anthropicBody = parsedBody
 			? openaiToAnthropicRequest(parsedBody)
 			: {};
 		if (isStream) {
 			(anthropicBody as Record<string, unknown>).stream = true;
+		}
+		// Disguise prompt (#2, design §3.1): inject after conversion — the
+		// converted body is fresh per call, so mutating it cannot leak across
+		// retry rounds or channels.
+		if (disguisePrompt && parsedBody) {
+			injectSystemPromptAnthropic(
+				anthropicBody as Record<string, unknown>,
+				disguisePrompt,
+			);
 		}
 		return { target, headers, body: JSON.stringify(anthropicBody) };
 	}
@@ -185,9 +209,18 @@ export function buildChannelRequest(
 		let body: string | undefined;
 		if (lower.startsWith("/v1/responses")) {
 			// Responses inbound: pass through untouched (R4) — ZenAPI does not
-			// interpret store / previous_response_id etc.; state lives upstream
+			// interpret store / previous_response_id etc.; state lives upstream.
+			// Disguise prompt (#4, design §3.1) still injects into `instructions`
+			// via a per-call shallow copy so the caller's parsed body stays
+			// pristine across retry rounds and channels.
 			target = cfSafeUrl(`${baseUrl}/responses${querySuffix}`);
-			body = requestText || undefined;
+			if (disguisePrompt && parsedBody) {
+				const bodyCopy: Record<string, unknown> = { ...parsedBody };
+				injectSystemPromptResponses(bodyCopy, disguisePrompt);
+				body = JSON.stringify(bodyCopy);
+			} else {
+				body = requestText || undefined;
+			}
 		} else if (isChatPath(lower)) {
 			// Chat inbound: convert the chat completion request into a Responses
 			// request (the converter drops stream_options and other unsupported
@@ -199,6 +232,14 @@ export function buildChannelRequest(
 			if (isStream) {
 				(responsesBody as Record<string, unknown>).stream = true;
 			}
+			// Disguise prompt (#3, design §3.1): converted body is fresh per
+			// call — inject instructions directly.
+			if (disguisePrompt && parsedBody) {
+				injectSystemPromptResponses(
+					responsesBody as Record<string, unknown>,
+					disguisePrompt,
+				);
+			}
 			body = JSON.stringify(responsesBody);
 		} else {
 			// Non-chat passthrough paths follow the openai rules
@@ -208,7 +249,12 @@ export function buildChannelRequest(
 		}
 		headers.set("Authorization", `Bearer ${effectiveKey}`);
 		headers.set("x-api-key", String(effectiveKey));
-		applyHeaderPolicy(headers, headerPolicy, channel.custom_headers_json);
+		applyHeaderPolicy(
+			headers,
+			headerPolicy,
+			channel.custom_headers_json,
+			channel.disguise_headers_json,
+		);
 		return { target, headers, body };
 	}
 
@@ -217,7 +263,14 @@ export function buildChannelRequest(
 		const target = cfSafeUrl(`${channel.base_url}${querySuffix}`);
 		headers.set("Authorization", `Bearer ${effectiveKey}`);
 		headers.set("x-api-key", String(effectiveKey));
-		applyHeaderPolicy(headers, headerPolicy, channel.custom_headers_json);
+		// Disguise prompt NOT injected (#5, design §3.1): body structure is
+		// unknown, blind edits could corrupt the request — headers only.
+		applyHeaderPolicy(
+			headers,
+			headerPolicy,
+			channel.custom_headers_json,
+			channel.disguise_headers_json,
+		);
 		return { target, headers, body: requestText || undefined };
 	}
 
@@ -228,8 +281,32 @@ export function buildChannelRequest(
 	const target = cfSafeUrl(`${baseUrl}${subPath}${querySuffix}`);
 	headers.set("Authorization", `Bearer ${effectiveKey}`);
 	headers.set("x-api-key", String(effectiveKey));
-	applyHeaderPolicy(headers, headerPolicy, channel.custom_headers_json);
-	return { target, headers, body: requestText || undefined };
+	applyHeaderPolicy(
+		headers,
+		headerPolicy,
+		channel.custom_headers_json,
+		channel.disguise_headers_json,
+	);
+	// Disguise prompt (#1, design §3.1): chat inbound only — inject into a
+	// per-call copy of the parsed body (messages array cloned) so the caller's
+	// shared parsed body never accumulates injections across retry rounds and
+	// channels. Embeddings and other bodies without a messages array pass
+	// through untouched, same as the stream_options injection precedent.
+	let body: string | undefined = requestText || undefined;
+	if (
+		disguisePrompt &&
+		parsedBody &&
+		isConvertedChatPath(targetPath) &&
+		Array.isArray(parsedBody.messages)
+	) {
+		const bodyCopy: Record<string, unknown> = {
+			...parsedBody,
+			messages: [...parsedBody.messages],
+		};
+		injectSystemPromptOpenAI(bodyCopy, disguisePrompt);
+		body = JSON.stringify(bodyCopy);
+	}
+	return { target, headers, body };
 }
 
 /**
@@ -629,6 +706,7 @@ proxy.all("/*", tokenAuth, async (c) => {
 					isStream,
 					apiKey,
 					headerPolicy,
+					channel.disguise_system_prompt ?? null,
 				);
 
 				try {

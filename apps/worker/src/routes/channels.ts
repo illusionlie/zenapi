@@ -52,6 +52,8 @@ type ChannelPayload = {
 	models?: unknown[];
 	api_format?: string;
 	custom_headers?: string;
+	disguise_headers?: string;
+	disguise_system_prompt?: string;
 	model_aliases?: Record<string, AliasConfig>;
 };
 
@@ -143,6 +145,8 @@ channels.post("/", async (c) => {
 	const now = nowIso();
 	const apiFormat = (body.api_format ?? "openai") as ChannelApiFormat;
 	const customHeadersJson = body.custom_headers?.trim() || null;
+	const disguiseHeadersJson = body.disguise_headers?.trim() || null;
+	const disguiseSystemPrompt = body.disguise_system_prompt?.trim() || null;
 
 	await insertChannel(c.env.DB, {
 		id,
@@ -162,6 +166,8 @@ channels.post("/", async (c) => {
 		metadata_json: null,
 		api_format: apiFormat,
 		custom_headers_json: customHeadersJson,
+		disguise_headers_json: disguiseHeadersJson,
+		disguise_system_prompt: disguiseSystemPrompt,
 		created_at: now,
 		updated_at: now,
 	});
@@ -211,6 +217,15 @@ channels.patch("/:id", async (c) => {
 		body.custom_headers !== undefined
 			? body.custom_headers?.trim() || null
 			: (current.custom_headers_json ?? null);
+	// 三态语义照抄 custom_headers：undefined 保留现值，具体值（含空串）trim 后覆盖
+	const disguiseHeadersJson =
+		body.disguise_headers !== undefined
+			? body.disguise_headers?.trim() || null
+			: (current.disguise_headers_json ?? null);
+	const disguiseSystemPrompt =
+		body.disguise_system_prompt !== undefined
+			? body.disguise_system_prompt?.trim() || null
+			: (current.disguise_system_prompt ?? null);
 	const baseUrl =
 		apiFormat === "anthropic"
 			? normalizeBaseUrl(String(body.base_url ?? current.base_url))
@@ -232,6 +247,8 @@ channels.patch("/:id", async (c) => {
 		metadata_json: current.metadata_json ?? null,
 		api_format: apiFormat,
 		custom_headers_json: customHeadersJson,
+		disguise_headers_json: disguiseHeadersJson,
+		disguise_system_prompt: disguiseSystemPrompt,
 		updated_at: nowIso(),
 	});
 
@@ -289,6 +306,7 @@ channels.post("/fetch_models", async (c) => {
 		apiKey,
 		apiFormat,
 		body.custom_headers?.trim() || null,
+		body.disguise_headers?.trim() || null,
 	);
 
 	if (!result.ok) {
@@ -304,6 +322,8 @@ type ModelTestPayload = {
 	api_key?: string;
 	api_format?: string;
 	custom_headers?: string;
+	disguise_headers?: string;
+	disguise_system_prompt?: string;
 	model?: string;
 	text?: string;
 };
@@ -367,14 +387,22 @@ channels.post("/test-model", async (c) => {
 		body?.custom_headers !== undefined
 			? body.custom_headers?.trim() || null
 			: (dbChannel?.custom_headers_json ?? null);
+	const disguiseHeadersJson =
+		body?.disguise_headers !== undefined
+			? body.disguise_headers?.trim() || null
+			: (dbChannel?.disguise_headers_json ?? null);
+	const disguiseSystemPrompt =
+		body?.disguise_system_prompt !== undefined
+			? body.disguise_system_prompt?.trim() || null
+			: (dbChannel?.disguise_system_prompt ?? null);
 	const text =
 		typeof body?.text === "string" && body.text.trim().length > 0
 			? body.text
 			: await getModelTestPrompt(c.env.DB);
 
 	// Minimal ChannelRecord: buildChannelRequest only reads base_url /
-	// api_key / api_format / custom_headers_json (plus typing-required
-	// identity fields).
+	// api_key / api_format / custom_headers_json / disguise_*（plus typing-required
+	// identity fields）.
 	const channelLike: ChannelRecord = {
 		id: dbChannel?.id ?? "model-test",
 		name: dbChannel?.name ?? "model-test",
@@ -384,6 +412,8 @@ channels.post("/test-model", async (c) => {
 		status: dbChannel?.status ?? "active",
 		api_format: apiFormat,
 		custom_headers_json: customHeadersJson,
+		disguise_headers_json: disguiseHeadersJson,
+		disguise_system_prompt: disguiseSystemPrompt,
 	};
 
 	const { bodyText, parsedBody } = buildModelTestRequestBody(model, text);
@@ -406,6 +436,7 @@ channels.post("/test-model", async (c) => {
 		false,
 		upstreamKey,
 		null,
+		disguiseSystemPrompt,
 	);
 
 	const start = Date.now();
@@ -453,6 +484,7 @@ channels.post("/:id/test", async (c) => {
 		parseApiKeys(String(channel.api_key))[0] ?? String(channel.api_key),
 		channel.api_format,
 		channel.custom_headers_json,
+		channel.disguise_headers_json ?? null,
 	);
 
 	if (!result.ok) {

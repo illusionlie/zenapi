@@ -15,6 +15,10 @@ import {
 import { calculateCost, getModelPrice } from "../services/pricing";
 import { loadProxyRetryConfig } from "../services/settings";
 import { recordUsage } from "../services/usage";
+import {
+	injectSystemPromptAnthropic,
+	injectSystemPromptOpenAI,
+} from "../utils/client-disguise";
 import { jsonError } from "../utils/http";
 import { safeJsonParse } from "../utils/json";
 import { parseApiKeys, shuffleArray } from "../utils/keys";
@@ -186,6 +190,7 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 		for (const channel of ordered) {
 			lastChannel = channel;
 			const apiFormat = channel.api_format ?? "openai";
+			const disguisePrompt = channel.disguise_system_prompt ?? null;
 			const keys = shuffleArray(parseApiKeys(channel.api_key));
 			let channelRetryable = false;
 
@@ -232,12 +237,29 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 							headers,
 							headerPolicy,
 							channel.custom_headers_json,
+							channel.disguise_headers_json,
 						);
+
+						// Disguise prompt (#6, design §3.1): inject into a per-attempt
+						// copy of the parsed Anthropic body via the same stringify chain
+						// as effectiveRequestText. Without a prompt the original text
+						// passes through byte-identical (zero regression).
+						let upstreamBody = channelRequestText;
+						if (disguisePrompt && parsedBody) {
+							const bodyCopy: Record<string, unknown> = { ...parsedBody };
+							if (channelModelName !== effectiveModel) {
+								// Per-channel alias matched: carry the alias-resolved model
+								// like the channelRequestText stringify chain does.
+								bodyCopy.model = channelModelName;
+							}
+							injectSystemPromptAnthropic(bodyCopy, disguisePrompt);
+							upstreamBody = JSON.stringify(bodyCopy);
+						}
 
 						response = await fetch(target, {
 							method: "POST",
 							headers,
-							body: channelRequestText,
+							body: upstreamBody,
 						});
 
 						if (response.ok) {
@@ -257,11 +279,22 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 							headers,
 							headerPolicy,
 							channel.custom_headers_json,
+							channel.disguise_headers_json,
 						);
 
-						const bodyToSend = channelOpenaiBody
+						let bodyToSend = channelOpenaiBody
 							? JSON.stringify(channelOpenaiBody)
 							: channelRequestText;
+						// Disguise prompt (#7, design §3.1): inject into a per-attempt
+						// shallow copy — the inject function only assigns top-level
+						// fields, so the shared converted body is never mutated.
+						if (disguisePrompt && channelOpenaiBody) {
+							const openaiCopy: Record<string, unknown> = {
+								...channelOpenaiBody,
+							};
+							injectSystemPromptOpenAI(openaiCopy, disguisePrompt);
+							bodyToSend = JSON.stringify(openaiCopy);
+						}
 
 						response = await fetch(target, {
 							method: "POST",
@@ -306,10 +339,12 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 						headers.set("Authorization", `Bearer ${apiKey}`);
 						headers.set("x-api-key", String(apiKey));
 						headers.set("content-type", "application/json");
+						// custom (#8, design §3.1): body forwarded as-is, headers only
 						applyHeaderPolicy(
 							headers,
 							headerPolicy,
 							channel.custom_headers_json,
+							channel.disguise_headers_json,
 						);
 
 						response = await fetch(target, {

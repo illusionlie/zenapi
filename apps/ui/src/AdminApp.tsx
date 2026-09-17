@@ -437,6 +437,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				weight: channel.weight ?? 1,
 				api_format: channel.api_format ?? "openai",
 				custom_headers: channel.custom_headers_json ?? "",
+				disguise_headers: channel.disguise_headers_json ?? "",
+				disguise_system_prompt: channel.disguise_system_prompt ?? "",
 				models: modelsList,
 			});
 			// Initialize alias state from per-channel alias map for this channel's models
@@ -517,6 +519,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					weight: Number(channelForm.weight),
 					api_format: channelForm.api_format,
 					custom_headers: channelForm.custom_headers.trim() || undefined,
+					// 伪装字段恒传 trim 后的字符串：PATCH 空串 = 清除现值（AC1 清空保存即关闭伪装）
+					disguise_headers: channelForm.disguise_headers.trim(),
+					disguise_system_prompt: channelForm.disguise_system_prompt.trim(),
 					models: modelsArray.length > 0 ? modelsArray : undefined,
 					model_aliases:
 						Object.keys(aliasPayload).length > 0 ? aliasPayload : undefined,
@@ -677,6 +682,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					api_key: channelForm.api_key.trim(),
 					api_format: channelForm.api_format,
 					custom_headers: channelForm.custom_headers.trim() || undefined,
+					disguise_headers: channelForm.disguise_headers.trim(),
+					disguise_system_prompt: channelForm.disguise_system_prompt.trim(),
 				}),
 			});
 			setFetchedModels(result.models);
@@ -792,6 +799,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 						api_key: channelForm.api_key.trim(),
 						api_format: channelForm.api_format,
 						custom_headers: channelForm.custom_headers.trim(),
+						disguise_headers: channelForm.disguise_headers.trim(),
+						disguise_system_prompt: channelForm.disguise_system_prompt.trim(),
 						model,
 						text,
 					}),

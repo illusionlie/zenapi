@@ -17,6 +17,8 @@ export type ChannelRow = {
 	response_time_ms?: number | null;
 	api_format: ChannelApiFormat;
 	custom_headers_json?: string | null;
+	disguise_headers_json?: string | null;
+	disguise_system_prompt?: string | null;
 	stream_only?: number | null;
 	created_at?: string | null;
 	updated_at?: string | null;

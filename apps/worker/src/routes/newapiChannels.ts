@@ -295,6 +295,8 @@ newapi.post("/", async (c) => {
 		metadata_json: parsed.metadata_json ?? null,
 		api_format: "openai",
 		custom_headers_json: null,
+		disguise_headers_json: null,
+		disguise_system_prompt: null,
 		created_at: now,
 		updated_at: now,
 	});
@@ -347,6 +349,8 @@ newapi.put("/", async (c) => {
 			(current.api_format as "openai" | "anthropic" | "custom" | "responses") ??
 			"openai",
 		custom_headers_json: current.custom_headers_json ?? null,
+		disguise_headers_json: current.disguise_headers_json ?? null,
+		disguise_system_prompt: current.disguise_system_prompt ?? null,
 		updated_at: nowIso(),
 	});
 

@@ -153,6 +153,8 @@ export type ChannelInsertInput = {
 	metadata_json: string | null;
 	api_format: ChannelApiFormat;
 	custom_headers_json: string | null;
+	disguise_headers_json: string | null;
+	disguise_system_prompt: string | null;
 	created_at: string;
 	updated_at: string;
 };
@@ -163,7 +165,7 @@ export async function insertChannel(
 ): Promise<void> {
 	await db
 		.prepare(
-			"INSERT INTO channels (id, name, base_url, api_key, weight, status, rate_limit, models_json, type, group_name, priority, metadata_json, api_format, custom_headers_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO channels (id, name, base_url, api_key, weight, status, rate_limit, models_json, type, group_name, priority, metadata_json, api_format, custom_headers_json, disguise_headers_json, disguise_system_prompt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		)
 		.bind(
 			input.id,
@@ -180,6 +182,8 @@ export async function insertChannel(
 			input.metadata_json,
 			input.api_format,
 			input.custom_headers_json,
+			input.disguise_headers_json,
+			input.disguise_system_prompt,
 			input.created_at,
 			input.updated_at,
 		)
@@ -200,6 +204,8 @@ export type ChannelUpdateInput = {
 	metadata_json: string | null;
 	api_format: ChannelApiFormat;
 	custom_headers_json: string | null;
+	disguise_headers_json: string | null;
+	disguise_system_prompt: string | null;
 	updated_at: string;
 };
 
@@ -210,7 +216,7 @@ export async function updateChannel(
 ): Promise<void> {
 	await db
 		.prepare(
-			"UPDATE channels SET name = ?, base_url = ?, api_key = ?, weight = ?, status = ?, rate_limit = ?, models_json = ?, type = ?, group_name = ?, priority = ?, metadata_json = ?, api_format = ?, custom_headers_json = ?, updated_at = ? WHERE id = ?",
+			"UPDATE channels SET name = ?, base_url = ?, api_key = ?, weight = ?, status = ?, rate_limit = ?, models_json = ?, type = ?, group_name = ?, priority = ?, metadata_json = ?, api_format = ?, custom_headers_json = ?, disguise_headers_json = ?, disguise_system_prompt = ?, updated_at = ? WHERE id = ?",
 		)
 		.bind(
 			input.name,
@@ -226,6 +232,8 @@ export async function updateChannel(
 			input.metadata_json,
 			input.api_format,
 			input.custom_headers_json,
+			input.disguise_headers_json,
+			input.disguise_system_prompt,
 			input.updated_at,
 			id,
 		)

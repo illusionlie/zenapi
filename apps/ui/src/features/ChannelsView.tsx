@@ -5,6 +5,7 @@ import {
 	useRef,
 	useState,
 } from "hono/jsx/dom";
+import { CLIENT_PRESETS, type ClientPreset } from "../core/client-presets";
 import type {
 	Channel,
 	ChannelApiFormat,
@@ -333,12 +334,16 @@ export const ChannelsView = ({
 	// 弹窗打开沿重置：文本回 settings 默认、清空勾选与搜索（运行中可临时改，
 	// 不写回设置）
 	const wasModalOpenRef = useRef(false);
+	const [disguiseHeadersInvalid, setDisguiseHeadersInvalid] = useState(false);
+	const [appliedPresetId, setAppliedPresetId] = useState<string | null>(null);
 	useEffect(() => {
 		if (isChannelModalOpen && !wasModalOpenRef.current) {
 			setModelTestText(modelTestPrompt);
 			setSelectedTestModels(new Set());
 			setTestSearch("");
 			setModelTestExpanded(false);
+			setDisguiseHeadersInvalid(false);
+			setAppliedPresetId(null);
 		}
 		wasModalOpenRef.current = isChannelModalOpen;
 	}, [isChannelModalOpen, modelTestPrompt]);
@@ -499,6 +504,46 @@ export const ChannelsView = ({
 		},
 		[channelAliasState, onChannelAliasStateChange],
 	);
+
+	// —— 客户端伪装（纯 UI 交互：预设覆盖填充 / JSON 失焦校验 / 清空） ——
+	const applyPreset = useCallback(
+		(preset: ClientPreset) => {
+			onFormChange({
+				disguise_headers: JSON.stringify(preset.headers, null, 2),
+				disguise_system_prompt: preset.systemPrompt,
+			});
+			setAppliedPresetId(preset.id);
+			setDisguiseHeadersInvalid(false);
+		},
+		[onFormChange],
+	);
+
+	const validateDisguiseHeaders = useCallback(() => {
+		const text = channelForm.disguise_headers.trim();
+		if (text === "") {
+			setDisguiseHeadersInvalid(false);
+			return;
+		}
+		try {
+			const parsed: unknown = JSON.parse(text);
+			setDisguiseHeadersInvalid(
+				typeof parsed !== "object" || parsed === null || Array.isArray(parsed),
+			);
+		} catch {
+			setDisguiseHeadersInvalid(true);
+		}
+	}, [channelForm.disguise_headers]);
+
+	const clearDisguise = useCallback(() => {
+		onFormChange({ disguise_headers: "", disguise_system_prompt: "" });
+		setAppliedPresetId(null);
+		setDisguiseHeadersInvalid(false);
+	}, [onFormChange]);
+
+	// 最近一次选中预设的快照说明（note：来源锚点 / 版本锦点 / 省略头与动态段），小字展示
+	const appliedPresetNote = appliedPresetId
+		? (CLIENT_PRESETS.find((p) => p.id === appliedPresetId)?.note ?? null)
+		: null;
 	return (
 		<div class="space-y-5">
 			<div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-lg">
@@ -1112,6 +1157,121 @@ export const ChannelsView = ({
 							对所有 API
 							格式生效。同名头覆盖系统设置中的全局注入头与内置鉴权头。
 						</p>
+					</div>
+					{/* 客户端伪装：预设选中即覆盖填充两字段（存储解析后的具体值，可再手工微调） */}
+					<div class="rounded-lg border border-stone-200 bg-stone-50 p-3">
+						<div class="mb-2.5 flex items-center justify-between gap-2">
+							<p class="text-xs font-medium uppercase tracking-widest text-stone-400">
+								客户端伪装
+							</p>
+							<button
+								type="button"
+								class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-700"
+								onClick={clearDisguise}
+							>
+								清除伪装
+							</button>
+						</div>
+						<div class="mb-2.5">
+							<label
+								class="mb-1 block text-xs uppercase tracking-widest text-stone-400"
+								for="channel-disguise-preset"
+							>
+								预设客户端
+							</label>
+							<select
+								class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+								id="channel-disguise-preset"
+								value=""
+								onChange={(event) => {
+									const id = (event.currentTarget as HTMLSelectElement).value;
+									const preset = CLIENT_PRESETS.find((p) => p.id === id);
+									if (preset) applyPreset(preset);
+								}}
+							>
+								<option value="">选择预设客户端…</option>
+								{CLIENT_PRESETS.map((preset) => (
+									<option key={preset.id} value={preset.id}>
+										{preset.name}
+										{preset.testing ? "（测试）" : ""}
+									</option>
+								))}
+							</select>
+							<p class="mt-1 text-xs text-stone-400">
+								选中预设即用其快照值覆盖填充下方两字段（可再手工微调）；（测试）=
+								指纹存在未验证环节，建议实测验证后再投入使用。
+							</p>
+							{appliedPresetNote && (
+								<p class="mt-1 text-xs leading-relaxed text-stone-400">
+									预设快照说明：{appliedPresetNote}
+								</p>
+							)}
+						</div>
+						<div class="mb-2.5">
+							<label
+								class="mb-1 block text-xs uppercase tracking-widest text-stone-400"
+								for="channel-disguise-headers"
+							>
+								伪装请求头 (JSON)
+							</label>
+							<textarea
+								class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+								id="channel-disguise-headers"
+								rows={3}
+								placeholder='{"User-Agent": "..."}'
+								value={channelForm.disguise_headers}
+								onInput={(event) =>
+									onFormChange({
+										disguise_headers: (
+											event.currentTarget as HTMLTextAreaElement
+										).value,
+									})
+								}
+								onBlur={validateDisguiseHeaders}
+							/>
+							{disguiseHeadersInvalid && (
+								<p class="mt-1 text-xs text-amber-600">
+									伪装请求头不是合法的 JSON
+									对象，保存后将按空配置处理（不阻断提交）。
+								</p>
+							)}
+						</div>
+						<div>
+							<label
+								class="mb-1 block text-xs uppercase tracking-widest text-stone-400"
+								for="channel-disguise-prompt"
+							>
+								伪装系统提示词
+							</label>
+							<textarea
+								class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+								id="channel-disguise-prompt"
+								rows={6}
+								placeholder="留空不注入提示词"
+								value={channelForm.disguise_system_prompt}
+								onInput={(event) =>
+									onFormChange({
+										disguise_system_prompt: (
+											event.currentTarget as HTMLTextAreaElement
+										).value,
+									})
+								}
+							/>
+						</div>
+						<div class="mt-2 space-y-1 text-xs text-stone-400">
+							<p>
+								作用范围：伪装请求头与系统提示词对全部代理路径及模型测试生效；连通性测试与拉取模型仅注入伪装请求头。
+							</p>
+							<p>
+								同名请求头优先级：渠道级自定义请求头 &gt; 伪装请求头 &gt;
+								全局注入头；伪装系统提示词前置为首条 system，用户自带 system
+								顺延保留。
+							</p>
+							<p class="text-amber-600">
+								警示：伪装请求头会覆盖同名内置鉴权头（如 Authorization /
+								x-api-key），配置不当可能导致上游 401。
+							</p>
+						</div>
 					</div>
 					{/* 模型测试：内嵌折叠区块，展示 + 回调，请求由 AdminApp 统一发起 */}
 					<div class="rounded-lg border border-stone-200 bg-stone-50">

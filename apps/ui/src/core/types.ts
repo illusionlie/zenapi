@@ -10,6 +10,10 @@ export type Channel = {
 	models_json?: string;
 	api_format: ChannelApiFormat;
 	custom_headers_json?: string | null;
+	/** 伪装请求头（JSON 对象字符串；NULL/空 = 不伪装） */
+	disguise_headers_json?: string | null;
+	/** 伪装系统提示词（前置注入的首条 system；NULL/空 = 不伪装） */
+	disguise_system_prompt?: string | null;
 };
 
 export type Token = {
@@ -203,6 +207,10 @@ export type ChannelForm = {
 	weight: number;
 	api_format: ChannelApiFormat;
 	custom_headers: string;
+	/** 伪装请求头（JSON 文本，textarea 直读直写；空串 = 不伪装） */
+	disguise_headers: string;
+	/** 伪装系统提示词（纯文本；空串 = 不伪装） */
+	disguise_system_prompt: string;
 	models: string;
 };
 
