@@ -119,8 +119,7 @@ app.use("/api/*", async (c, next) => {
 		p.startsWith("/api/group/") ||
 		p.startsWith("/api/public") ||
 		p.startsWith("/api/u/") ||
-		p.startsWith("/api/recharge") ||
-		p.startsWith("/api/monitoring")
+		p.startsWith("/api/recharge")
 	) {
 		return next();
 	}

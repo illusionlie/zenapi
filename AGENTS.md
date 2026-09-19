@@ -72,7 +72,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 
 ## 6. 路由 / 模块速查表
 
-挂载点见 `apps/worker/src/index.ts`。鉴权放行规则：`/api/auth/login`、`/api/channel*`、`/api/user*`、`/api/group*`、`/api/public*`、`/api/u/*`、`/api/recharge*`、`/api/monitoring*` 不走 `adminAuth`。
+挂载点见 `apps/worker/src/index.ts`。鉴权放行规则：`/api/auth/login`、`/api/channel*`、`/api/user*`、`/api/group*`、`/api/public*`、`/api/u/*`、`/api/recharge*` 不走 `adminAuth`。
 
 | 挂载路径 | 路由文件 | 职责 |
 |----------|----------|------|
@@ -83,7 +83,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 | `/api/tokens` | `routes/tokens.ts` | API 令牌 CRUD、令牌级模型白名单、额度编辑（三态 PATCH）、`/reveal` 二次查看明文 |
 | `/api/usage` | `routes/usage.ts` | 使用日志查询与保留清理 |
 | `/api/dashboard` | `routes/dashboard.ts` | 聚合统计 |
-| `/api/monitoring` | `routes/monitoring.ts` | 渠道健康 / 成功率 / 延迟（15m/1h/1d/7d/30d） |
+| `/api/monitoring` | `routes/monitoring.ts` | 渠道健康 / 成功率 / 延迟（15m/1h/1d/7d/30d，管理员专用） |
 | `/api/settings` | `routes/settings.ts` | 系统键值配置 |
 | `/api/invite-codes` | `routes/invite-codes.ts` | 邀请码 |
 | `/api/public` | `routes/public.ts` | 站点信息 / 公开模型（含定价） |
@@ -93,7 +93,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 | `/api/playground` | `routes/playground.ts` | 对话测试（不记用量、不扣费） |
 | `/api/users` | `routes/admin-users.ts` | 用户管理 CRUD（含 `allowed_models` 可用模型白名单） |
 | `/api/u/auth` | `routes/user-auth.ts` | 用户注册 / 登录 / 登出 / me |
-| `/api/u` | `routes/user-api.ts` | 用户仪表盘 / 模型 / 令牌（含模型白名单配置，额度字段拒改） / 日志 |
+| `/api/u` | `routes/user-api.ts` | 用户仪表盘 / 模型 / 令牌（含模型白名单配置，额度字段拒改） / 日志 / 模型可用性监测 |
 | `/api/recharge` | `routes/recharge.ts` | 充值订单 |
 | `/v1` | `routes/proxy.ts` | OpenAI 兼容代理（见 §8） |
 | `/anthropic/v1` | `routes/anthropic-proxy.ts` | Anthropic Messages 代理（含格式互转） |

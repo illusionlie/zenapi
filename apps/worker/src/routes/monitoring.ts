@@ -1,19 +1,12 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
+import { resolveMonitoringRange } from "../utils/monitoring";
 
 const monitoring = new Hono<AppEnv>();
 
-const RANGE_CONFIG: Record<string, { ms: number; sqlSlice: number }> = {
-	"15m": { ms: 15 * 60_000, sqlSlice: 16 },
-	"1h": { ms: 60 * 60_000, sqlSlice: 16 },
-	"1d": { ms: 86_400_000, sqlSlice: 13 },
-	"7d": { ms: 7 * 86_400_000, sqlSlice: 13 },
-	"30d": { ms: 30 * 86_400_000, sqlSlice: 10 },
-};
-
 monitoring.get("/", async (c) => {
 	const range = c.req.query("range") ?? "7d";
-	const config = RANGE_CONFIG[range] ?? RANGE_CONFIG["7d"];
+	const config = resolveMonitoringRange(range);
 	const since = new Date(Date.now() - config.ms).toISOString().slice(0, 19);
 	const slotExpr = `substr(created_at, 1, ${config.sqlSlice})`;
 
@@ -192,7 +185,7 @@ monitoring.get("/slot-details", async (c) => {
 		return c.json({ models: [], errors: [] });
 	}
 
-	const config = RANGE_CONFIG[range] ?? RANGE_CONFIG["7d"];
+	const config = resolveMonitoringRange(range);
 	const slotFilter = `substr(created_at, 1, ${config.sqlSlice}) = ?`;
 
 	const modelRows = await c.env.DB.prepare(

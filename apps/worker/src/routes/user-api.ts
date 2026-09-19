@@ -18,6 +18,8 @@ import {
 	parseAllowlist,
 	serializeAllowlist,
 } from "../utils/model-allowlist";
+import { buildModelMonitoring } from "../utils/model-monitoring";
+import { resolveMonitoringRange } from "../utils/monitoring";
 import { nowIso } from "../utils/time";
 
 const userApi = new Hono<AppEnv>();
@@ -98,6 +100,114 @@ userApi.get("/models", async (c) => {
 	const visibleModels = filterModelsByAllowlist(models, allowlist);
 
 	return c.json({ models: visibleModels });
+});
+
+/**
+ * Model-availability monitoring for the current user.
+ *
+ * Aggregates usage_logs by model only — no join to channels, so the response
+ * never carries channel names / ids / api_format / error messages. Model rows
+ * and trends are filtered by the user's allowed_models allowlist (same
+ * semantics as /models: null/empty = unrestricted).
+ */
+userApi.get("/monitoring", async (c) => {
+	const range = c.req.query("range") ?? "7d";
+	const config = resolveMonitoringRange(range);
+	const since = new Date(Date.now() - config.ms).toISOString().slice(0, 19);
+	const slotExpr = `substr(created_at, 1, ${config.sqlSlice})`;
+
+	// Per-model aggregates within the selected range
+	const modelRows = await c.env.DB.prepare(
+		`SELECT
+			COALESCE(model, 'unknown') AS model,
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END), 0) AS success_count,
+			COALESCE(SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END), 0) AS error_count,
+			COALESCE(AVG(latency_ms), 0) AS avg_latency_ms,
+			MAX(created_at) AS last_seen
+		FROM usage_logs
+		WHERE created_at >= ?
+		GROUP BY model
+		ORDER BY total_requests DESC`,
+	)
+		.bind(since)
+		.all();
+
+	// Per-model × time-slot trends within the selected range
+	const trendRows = await c.env.DB.prepare(
+		`SELECT
+			COALESCE(model, 'unknown') AS model,
+			${slotExpr} AS day,
+			COUNT(*) AS requests,
+			SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) AS success,
+			SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END) AS errors,
+			COALESCE(AVG(latency_ms), 0) AS avg_latency_ms
+		FROM usage_logs
+		WHERE created_at >= ?
+		GROUP BY model, day
+		ORDER BY day DESC, requests DESC`,
+	)
+		.bind(since)
+		.all();
+
+	// Global aggregates within the selected range
+	const globalRow = await c.env.DB.prepare(
+		`SELECT
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END), 0) AS total_success,
+			COALESCE(SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END), 0) AS total_errors,
+			COALESCE(AVG(latency_ms), 0) AS avg_latency_ms
+		FROM usage_logs
+		WHERE created_at >= ?`,
+	)
+		.bind(since)
+		.first();
+
+	// Always query last 15 minutes for system status
+	const recentSince = new Date(Date.now() - 15 * 60_000)
+		.toISOString()
+		.slice(0, 19);
+	const recentRow = await c.env.DB.prepare(
+		`SELECT
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END), 0) AS total_success,
+			COALESCE(SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END), 0) AS total_errors,
+			COALESCE(AVG(latency_ms), 0) AS avg_latency_ms
+		FROM usage_logs
+		WHERE created_at >= ?`,
+	)
+		.bind(recentSince)
+		.first();
+
+	// Per-model last 15 minutes (fills recent_success_rate / recent_avg_latency_ms)
+	const recentModelRows = await c.env.DB.prepare(
+		`SELECT
+			COALESCE(model, 'unknown') AS model,
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END), 0) AS success_count,
+			COALESCE(AVG(latency_ms), 0) AS avg_latency_ms
+		FROM usage_logs
+		WHERE created_at >= ?
+		GROUP BY model`,
+	)
+		.bind(recentSince)
+		.all();
+
+	// Same allowlist semantics as GET /models (null = unrestricted)
+	const userRecord = c.get("userRecord") as UserRecord;
+	const allowlist = parseAllowlist(userRecord.allowed_models);
+
+	return c.json(
+		buildModelMonitoring({
+			modelRows: modelRows.results ?? [],
+			trendRows: trendRows.results ?? [],
+			globalRow: globalRow ?? null,
+			recentRow: recentRow ?? null,
+			recentModelRows: recentModelRows.results ?? [],
+			allowlist,
+			range,
+		}),
+	);
 });
 
 /**

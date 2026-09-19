@@ -9,7 +9,7 @@ import { createApiFetch } from "./core/api";
 import { userTabs } from "./core/constants";
 import { toast } from "./core/toast";
 import type {
-	MonitoringData,
+	ModelMonitoringData,
 	PublicModelItem,
 	Token,
 	UsageLog,
@@ -18,7 +18,7 @@ import type {
 	UserTabId,
 } from "./core/types";
 import { toggleStatus } from "./core/utils";
-import { MonitoringView } from "./features/MonitoringView";
+import { ModelMonitoringView } from "./features/ModelMonitoringView";
 import { SecretValueModal } from "./features/SecretValueModal";
 import { UserDashboard } from "./features/UserDashboard";
 import { UserModelsView } from "./features/UserModelsView";
@@ -92,7 +92,9 @@ export const UserApp = ({
 	const [models, setModels] = useState<PublicModelItem[]>([]);
 	const [tokens, setTokens] = useState<Token[]>([]);
 	const [usage, setUsage] = useState<UsageLog[]>([]);
-	const [monitoring, setMonitoring] = useState<MonitoringData | null>(null);
+	const [monitoring, setMonitoring] = useState<ModelMonitoringData | null>(
+		null,
+	);
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [secretModal, setSecretModal] = useState<{
 		title: string;
@@ -162,11 +164,13 @@ export const UserApp = ({
 	}, [apiFetch]);
 
 	const loadMonitoring = useCallback(async () => {
-		const data = await apiFetch<MonitoringData>("/api/monitoring?range=15m");
+		const data = await apiFetch<ModelMonitoringData>(
+			"/api/u/monitoring?range=15m",
+		);
 		setMonitoring(data);
 	}, [apiFetch]);
 
-	const handleMonitoringLoaded = useCallback((data: MonitoringData) => {
+	const handleMonitoringLoaded = useCallback((data: ModelMonitoringData) => {
 		setMonitoring(data);
 	}, []);
 
@@ -404,7 +408,7 @@ export const UserApp = ({
 		}
 		if (activeTab === "monitoring") {
 			return (
-				<MonitoringView
+				<ModelMonitoringView
 					monitoring={monitoring}
 					token={token}
 					onLoaded={handleMonitoringLoaded}

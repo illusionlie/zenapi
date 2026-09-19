@@ -132,6 +132,50 @@ export type MonitoringData = {
 	range: string;
 };
 
+export type ModelMonitoringModel = {
+	model: string;
+	total_requests: number;
+	success_count: number;
+	error_count: number;
+	success_rate: number | null;
+	avg_latency_ms: number;
+	last_seen: string | null;
+	recent_success_rate: number | null;
+	recent_avg_latency_ms: number | null;
+};
+
+export type ModelMonitoringTrend = {
+	model: string;
+	day: string;
+	requests: number;
+	success: number;
+	errors: number;
+	success_rate: number;
+	avg_latency_ms: number;
+};
+
+/** GET /api/u/monitoring — model-availability payload, no channel fields. */
+export type ModelMonitoringData = {
+	summary: {
+		total_requests: number;
+		total_success: number;
+		total_errors: number;
+		avg_latency_ms: number;
+		success_rate: number;
+		active_models: number;
+	};
+	recentStatus: {
+		total_requests: number;
+		total_success: number;
+		total_errors: number;
+		avg_latency_ms: number;
+		success_rate: number;
+	};
+	models: ModelMonitoringModel[];
+	dailyTrends: ModelMonitoringTrend[];
+	range: string;
+};
+
 export type RegistrationMode = "open" | "linuxdo_only" | "closed";
 
 export type Settings = {
