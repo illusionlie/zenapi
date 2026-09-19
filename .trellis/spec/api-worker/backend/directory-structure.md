@@ -24,7 +24,7 @@ apps/worker/migrations/  # NNNN_name.sql 编号迁移，d1_migrations 表跟踪
 
 ### Convention: 路由先挂载、鉴权先核对，再写业务
 
-**What**: 所有 `app.route()` 集中在 `index.ts`；`/api/*` 的 adminAuth 由内联中间件 + **放行清单**（`/api/auth/login`、`/api/channel*`、`/api/user*`、`/api/group*`、`/api/public*`、`/api/u/*`、`/api/recharge*`、`/api/monitoring*`）控制。新增路由模块 = 新建 `routes/xxx.ts` + `index.ts` 加一行挂载 + 核对是否需要进放行清单。
+**What**: 所有 `app.route()` 集中在 `index.ts`；`/api/*` 的 adminAuth 由内联中间件 + **放行清单**（`/api/auth/login`、`/api/channel*`、`/api/user*`、`/api/group*`、`/api/public*`、`/api/u/*`、`/api/recharge*`）控制。新增路由模块 = 新建 `routes/xxx.ts` + `index.ts` 加一行挂载 + 核对是否需要进放行清单。`/api/monitoring*` **不在**放行清单（管理员专用，2026-09 收紧：渠道名/渠道状态属管理侧敏感数据，曾匿名可读）；用户侧可用性走 `/api/u/monitoring`（见下方 Convention）。
 
 **Why**: 挂载点分散会导致鉴权边界失控——放行清单只在此处可见。
 
@@ -55,6 +55,29 @@ apps/worker/migrations/  # NNNN_name.sql 编号迁移，d1_migrations 表跟踪
 **What**: 需要对多个模型/渠道发真实上游请求的功能，API 按单对象设计（一请求一上游调用），批量调度由前端 worker-pool（并发 ~4）驱动；禁止后端单次调用内串/并发 N 个上游子请求。
 
 **Why**: Workers 单次调用有子请求上限（免费版 50），批量接口选大渠道必炸；前端逐项调用各自独立 invocation（每请求 1 个子请求），且天然获得逐项实时结果与故障隔离。
+
+### Convention: 用户可见监测端点的「无渠道泄露」不变量
+
+**Scope / Trigger**: 任何面向用户/公开侧的监测、统计类端点（先例 `GET /api/u/monitoring`，`routes/user-api.ts`）。
+
+**Signatures / Contracts**:
+- `GET /api/u/monitoring?range=15m|1h|1d|7d|30d`（userAuth；SQL 只查 `usage_logs`，按 `COALESCE(model,'unknown')` 分组，**禁止 join `channels`**）。
+- 范围解析统一走 `utils/monitoring.ts` 的 `resolveMonitoringRange(range)`（与 `routes/monitoring.ts` 共享 `RANGE_CONFIG`，两份配置必漂移）；`sqlSlice` 只能来自该固定表后拼入 `substr(...)`，原始 query 参数禁止进 SQL 文本。
+- 响应形状 `ModelMonitoringData`（`summary` / `recentStatus` / `models[]` / `dailyTrends[]` / `range`），**键集合不得含** `channel_name` / `channel_id` / `api_format` / `error_message`——`error_message` 可能含上游端点信息，用户侧不提供 slot 下钻端点。
+- 模型行与趋势行都必须过 `isModelAllowed(parseAllowlist(userRecord.allowed_models), model)`（NULL/空 = 不限制，精确匹配）；`summary`/`recentStatus` 为平台全局聚合，不过滤（不含任何名称，语义即平台健康度）。
+- 行→响应映射、舍入（`Math.round(x*10000)/100`）、过滤集中在纯函数 `utils/model-monitoring.ts#buildModelMonitoring`，路由 handler 只做参数解析 + SQL + 调用。
+
+**Validation & Error Matrix**: 未认证/他人 session → `userAuth` 401；非法 range → 归一为 7d（不报错）。
+
+**Tests**: `tests/model-monitoring.test.ts`——舍入与零流量 null、行+趋势双过滤、`active_models` 计数、`JSON.stringify(payload)` 全文不含 `channel*`/`error_message` 的防回归断言（新增用户侧统计端点时照此补同构断言）。
+
+**Wrong vs Correct**:
+```ts
+// Wrong：用户端统计直接复用管理端聚合（join channels 取渠道名做分组键）
+SELECT c.name AS channel_name FROM usage_logs u JOIN channels c ON ...
+// Correct：只按模型聚合，渠道身份永不出现在用户可见响应
+SELECT COALESCE(model, 'unknown') AS model FROM usage_logs WHERE created_at >= ?
+```
 
 ---
 
