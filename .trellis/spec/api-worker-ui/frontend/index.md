@@ -14,6 +14,7 @@
 | [Hook Guidelines](./hook-guidelines.md) | 无自定义 hook、容器 hooks 惯用法、hono/jsx/dom 注意事项 | ✅ Filled |
 | [State Management](./state-management.md) | 零状态库、容器集中持有 + props 单向下发、localStorage token | ✅ Filled |
 | [Type Safety](./type-safety.md) | 类型集中在 core/types.ts、snake_case 直通、strict 门禁 | ✅ Filled |
+| [Third-Party Widget](./third-party-widget.md) | 动态第三方脚本挂载模式（单例 loader、ref 渲染、resetSignal、卸载清理） | ✅ Filled |
 
 ---
 
