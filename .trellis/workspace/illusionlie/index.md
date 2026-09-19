@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~400 | Active |
+| `journal-1.md` | ~422 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-09-19 | 登录注册接入 Cloudflare Turnstile 人机验证 | `d66c9d1`, `8cf65ac` | `main` |
 | 14 | 2026-09-19 | 用户端监控改为模型可用性并收紧 monitoring 鉴权 | `b7cd4d5`, `e09928f` | `main` |
 | 13 | 2026-09-19 | 渠道伪装动态头模板与 OpenCode 客户端预设 | `f8826e8`, `99f4dba`, `34a02eb` | `main` |
 | 12 | 2026-09-17 | 渠道客户端伪装(请求头+系统提示词注入) | `dbbcd3d`, `5235595` | `main` |

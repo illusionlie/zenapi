@@ -398,3 +398,25 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: 登录注册接入 Cloudflare Turnstile 人机验证
+
+**Date**: 2026-09-19
+**Task**: 登录注册接入 Cloudflare Turnstile 人机验证
+**Branch**: `main`
+
+### Summary
+
+为管理员登录、用户登录、用户注册三处接入 Cloudflare Turnstile：services/turnstile.ts 单点实现（读宽写严 + siteverify 基建故障 fail-open + TURNSTILE_DISABLED env 逃生），settings 三键（secret 零回显），site-info 下发启用状态与 site key，前端首例动态第三方脚本模式（core 单例 loader + resetSignal），管理台配置卡片。新增 45 测试（共 292 全绿），check/typecheck 通过；沉淀后端 turnstile-auth 与前端 third-party-widget 两份 spec。人工验收项 AC7（含启用态断网场景）留给用户。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d66c9d1` | (see git log) |
+| `8cf65ac` | (see git log) |
+
+### Status
+
+[OK] **Completed**
