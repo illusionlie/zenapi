@@ -1,0 +1,8 @@
+{"file": ".trellis/tasks/09-19-user-model-monitoring/design.md", "reason": "本任务技术设计：D1-D9 契约（鉴权收紧、/api/u/monitoring 响应形状、共享抽取）"}
+{"file": ".trellis/spec/api-worker/backend/index.md", "reason": "worker 层规范总纲"}
+{"file": ".trellis/spec/api-worker/backend/directory-structure.md", "reason": "utils/ 与 routes/ 落位规则（新增 monitoring.ts / model-monitoring.ts 遵循）"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "worker 质量规范"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "错误码与响应惯例"}
+{"file": ".trellis/spec/api-worker-ui/frontend/index.md", "reason": "前端层规范总纲"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "新建 ModelMonitoringView 组件规范"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "新增 ModelMonitoringData 类型规范"}

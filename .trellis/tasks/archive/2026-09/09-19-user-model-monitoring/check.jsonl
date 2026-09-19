@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/09-19-user-model-monitoring/prd.md", "reason": "验收标准 AC1-AC8 来源"}
+{"file": ".trellis/tasks/09-19-user-model-monitoring/design.md", "reason": "鉴权边界/响应契约/抽取范围核对基准"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "worker 侧检查基准"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端侧检查基准"}
