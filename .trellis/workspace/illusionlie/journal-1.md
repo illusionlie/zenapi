@@ -353,3 +353,26 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+
+## Session 13: 渠道伪装动态头模板与 OpenCode 客户端预设
+
+**Date**: 2026-09-19
+**Task**: 渠道伪装动态头模板与 OpenCode 客户端预设
+**Branch**: `main`
+
+### Summary
+
+为客户端伪装机制新增动态头模板能力：伪装头值支持 {{uuid}}/{{timestamp_ms}}/{{opencode_request_id}}/{{opencode_session_id}} 每请求实时解析（仅伪装域，custom/全局头字面值），ID 生成算法经官方源码与抓包样本双重验证（时间戳段为 ts mod 2^36）；新增第七预设 OpenCode（含 Zen 免费额度不支持警示）。三子代理流程（implement/check/update-spec），AC1-AC8 全过，240 测试绿，spec 契约同步至 proxy-headers.md。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f8826e8` | (see git log) |
+| `99f4dba` | (see git log) |
+| `34a02eb` | (see git log) |
+
+### Status
+
+[OK] **Completed**

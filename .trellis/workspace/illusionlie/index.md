@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
-- **Last Active**: 2026-09-17
+- **Total Sessions**: 13
+- **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~355 | Active |
+| `journal-1.md` | ~378 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-09-19 | 渠道伪装动态头模板与 OpenCode 客户端预设 | `f8826e8`, `99f4dba`, `34a02eb` | `main` |
 | 12 | 2026-09-17 | 渠道客户端伪装(请求头+系统提示词注入) | `dbbcd3d`, `5235595` | `main` |
 | 11 | 2026-09-17 | UI 选项卡过渡动画与骨架屏加载态（含 containing block 回归修复） | `5c610be`, `9059f72` | `main` |
 | 10 | 2026-09-17 | 用户端我的令牌与管理端令牌管理完全对齐 | `19c4da0` | `main` |
