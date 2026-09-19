@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "后端质量门禁：check/typecheck/test 全绿、Biome 规则、禁则清单"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端质量门禁：全仓 0-error、新增 UI 代码保持全绿"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "校验错误码契约：新错误码小写蛇形、读宽写严语义未被反转"}
+{"file": ".trellis/spec/api-worker/backend/patch-update-semantics.md", "reason": "核对 secret 三态实现与契约一致（undefined 保留/null 清除/非法值 400 不静默回退）"}
+{"file": ".trellis/spec/api-worker/backend/settings-config.md", "reason": "核对 settings 读取 SQL 形态（单条 key IN）与 GET 返回有效值约定"}

@@ -1,0 +1,11 @@
+{"file": ".trellis/spec/api-worker/backend/index.md", "reason": "后端规范索引：index.ts 唯一挂载点、routes 薄壳 + services 下沉原则"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "jsonError 统一错误形态、小写蛇形错误码、读宽写严（fail-open/fail-closed）全局契约"}
+{"file": ".trellis/spec/api-worker/backend/settings-config.md", "reason": "settings 新增配置项标准链路：单条 SQL key IN 读取、GET 返回有效值、SQL 形态样板"}
+{"file": ".trellis/spec/api-worker/backend/patch-update-semantics.md", "reason": "secret_key 三态语义（undefined 保留/null 清除/值覆盖）与 key in body 判定契约"}
+{"file": ".trellis/spec/api-worker/backend/logging-guidelines.md", "reason": "console.* 前缀标签惯例，siteverify fail-open 时 warn 日志的写法"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "提交门禁 check/typecheck/test、Biome 规则、命名禁则"}
+{"file": ".trellis/spec/api-worker-ui/frontend/index.md", "reason": "前端规范索引：App 分发三层、core 基础设施、features 纯展示视图"}
+{"file": ".trellis/spec/api-worker-ui/frontend/state-management.md", "reason": "容器集中持有 + props 单向下发：token/siteInfo/resetSignal 的状态放置依据"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "a11y 约定（aria/htmlFor）、Tailwind 色系与按钮约定，widget 区与表单接入需遵守"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "类型集中在 core/types.ts、snake_case 直通：site-info 新字段类型声明位置"}
+{"file": ".trellis/spec/api-worker-ui/frontend/hook-guidelines.md", "reason": "hono/jsx/dom 注意事项与容器 hooks 惯用法，Turnstile 组件 useEffect/useRef 写法依据"}
