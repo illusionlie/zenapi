@@ -8,7 +8,9 @@ import {
 	getLdcPaymentEnabled,
 	getRegistrationMode,
 	getRequireInviteCode,
+	getTurnstileConfig,
 } from "../services/settings";
+import { isTurnstileEnforced } from "../services/turnstile";
 
 const publicRoutes = new Hono<AppEnv>();
 
@@ -21,12 +23,20 @@ publicRoutes.get("/site-info", async (c) => {
 	const requireInviteCode = await getRequireInviteCode(c.env.DB);
 	const ldcPaymentEnabled = await getLdcPaymentEnabled(c.env.DB);
 	const announcement = await getAnnouncement(c.env.DB);
+	const turnstileConfig = await getTurnstileConfig(c.env.DB);
+	const turnstileEnabled = isTurnstileEnforced(
+		turnstileConfig,
+		c.env.TURNSTILE_DISABLED,
+	);
 	return c.json({
 		registration_mode: registrationMode,
 		linuxdo_enabled: linuxdoEnabled,
 		require_invite_code: requireInviteCode,
 		ldc_payment_enabled: ldcPaymentEnabled,
 		announcement,
+		// 有效启用判定（含 TURNSTILE_DISABLED 与键完整性）；secret 永不下发
+		turnstile_enabled: turnstileEnabled,
+		turnstile_site_key: turnstileEnabled ? turnstileConfig.siteKey : "",
 	});
 });
 

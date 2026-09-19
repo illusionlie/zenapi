@@ -104,6 +104,7 @@ bun run dev:ui
 | 新用户初始额度 | 0 | 注册用户初始余额 |
 | 需要邀请码注册 | 关 | 开启后注册需填写有效邀请码 |
 | LDC 充值 | 关 | LDC 支付开关、易支付参数与兑换汇率 |
+| Turnstile 人机验证 | 关 | 登录 / 注册人机验证开关与 Cloudflare 密钥，详见下文 |
 | 站点公告 | 空 | 全站公告内容，留空不显示 |
 
 ## 渠道格式
@@ -149,6 +150,16 @@ bun run dev:ui
 | 模型广场 | 可用模型与定价 |
 | 我的令牌 | 创建/管理个人 API Token |
 | 使用日志 | 个人请求记录 |
+
+## Turnstile 人机验证
+
+为管理员登录、用户登录、用户注册三个入口接入 [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/)，抵御脚本爆破管理员密码、撞库登录与垃圾注册。
+
+- **配置入口**：管理后台 → 系统设置 → 「Turnstile 人机验证」。在 Cloudflare Dashboard 创建 Turnstile 站点后，把 Site Key 与 Secret Key 填入并保存，两把密钥齐备后才能打开开关（避免半配置启用）。Secret Key 只写不回显。
+- **紧急开关**：环境变量 `TURNSTILE_DISABLED` 设为 `1` / `true` / `yes`（大小写不敏感）并重新部署后，即使 settings 已启用也全局跳过校验，用于 siteverify 故障或误锁定时的快速止血。
+- **fail-open 容错**：siteverify 网络异常 / 超时（5s）/ 非 2xx 时按放行处理并记录 warn 日志；仅 siteverify 显式判定 `success=false` 才拒绝（403 `turnstile_verify_failed`）。缺 token 为 400 `turnstile_token_missing`。
+- **本地联调**：可使用 Cloudflare 官方测试密钥（总是通过）——Site Key `1x00000000000000000000AA`、Secret Key `1x0000000000000000000000000000000AA`（另有 always-block 的 `2x` 前缀密钥）。
+- **对程序化客户端的影响**：启用后，三个登录/注册端点必须携带 Turnstile token（浏览器页面会自动完成），脚本直接调用 `POST /api/auth/login`、`POST /api/u/auth/login`、`POST /api/u/auth/register` 将无法登录。LinuxDO OAuth 流程与 `/v1`、`/anthropic/v1` 代理、New API 兼容端点不受影响。未配置 / 未启用时系统行为与之前完全一致。
 
 ## API 参考
 

@@ -7,6 +7,7 @@ import {
 	getRegistrationMode,
 	getRequireInviteCode,
 } from "../services/settings";
+import { enforceTurnstile } from "../services/turnstile";
 import { generateToken, sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
 import { addHours, nowIso } from "../utils/time";
@@ -27,6 +28,11 @@ userAuthRoutes.post("/register", async (c) => {
 	}
 
 	const body = await c.req.json().catch(() => null);
+	// body 只能读一次：enforceTurnstile 只消费这里已解析的结果（register 仅 open 分支可达，天然覆盖）
+	const turnstileError = await enforceTurnstile(c, body);
+	if (turnstileError) {
+		return turnstileError;
+	}
 	if (!body?.email || !body?.name || !body?.password) {
 		return jsonError(
 			c,
@@ -137,6 +143,11 @@ userAuthRoutes.post("/register", async (c) => {
  */
 userAuthRoutes.post("/login", async (c) => {
 	const body = await c.req.json().catch(() => null);
+	// body 只能读一次：enforceTurnstile 只消费这里已解析的结果
+	const turnstileError = await enforceTurnstile(c, body);
+	if (turnstileError) {
+		return turnstileError;
+	}
 	const account = body?.account ?? body?.email;
 	if (!account || !body?.password) {
 		return jsonError(c, 400, "missing_fields", "account and password required");

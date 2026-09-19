@@ -6,6 +6,7 @@ import {
 	getSessionTtlHours,
 	setAdminPasswordHash,
 } from "../services/settings";
+import { enforceTurnstile } from "../services/turnstile";
 import { generateToken, sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
 import { addHours, nowIso } from "../utils/time";
@@ -17,6 +18,11 @@ const auth = new Hono<AppEnv>();
  */
 auth.post("/login", async (c) => {
 	const body = await c.req.json().catch(() => null);
+	// body 只能读一次：enforceTurnstile 只消费这里已解析的结果
+	const turnstileError = await enforceTurnstile(c, body);
+	if (turnstileError) {
+		return turnstileError;
+	}
 	if (!body?.password) {
 		return jsonError(c, 400, "password_required", "password_required");
 	}

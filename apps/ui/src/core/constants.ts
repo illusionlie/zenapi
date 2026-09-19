@@ -77,4 +77,7 @@ export const initialSettingsForm: SettingsForm = {
 	proxy_retry_rounds: "2",
 	proxy_retry_delay_ms: "200",
 	model_test_prompt: "",
+	turnstile_enabled: "false",
+	turnstile_site_key: "",
+	turnstile_secret_key: "",
 };

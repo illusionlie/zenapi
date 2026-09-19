@@ -16,6 +16,7 @@ import {
 	getRequireInviteCode,
 	getRetentionDays,
 	getSessionTtlHours,
+	getTurnstileConfig,
 	isAdminPasswordSet,
 	loadProxyRetryConfig,
 	MAX_PROXY_RETRY_DELAY_MS,
@@ -41,6 +42,9 @@ import {
 	setRequireInviteCode,
 	setRetentionDays,
 	setSessionTtlHours,
+	setTurnstileEnabled,
+	setTurnstileSecretKey,
+	setTurnstileSiteKey,
 } from "../services/settings";
 import { sha256Hex } from "../utils/crypto";
 import { jsonError } from "../utils/http";
@@ -69,6 +73,7 @@ settings.get("/", async (c) => {
 	const proxyRemoveHeaders = await getProxyRemoveHeaders(c.env.DB);
 	const modelTestPrompt = await getModelTestPrompt(c.env.DB);
 	const proxyRetryConfig = await loadProxyRetryConfig(c.env.DB);
+	const turnstileConfig = await getTurnstileConfig(c.env.DB);
 	return c.json({
 		log_retention_days: retention,
 		session_ttl_hours: sessionTtlHours,
@@ -88,6 +93,10 @@ settings.get("/", async (c) => {
 		proxy_retry_rounds: proxyRetryConfig.rounds,
 		proxy_retry_delay_ms: proxyRetryConfig.delayMs,
 		model_test_prompt: modelTestPrompt,
+		// secret 永不回显，只返回已设置布尔（先例：admin_password_hash）
+		turnstile_enabled: turnstileConfig.enabled,
+		turnstile_site_key: turnstileConfig.siteKey,
+		turnstile_secret_key_set: turnstileConfig.secretKey !== "",
 	});
 });
 
@@ -295,6 +304,97 @@ settings.put("/", async (c) => {
 	if (body.model_test_prompt !== undefined) {
 		await setModelTestPrompt(c.env.DB, String(body.model_test_prompt));
 		touched = true;
+	}
+
+	// Turnstile：先合并三态解析（键缺省 = 保留现值），校验全部通过后再落库，
+	// 保证库内不出现「enabled=true 而两键缺失」的半配置脏状态（写侧 fail-closed）
+	const bodyIsObject = typeof body === "object" && body !== null;
+	const hasTurnstileFields =
+		bodyIsObject &&
+		("turnstile_enabled" in body ||
+			"turnstile_site_key" in body ||
+			"turnstile_secret_key" in body);
+
+	if (bodyIsObject && hasTurnstileFields) {
+		const current = await getTurnstileConfig(c.env.DB);
+
+		let enabled: boolean;
+		if (body.turnstile_enabled !== undefined) {
+			if (
+				body.turnstile_enabled !== "true" &&
+				body.turnstile_enabled !== "false"
+			) {
+				return jsonError(
+					c,
+					400,
+					"invalid_turnstile_enabled",
+					"invalid_turnstile_enabled",
+				);
+			}
+			enabled = body.turnstile_enabled === "true";
+		} else {
+			enabled = current.enabled;
+		}
+
+		let siteKey: string;
+		if (body.turnstile_site_key !== undefined) {
+			if (typeof body.turnstile_site_key !== "string") {
+				return jsonError(
+					c,
+					400,
+					"invalid_turnstile_site_key",
+					"invalid_turnstile_site_key",
+				);
+			}
+			siteKey = body.turnstile_site_key.trim();
+			if (siteKey.length > 200) {
+				return jsonError(
+					c,
+					400,
+					"invalid_turnstile_site_key",
+					"invalid_turnstile_site_key",
+				);
+			}
+		} else {
+			siteKey = current.siteKey;
+		}
+
+		// secret 三态：键缺省 = 保留；null / "" = 清除；非空字符串 = 覆盖
+		let secretKey: string;
+		if ("turnstile_secret_key" in body) {
+			const raw = body.turnstile_secret_key;
+			if (raw === null || raw === "") {
+				secretKey = "";
+			} else if (typeof raw === "string") {
+				secretKey = raw;
+			} else {
+				return jsonError(
+					c,
+					400,
+					"invalid_turnstile_secret_key",
+					"invalid_turnstile_secret_key",
+				);
+			}
+		} else {
+			secretKey = current.secretKey;
+		}
+
+		if (enabled && (siteKey === "" || secretKey === "")) {
+			return jsonError(c, 400, "turnstile_incomplete", "turnstile_incomplete");
+		}
+
+		if (body.turnstile_enabled !== undefined) {
+			await setTurnstileEnabled(c.env.DB, enabled);
+			touched = true;
+		}
+		if (body.turnstile_site_key !== undefined) {
+			await setTurnstileSiteKey(c.env.DB, siteKey);
+			touched = true;
+		}
+		if ("turnstile_secret_key" in body) {
+			await setTurnstileSecretKey(c.env.DB, secretKey);
+			touched = true;
+		}
 	}
 
 	if (!touched) {

@@ -4,6 +4,7 @@ import type { InviteCode, RegistrationMode, SettingsForm } from "../core/types";
 type SettingsViewProps = {
 	settingsForm: SettingsForm;
 	adminPasswordSet: boolean;
+	turnstileSecretKeySet: boolean;
 	onSubmit: (event: Event) => void;
 	onFormChange: (patch: Partial<SettingsForm>) => void;
 	inviteCodes: InviteCode[];
@@ -41,6 +42,7 @@ const registrationModeOptions: {
 export const SettingsView = ({
 	settingsForm,
 	adminPasswordSet,
+	turnstileSecretKeySet,
 	onSubmit,
 	onFormChange,
 	inviteCodes,
@@ -53,6 +55,13 @@ export const SettingsView = ({
 	const [genPrefix, setGenPrefix] = useState("ZEN-");
 	const announcementRef = useRef<HTMLTextAreaElement>(null);
 	const modelTestPromptRef = useRef<HTMLTextAreaElement>(null);
+
+	// enabled toggle 门控：两把密钥（现值 + 未保存的输入）解析后任一为空则不可开启
+	const turnstileSiteKeyReady = settingsForm.turnstile_site_key.trim() !== "";
+	const turnstileSecretReady =
+		turnstileSecretKeySet || settingsForm.turnstile_secret_key !== "";
+	const turnstileToggleDisabled =
+		!turnstileSiteKeyReady || !turnstileSecretReady;
 
 	useEffect(() => {
 		if (
@@ -361,6 +370,106 @@ export const SettingsView = ({
 							</div>
 						</>
 					)}
+					<div class="lg:col-span-2 border-t border-stone-100 pt-4 mt-1">
+						<h4 class="mb-3 text-sm font-semibold text-stone-700">
+							Turnstile 人机验证
+						</h4>
+						<label class="flex items-center gap-2 text-sm text-stone-700">
+							<input
+								type="checkbox"
+								class="h-4 w-4 rounded border-stone-300 text-amber-500 focus:ring-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+								checked={settingsForm.turnstile_enabled === "true"}
+								disabled={turnstileToggleDisabled}
+								onChange={(event) => {
+									const target = event.currentTarget as HTMLInputElement | null;
+									onFormChange({
+										turnstile_enabled: target?.checked ? "true" : "false",
+									});
+								}}
+							/>
+							启用登录 / 注册人机验证
+						</label>
+						{turnstileToggleDisabled && (
+							<p class="mt-1 text-xs text-stone-500">
+								启用前需先填写 Site Key 与 Secret Key（Secret
+								已设置则无需重填）。
+							</p>
+						)}
+						<div class="mt-3 grid gap-3.5 lg:grid-cols-2">
+							<div>
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									for="turnstile-site-key"
+								>
+									Site Key（公开，可回显）
+								</label>
+								<input
+									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+									id="turnstile-site-key"
+									name="turnstile_site_key"
+									type="text"
+									maxLength={200}
+									value={settingsForm.turnstile_site_key}
+									onInput={(event) => {
+										const target =
+											event.currentTarget as HTMLInputElement | null;
+										onFormChange({
+											turnstile_site_key: target?.value ?? "",
+										});
+									}}
+								/>
+							</div>
+							<div>
+								<label
+									class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
+									for="turnstile-secret-key"
+								>
+									Secret Key（服务端密钥，不回显）
+								</label>
+								<input
+									class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+									id="turnstile-secret-key"
+									name="turnstile_secret_key"
+									type="password"
+									placeholder={
+										turnstileSecretKeySet
+											? "已设置，留空保持不变"
+											: "未设置，填入后保存生效"
+									}
+									value={settingsForm.turnstile_secret_key}
+									onInput={(event) => {
+										const target =
+											event.currentTarget as HTMLInputElement | null;
+										onFormChange({
+											turnstile_secret_key: target?.value ?? "",
+										});
+									}}
+								/>
+								<p class="mt-1 text-xs text-stone-500">
+									密码状态：{turnstileSecretKeySet ? "已设置" : "未设置"}
+								</p>
+							</div>
+						</div>
+						<p class="mt-1 text-xs text-stone-500">
+							在
+							<a
+								class="mx-1 text-amber-600 hover:text-amber-700"
+								href="https://dash.cloudflare.com/?to=/:account/turnstile"
+								target="_blank"
+								rel="noreferrer"
+							>
+								Cloudflare Dashboard
+							</a>
+							创建 Turnstile 站点后填入两把密钥再打开开关。
+							本地联调可使用官方测试密钥（总是通过）：Site Key
+							<code class="mx-1 font-mono">1x00000000000000000000AA</code>/
+							Secret Key
+							<code class="mx-1 font-mono">
+								1x0000000000000000000000000000000AA
+							</code>
+							。
+						</p>
+					</div>
 					<div class="lg:col-span-2 border-t border-stone-100 pt-4 mt-1">
 						<label
 							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"

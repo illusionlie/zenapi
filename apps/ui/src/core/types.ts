@@ -197,6 +197,10 @@ export type Settings = {
 	proxy_retry_rounds: number;
 	proxy_retry_delay_ms: number;
 	model_test_prompt: string;
+	turnstile_enabled: boolean;
+	turnstile_site_key: string;
+	/** secret 永不回显，只返回已设置布尔 */
+	turnstile_secret_key_set?: boolean;
 };
 
 export type ModelChannel = {
@@ -285,6 +289,12 @@ export type SettingsForm = {
 	proxy_retry_rounds: string;
 	proxy_retry_delay_ms: string;
 	model_test_prompt: string;
+	/** "true" / "false" 直传后端（服务端仅接受这两个字符串） */
+	turnstile_enabled: string;
+	/** 回显值；空串提交 = 清除 */
+	turnstile_site_key: string;
+	/** 永不回显：仅承接新输入，留空 = 不提交（保留现值） */
+	turnstile_secret_key: string;
 };
 
 export type ModelTestStatus = "pending" | "running" | "success" | "failed";

@@ -37,6 +37,10 @@ const AppRoutes = () => {
 	const [requireInviteCode, setRequireInviteCode] = useState(false);
 	const [announcement, setAnnouncement] = useState("");
 	const [showAnnouncement, setShowAnnouncement] = useState(false);
+	const [turnstileEnabled, setTurnstileEnabled] = useState(false);
+	const [turnstileSiteKey, setTurnstileSiteKey] = useState("");
+	const [adminTurnstileToken, setAdminTurnstileToken] = useState("");
+	const [adminTurnstileResetSignal, setAdminTurnstileResetSignal] = useState(0);
 	const [path, setPath] = useState(() =>
 		normalizePath(window.location.pathname),
 	);
@@ -69,11 +73,15 @@ const AppRoutes = () => {
 			linuxdo_enabled?: boolean;
 			require_invite_code?: boolean;
 			announcement?: string;
+			turnstile_enabled?: boolean;
+			turnstile_site_key?: string;
 		}>("/api/public/site-info")
 			.then((result) => {
 				setRegistrationMode(result.registration_mode ?? "open");
 				setLinuxdoEnabled(result.linuxdo_enabled ?? false);
 				setRequireInviteCode(result.require_invite_code ?? false);
+				setTurnstileEnabled(result.turnstile_enabled ?? false);
+				setTurnstileSiteKey(result.turnstile_site_key ?? "");
 				const announcementText = result.announcement ?? "";
 				setAnnouncement(announcementText);
 				if (announcementText) {
@@ -155,14 +163,19 @@ const AppRoutes = () => {
 				const api = createApiFetch(null, () => {});
 				const result = await api<{ token: string }>("/api/auth/login", {
 					method: "POST",
-					body: JSON.stringify({ password }),
+					body: JSON.stringify({
+						password,
+						turnstile_token: adminTurnstileToken,
+					}),
 				});
 				updateAdminToken(result.token);
 			} catch (error) {
 				toast.error((error as Error).message);
+				// token 一次性：任何提交失败都重置 widget 换取新 token
+				setAdminTurnstileResetSignal((signal) => signal + 1);
 			}
 		},
-		[updateAdminToken],
+		[updateAdminToken, adminTurnstileToken],
 	);
 
 	// Admin routes — always accessible, no need to wait for siteInfo/userCheck
@@ -173,7 +186,16 @@ const AppRoutes = () => {
 					key="admin-login"
 					class="t-page-enter min-h-screen bg-linear-to-b from-white via-stone-50 to-stone-100 font-['IBM_Plex_Sans'] text-stone-900 antialiased"
 				>
-					<LoginView onSubmit={handleAdminLogin} onNavigate={navigateTo} />
+					<LoginView
+						onSubmit={handleAdminLogin}
+						onNavigate={navigateTo}
+						turnstilePending={!siteInfoLoaded}
+						turnstileEnabled={turnstileEnabled}
+						turnstileSiteKey={turnstileSiteKey}
+						turnstileToken={adminTurnstileToken}
+						onTurnstileToken={setAdminTurnstileToken}
+						turnstileResetSignal={adminTurnstileResetSignal}
+					/>
 				</div>
 			);
 		}
@@ -227,6 +249,8 @@ const AppRoutes = () => {
 						linuxdoEnabled={linuxdoEnabled}
 						registrationMode={registrationMode}
 						requireInviteCode={requireInviteCode}
+						turnstileEnabled={turnstileEnabled}
+						turnstileSiteKey={turnstileSiteKey}
 					/>
 				</div>
 			);
@@ -247,6 +271,8 @@ const AppRoutes = () => {
 						linuxdoEnabled={linuxdoEnabled}
 						registrationMode={registrationMode}
 						requireInviteCode={requireInviteCode}
+						turnstileEnabled={turnstileEnabled}
+						turnstileSiteKey={turnstileSiteKey}
 					/>
 				</div>
 			);
@@ -289,6 +315,8 @@ const AppRoutes = () => {
 				linuxdoEnabled={linuxdoEnabled}
 				registrationMode={registrationMode}
 				requireInviteCode={requireInviteCode}
+				turnstileEnabled={turnstileEnabled}
+				turnstileSiteKey={turnstileSiteKey}
 			/>
 			<AnnouncementModal
 				isOpen={showAnnouncement && announcement !== ""}

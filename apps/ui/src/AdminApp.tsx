@@ -219,6 +219,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			proxy_retry_rounds: String(settings.proxy_retry_rounds ?? 2),
 			proxy_retry_delay_ms: String(settings.proxy_retry_delay_ms ?? 200),
 			model_test_prompt: settings.model_test_prompt ?? "",
+			turnstile_enabled: settings.turnstile_enabled ? "true" : "false",
+			turnstile_site_key: settings.turnstile_site_key ?? "",
+			turnstile_secret_key: "",
 		});
 		if (settings.require_invite_code) {
 			const result = await apiFetch<{ codes: InviteCode[] }>(
@@ -645,10 +648,17 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				proxy_retry_rounds: Number(settingsForm.proxy_retry_rounds),
 				proxy_retry_delay_ms: Number(settingsForm.proxy_retry_delay_ms),
 				model_test_prompt: settingsForm.model_test_prompt,
+				turnstile_enabled: settingsForm.turnstile_enabled,
+				turnstile_site_key: settingsForm.turnstile_site_key,
 			};
 			const password = settingsForm.admin_password.trim();
 			if (password) {
 				payload.admin_password = password;
+			}
+			// secret 永不回显：留空 = 不提交该键（服务端保留现值）；输入了才覆盖
+			const turnstileSecret = settingsForm.turnstile_secret_key;
+			if (turnstileSecret) {
+				payload.turnstile_secret_key = turnstileSecret;
 			}
 			try {
 				await apiFetch("/api/settings", {
@@ -656,7 +666,11 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					body: JSON.stringify(payload),
 				});
 				await loadSettings();
-				setSettingsForm((prev) => ({ ...prev, admin_password: "" }));
+				setSettingsForm((prev) => ({
+					...prev,
+					admin_password: "",
+					turnstile_secret_key: "",
+				}));
 				toast.success("设置已更新");
 			} catch (error) {
 				toast.error((error as Error).message);
@@ -1271,6 +1285,9 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				<SettingsView
 					settingsForm={settingsForm}
 					adminPasswordSet={data.settings?.admin_password_set ?? false}
+					turnstileSecretKeySet={
+						data.settings?.turnstile_secret_key_set ?? false
+					}
 					onSubmit={handleSettingsSubmit}
 					onFormChange={handleSettingsFormChange}
 					inviteCodes={inviteCodes}

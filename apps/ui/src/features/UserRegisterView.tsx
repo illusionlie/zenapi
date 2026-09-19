@@ -1,5 +1,6 @@
 import { useState } from "hono/jsx/dom";
 import type { RegistrationMode } from "../core/types";
+import { Turnstile } from "./Turnstile";
 
 type UserRegisterViewProps = {
 	onSubmit: (
@@ -7,12 +8,18 @@ type UserRegisterViewProps = {
 		name: string,
 		password: string,
 		inviteCode?: string,
+		turnstileToken?: string,
 	) => void;
 	onGoLogin: () => void;
 	onNavigate: (path: string) => void;
 	linuxdoEnabled: boolean;
 	registrationMode: RegistrationMode;
 	requireInviteCode: boolean;
+	turnstileEnabled: boolean;
+	turnstileSiteKey: string;
+	turnstileToken: string;
+	onTurnstileToken: (token: string) => void;
+	turnstileResetSignal: number;
 };
 
 export const UserRegisterView = ({
@@ -22,6 +29,11 @@ export const UserRegisterView = ({
 	linuxdoEnabled,
 	registrationMode,
 	requireInviteCode,
+	turnstileEnabled,
+	turnstileSiteKey,
+	turnstileToken,
+	onTurnstileToken,
+	turnstileResetSignal,
 }: UserRegisterViewProps) => {
 	const [email, setEmail] = useState("");
 	const [name, setName] = useState("");
@@ -45,7 +57,13 @@ export const UserRegisterView = ({
 			setError("请输入邀请码");
 			return;
 		}
-		onSubmit(email, name, password, inviteCode.trim() || undefined);
+		onSubmit(
+			email,
+			name,
+			password,
+			inviteCode.trim() || undefined,
+			turnstileToken,
+		);
 	};
 
 	if (registrationMode === "closed") {
@@ -261,6 +279,13 @@ export const UserRegisterView = ({
 								}
 							/>
 						</div>
+					)}
+					{turnstileEnabled && turnstileSiteKey && (
+						<Turnstile
+							siteKey={turnstileSiteKey}
+							onToken={onTurnstileToken}
+							resetSignal={turnstileResetSignal}
+						/>
 					)}
 					<button
 						class="h-11 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-[transform,box-shadow] duration-200 ease-smooth-out hover:-translate-y-0.5 hover:shadow-lg"

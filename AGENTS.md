@@ -146,6 +146,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 | `CORS_ORIGIN` | `/api/*` 允许来源，`*` 或逗号分隔列表 |
 | `PROXY_RETRY_ROUNDS` | 代理重试轮数兼容回退（settings `proxy_retry_rounds` 优先，默认 2） |
 | `PROXY_RETRY_DELAY_MS` | 重试间隔毫秒兼容回退（settings `proxy_retry_delay_ms` 优先，默认 200） |
+| `TURNSTILE_DISABLED` | Turnstile 紧急逃生开关：真值（`"1"` / `"true"` / `"yes"`，大小写不敏感）时全局跳过登录/注册人机验证（settings 已启用也跳过，重新部署生效） |
 | `LINUXDO_CLIENT_ID` / `LINUXDO_CLIENT_SECRET` | LinuxDO OAuth（如启用） |
 
 管理员密码、注册模式、会话时长、日志保留天数等**业务配置存 `settings` 表**，经管理台「系统设置」修改，非环境变量。

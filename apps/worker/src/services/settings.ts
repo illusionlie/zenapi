@@ -493,3 +493,77 @@ export async function setProxyRetryDelayMs(
 ): Promise<void> {
 	await upsertSetting(db, PROXY_RETRY_DELAY_MS_KEY, delayMs.toString());
 }
+
+// Turnstile (login/register human verification)
+
+export const TURNSTILE_ENABLED_KEY = "turnstile_enabled";
+export const TURNSTILE_SITE_KEY_KEY = "turnstile_site_key";
+export const TURNSTILE_SECRET_KEY_KEY = "turnstile_secret_key";
+
+export type TurnstileKeysConfig = {
+	/** 存储态开关（严格 "true" 才为 true；脏值一律视为未启用） */
+	enabled: boolean;
+	siteKey: string;
+	secretKey: string;
+};
+
+/**
+ * Loads the three turnstile settings keys with a single SQL query
+ * (same `key IN` pattern as loadProxyRetryConfig). Read-side lenient:
+ * missing keys / dirty values degrade to disabled + empty keys.
+ */
+export async function getTurnstileConfig(
+	db: D1Database,
+): Promise<TurnstileKeysConfig> {
+	const result = await db
+		.prepare("SELECT key, value FROM settings WHERE key IN (?, ?, ?)")
+		.bind(
+			TURNSTILE_ENABLED_KEY,
+			TURNSTILE_SITE_KEY_KEY,
+			TURNSTILE_SECRET_KEY_KEY,
+		)
+		.all<{ key: string; value: string | null }>();
+	let enabledRaw: string | null = null;
+	let siteKey = "";
+	let secretKey = "";
+	for (const row of result.results ?? []) {
+		if (row.key === TURNSTILE_ENABLED_KEY) {
+			enabledRaw = row.value ?? null;
+		} else if (row.key === TURNSTILE_SITE_KEY_KEY) {
+			siteKey = row.value ?? "";
+		} else if (row.key === TURNSTILE_SECRET_KEY_KEY) {
+			secretKey = row.value ?? "";
+		}
+	}
+	return { enabled: enabledRaw === "true", siteKey, secretKey };
+}
+
+/**
+ * Updates the turnstile enabled flag.
+ */
+export async function setTurnstileEnabled(
+	db: D1Database,
+	enabled: boolean,
+): Promise<void> {
+	await upsertSetting(db, TURNSTILE_ENABLED_KEY, enabled ? "true" : "false");
+}
+
+/**
+ * Updates the turnstile site key. Pass empty string to clear.
+ */
+export async function setTurnstileSiteKey(
+	db: D1Database,
+	siteKey: string,
+): Promise<void> {
+	await upsertSetting(db, TURNSTILE_SITE_KEY_KEY, siteKey);
+}
+
+/**
+ * Updates the turnstile secret key. Pass empty string to clear.
+ */
+export async function setTurnstileSecretKey(
+	db: D1Database,
+	secretKey: string,
+): Promise<void> {
+	await upsertSetting(db, TURNSTILE_SECRET_KEY_KEY, secretKey);
+}

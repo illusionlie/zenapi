@@ -16,6 +16,8 @@ type PublicAppProps = {
 	linuxdoEnabled: boolean;
 	registrationMode: RegistrationMode;
 	requireInviteCode: boolean;
+	turnstileEnabled: boolean;
+	turnstileSiteKey: string;
 };
 
 export const PublicApp = ({
@@ -24,12 +26,16 @@ export const PublicApp = ({
 	linuxdoEnabled,
 	registrationMode,
 	requireInviteCode,
+	turnstileEnabled,
+	turnstileSiteKey,
 }: PublicAppProps) => {
 	const [page, setPage] = useState<"login" | "register">(() => {
 		const normalized = normalizePath(window.location.pathname);
 		if (normalized === "/register") return "register";
 		return "login";
 	});
+	const [turnstileToken, setTurnstileToken] = useState("");
+	const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
 
 	const apiFetch = useCallback(() => createApiFetch(null, () => {}), []);
 
@@ -76,16 +82,22 @@ export const PublicApp = ({
 	}, []);
 
 	const handleLogin = useCallback(
-		async (account: string, password: string) => {
+		async (account: string, password: string, loginTurnstileToken: string) => {
 			try {
 				const api = apiFetch();
 				const result = await api<{ token: string }>("/api/u/auth/login", {
 					method: "POST",
-					body: JSON.stringify({ account, password }),
+					body: JSON.stringify({
+						account,
+						password,
+						turnstile_token: loginTurnstileToken,
+					}),
 				});
 				onUserLogin(result.token);
 			} catch (error) {
 				toast.error((error as Error).message);
+				// token 一次性：任何提交失败都重置 widget 换取新 token
+				setTurnstileResetSignal((signal) => signal + 1);
 			}
 		},
 		[apiFetch, onUserLogin],
@@ -97,6 +109,7 @@ export const PublicApp = ({
 			name: string,
 			password: string,
 			inviteCode?: string,
+			registerTurnstileToken?: string,
 		) => {
 			try {
 				const api = apiFetch();
@@ -107,11 +120,14 @@ export const PublicApp = ({
 						name,
 						password,
 						invite_code: inviteCode,
+						turnstile_token: registerTurnstileToken ?? "",
 					}),
 				});
 				onUserLogin(result.token);
 			} catch (error) {
 				toast.error((error as Error).message);
+				// token 一次性：任何提交失败都重置 widget 换取新 token
+				setTurnstileResetSignal((signal) => signal + 1);
 			}
 		},
 		[apiFetch, onUserLogin],
@@ -154,6 +170,11 @@ export const PublicApp = ({
 					linuxdoEnabled={linuxdoEnabled}
 					registrationMode={registrationMode}
 					requireInviteCode={requireInviteCode}
+					turnstileEnabled={turnstileEnabled}
+					turnstileSiteKey={turnstileSiteKey}
+					turnstileToken={turnstileToken}
+					onTurnstileToken={setTurnstileToken}
+					turnstileResetSignal={turnstileResetSignal}
 				/>
 			</div>
 		);
@@ -198,6 +219,11 @@ export const PublicApp = ({
 				linuxdoEnabled={linuxdoEnabled}
 				registrationMode={registrationMode}
 				requireInviteCode={requireInviteCode}
+				turnstileEnabled={turnstileEnabled}
+				turnstileSiteKey={turnstileSiteKey}
+				turnstileToken={turnstileToken}
+				onTurnstileToken={setTurnstileToken}
+				turnstileResetSignal={turnstileResetSignal}
 			/>
 		</div>
 	);
