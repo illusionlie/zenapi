@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/09-19-disguise-dynamic-headers/research/opencode-zen-disguise.md", "reason": "对照算法正确性：ID 格式（12 hex + 14 base62、ses 取反）、偏差声明（ctr 恒 1）、非目标边界不得越界实现"}
+{"file": ".trellis/spec/api-worker/backend/proxy-headers.md", "reason": "检查头策略顺序契约与零回归基线（既有 25 用例不回退、fast path 热路径语义）"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "后端质量门禁：check/typecheck/test"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "UI 质量门禁与禁则（预设数据条目与文案）"}

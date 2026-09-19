@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/09-19-disguise-dynamic-headers/research/opencode-zen-disguise.md", "reason": "核心调研：opencode ID 生成算法（§2 逐行规格）、必需头清单、Zen body 校验边界（非目标依据）——worker 函数与 UI 预设数据均以此为准"}
+{"file": ".trellis/spec/api-worker/backend/proxy-headers.md", "reason": "头策略契约：applyHeaderPolicy 唯一入口、应用顺序、channel-testing 不收敛语义——模板接线两处必读"}
+{"file": ".trellis/spec/api-worker/backend/index.md", "reason": "后端规范索引：routes 薄壳 + services 下沉、纯函数置 utils 的分层约定"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "UI 规范：ChannelsView 表单组件与文案风格（伪装分组追加占位符说明）"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "UI 类型链路：ClientPreset / ChannelForm 约定（预设数据条目）"}
