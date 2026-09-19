@@ -1,4 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import { resolveDisguiseTemplate } from "./client-disguise";
 import { safeJsonParse } from "./json";
 
 export const PROXY_EXTRA_HEADERS_KEY = "proxy_extra_headers";
@@ -102,7 +103,10 @@ export async function loadProxyHeaderPolicy(
  * overrides built-in headers (Authorization / x-api-key / ...).
  * With policy === null both global steps are skipped (Playground exemption)
  * while disguise and channel-level headers still apply.
- * Malformed disguise JSON is treated as an empty config (fail-open, PRD AC7).
+ * Disguise header values support `{{...}}` dynamic templates resolved at
+ * call time (per upstream request / attempt); channel-level custom and
+ * global extra/remove headers stay literal. Malformed disguise JSON is
+ * treated as an empty config (fail-open, PRD AC7).
  */
 export function applyHeaderPolicy(
 	headers: Headers,
@@ -121,7 +125,9 @@ export function applyHeaderPolicy(
 	if (disguiseJson) {
 		const disguiseHeaders = parseExtraHeaders(disguiseJson) ?? {};
 		for (const [key, value] of Object.entries(disguiseHeaders)) {
-			headers.set(key, value);
+			// Only disguise values go through template resolution (per-request
+			// freshness); custom/global headers below stay literal (AC5 scope).
+			headers.set(key, resolveDisguiseTemplate(value));
 		}
 	}
 	if (channelCustomJson) {

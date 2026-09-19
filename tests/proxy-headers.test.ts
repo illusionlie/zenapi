@@ -395,4 +395,31 @@ describe("applyHeaderPolicy disguise headers (channel client disguise)", () => {
 		expect(headers.get("x-channel")).toBe("1");
 		expect(headers.get("user-agent")).toBe("client");
 	});
+
+	it("resolves {{...}} templates in disguise values at call time (design §6-3)", () => {
+		const headers = new Headers();
+		applyHeaderPolicy(
+			headers,
+			null,
+			null,
+			'{"x-opencode-request":"{{opencode_request_id}}","X-Ts":"ts={{timestamp_ms}}"}',
+		);
+		expect(headers.get("x-opencode-request")).toMatch(
+			/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/,
+		);
+		expect(headers.get("x-ts")).toMatch(/^ts=\d{13}$/);
+	});
+
+	it("keeps the same template literal in channel-level custom headers (AC5 scope)", () => {
+		const headers = new Headers();
+		applyHeaderPolicy(
+			headers,
+			null,
+			'{"X-Literal":"{{uuid}}"}',
+			'{"X-Disguise":"{{uuid}}"}',
+		);
+		// disguise value rendered; custom value stays a literal template string
+		expect(headers.get("x-disguise")).toMatch(/^[0-9a-f-]{36}$/);
+		expect(headers.get("x-literal")).toBe("{{uuid}}");
+	});
 });

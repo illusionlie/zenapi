@@ -121,6 +121,7 @@ tests/                      # Vitest 单测（如 model-allowlist.test.ts、chan
 - **禁用的模型不参与路由匹配**，也不出现在 `/v1/models`。
 - **用户级可用模型白名单**：`users.allowed_models`（JSON 数组，空 = 不限制）；按请求模型名**精确匹配**，白名单外返回 403 `model_not_allowed`；`/v1/models` 与 `/api/u/models` 同步过滤；与令牌级 `allowed_channels` 相互独立、正交生效。
 - **令牌级可用模型白名单**：`tokens.allowed_models`（JSON 数组，NULL/空 = 不限制），管理台与用户端均可配置；与用户级白名单**取交集生效**（逐清单独立校验后 AND，不合并数组，避免空交集 fail-open 反转），精确匹配、白名单外 403 `model_not_allowed`；`/v1/models` 同步双重过滤；与令牌级 `allowed_channels` 正交。
+- **伪装头动态模板**：伪装头（`disguise_headers_json`）的值支持每上游请求实时解析的 `{{...}}` 占位符（`{{uuid}}` / `{{timestamp_ms}}` / `{{opencode_request_id}}` / `{{opencode_session_id}}`，解析于 `applyHeaderPolicy` 与连通性探针两处接线点，重试/换渠道/换 Key 天然各自新鲜）；未知占位符原样保留；渠道级 `custom_headers_json` 与全局注入/剔除头**不**解释模板，按字面值发送。
 
 ## 9. 静态资源 / SPA 回退
 

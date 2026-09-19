@@ -1,5 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import { parseDisguiseHeaders } from "../utils/client-disguise";
+import {
+	parseDisguiseHeaders,
+	resolveDisguiseTemplate,
+} from "../utils/client-disguise";
 import { safeJsonParse } from "../utils/json";
 import { nowIso } from "../utils/time";
 import { normalizeBaseUrl } from "../utils/url";
@@ -61,10 +64,12 @@ export async function fetchChannelModels(
 
 	// Disguise headers first, channel-level custom headers after (same
 	// "later applier wins" order as the proxy chain); malformed disguise
-	// JSON is treated as empty config (fail-open).
+	// JSON is treated as empty config (fail-open). Disguise values go
+	// through template resolution (per-probe freshness); custom headers
+	// below stay literal.
 	const disguiseHeaders = parseDisguiseHeaders(disguiseHeadersJson);
 	for (const [key, value] of Object.entries(disguiseHeaders)) {
-		headers[key] = value;
+		headers[key] = resolveDisguiseTemplate(value);
 	}
 
 	if (format === "custom" && customHeadersJson) {
