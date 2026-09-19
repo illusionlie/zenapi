@@ -376,3 +376,25 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: 用户端监控改为模型可用性并收紧 monitoring 鉴权
+
+**Date**: 2026-09-19
+**Task**: 用户端监控改为模型可用性并收紧 monitoring 鉴权
+**Branch**: `main`
+
+### Summary
+
+发现 /api/monitoring* 在 adminAuth 放行清单中匿名可读（渠道名/渠道状态/错误详情全量泄露）。用户端「状态」页由共用 MonitoringView（渠道维度）替换为新的 ModelMonitoringView（模型维度，非交互 uptime 条，无下钻）：后端新增 GET /api/u/monitoring（userAuth，usage_logs 按模型聚合，零渠道字段，用户级 allowed_models 白名单过滤，聚合下沉纯函数 utils/model-monitoring.ts 并配 7 单测含无渠道字段防回归断言）；/api/monitoring* 移出放行清单收紧为管理员专用（管理端走 admin session 零改动）；RANGE_CONFIG 抽至 utils/monitoring.ts 共享；前端 generateSlots/formatSlotLabel/barColor 抽至 monitoring-shared.ts。AGENTS.md §6 与 spec 目录结构契约同步。check/typecheck/test 全绿（247 tests），trellis-check 逐条核过 AC1-AC8。遗留备忘：模型广场 /api/u/models 与 /api/public/models 仍按设计返回 channels[].name（按渠道定价），如需收敛另开任务；部署选 both，新旧混跑间隙用户端状态页短暂显示暂无数据。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b7cd4d5` | (see git log) |
+| `e09928f` | (see git log) |
+
+### Status
+
+[OK] **Completed**
