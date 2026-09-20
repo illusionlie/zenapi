@@ -1,5 +1,9 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { ChannelApiFormat, ChannelRow } from "./channel-types";
+import {
+	type ChannelApiFormat,
+	type ChannelRow,
+	normalizeApiFormats,
+} from "./channel-types";
 
 type ChannelFilters = {
 	status?: string | null;
@@ -138,6 +142,27 @@ export async function channelExists(
 	return Boolean(row?.id);
 }
 
+/**
+ * api_formats 双写派生：api_formats 列存全量数组 JSON，镜像列 api_format
+ * 存规范化数组首元素（保证旧代码回滚可读、monitoring GROUP BY 不变）。
+ * 入参经 normalizeApiFormats 规范化；调用方应已校验，此处兜底回退
+ * ["openai"]（历史默认值），绝不落脏值进镜像列。
+ */
+function toApiFormatColumns(apiFormats: ChannelApiFormat[]): {
+	api_formats: string;
+	api_format: ChannelApiFormat;
+} {
+	const normalized = normalizeApiFormats(apiFormats);
+	const formats: ChannelApiFormat[] = normalized.ok
+		? normalized.value
+		: ["openai"];
+	const first: ChannelApiFormat = formats[0] ?? "openai";
+	return {
+		api_formats: JSON.stringify(formats),
+		api_format: first,
+	};
+}
+
 export type ChannelInsertInput = {
 	id: string;
 	name: string;
@@ -151,7 +176,7 @@ export type ChannelInsertInput = {
 	group_name: string | null;
 	priority: number;
 	metadata_json: string | null;
-	api_format: ChannelApiFormat;
+	api_formats: ChannelApiFormat[];
 	custom_headers_json: string | null;
 	disguise_headers_json: string | null;
 	disguise_system_prompt: string | null;
@@ -163,9 +188,10 @@ export async function insertChannel(
 	db: D1Database,
 	input: ChannelInsertInput,
 ): Promise<void> {
+	const apiFormatColumns = toApiFormatColumns(input.api_formats);
 	await db
 		.prepare(
-			"INSERT INTO channels (id, name, base_url, api_key, weight, status, rate_limit, models_json, type, group_name, priority, metadata_json, api_format, custom_headers_json, disguise_headers_json, disguise_system_prompt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO channels (id, name, base_url, api_key, weight, status, rate_limit, models_json, type, group_name, priority, metadata_json, api_format, api_formats, custom_headers_json, disguise_headers_json, disguise_system_prompt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		)
 		.bind(
 			input.id,
@@ -180,7 +206,8 @@ export async function insertChannel(
 			input.group_name,
 			input.priority,
 			input.metadata_json,
-			input.api_format,
+			apiFormatColumns.api_format,
+			apiFormatColumns.api_formats,
 			input.custom_headers_json,
 			input.disguise_headers_json,
 			input.disguise_system_prompt,
@@ -202,7 +229,7 @@ export type ChannelUpdateInput = {
 	group_name: string | null;
 	priority: number;
 	metadata_json: string | null;
-	api_format: ChannelApiFormat;
+	api_formats: ChannelApiFormat[];
 	custom_headers_json: string | null;
 	disguise_headers_json: string | null;
 	disguise_system_prompt: string | null;
@@ -214,9 +241,10 @@ export async function updateChannel(
 	id: string,
 	input: ChannelUpdateInput,
 ): Promise<void> {
+	const apiFormatColumns = toApiFormatColumns(input.api_formats);
 	await db
 		.prepare(
-			"UPDATE channels SET name = ?, base_url = ?, api_key = ?, weight = ?, status = ?, rate_limit = ?, models_json = ?, type = ?, group_name = ?, priority = ?, metadata_json = ?, api_format = ?, custom_headers_json = ?, disguise_headers_json = ?, disguise_system_prompt = ?, updated_at = ? WHERE id = ?",
+			"UPDATE channels SET name = ?, base_url = ?, api_key = ?, weight = ?, status = ?, rate_limit = ?, models_json = ?, type = ?, group_name = ?, priority = ?, metadata_json = ?, api_format = ?, api_formats = ?, custom_headers_json = ?, disguise_headers_json = ?, disguise_system_prompt = ?, updated_at = ? WHERE id = ?",
 		)
 		.bind(
 			input.name,
@@ -230,7 +258,8 @@ export async function updateChannel(
 			input.group_name,
 			input.priority,
 			input.metadata_json,
-			input.api_format,
+			apiFormatColumns.api_format,
+			apiFormatColumns.api_formats,
 			input.custom_headers_json,
 			input.disguise_headers_json,
 			input.disguise_system_prompt,

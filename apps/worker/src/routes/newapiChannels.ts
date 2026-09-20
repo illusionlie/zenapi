@@ -293,7 +293,7 @@ newapi.post("/", async (c) => {
 		group_name: parsed.group_name ?? null,
 		priority: parsed.priority ?? 0,
 		metadata_json: parsed.metadata_json ?? null,
-		api_format: "openai",
+		api_formats: ["openai"],
 		custom_headers_json: null,
 		disguise_headers_json: null,
 		disguise_system_prompt: null,
@@ -345,9 +345,7 @@ newapi.put("/", async (c) => {
 		group_name: parsed.group_name ?? current.group_name ?? null,
 		priority: parsed.priority ?? current.priority ?? 0,
 		metadata_json: mergedMetadata,
-		api_format:
-			(current.api_format as "openai" | "anthropic" | "custom" | "responses") ??
-			"openai",
+		api_formats: [current.api_format ?? "openai"],
 		custom_headers_json: current.custom_headers_json ?? null,
 		disguise_headers_json: current.disguise_headers_json ?? null,
 		disguise_system_prompt: current.disguise_system_prompt ?? null,

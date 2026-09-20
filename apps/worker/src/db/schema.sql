@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS channels (
   test_time INTEGER,
   response_time_ms INTEGER,
   api_format TEXT NOT NULL DEFAULT 'openai',
+  -- api_formats: JSON 数组，渠道 API 格式能力声明（白名单
+  --   openai/responses/anthropic/custom，custom 独占）；api_format 为镜像列，
+  --   存规范化数组的首元素（双写保证旧代码回滚可用）。
+  api_formats TEXT,
   custom_headers_json TEXT,
   disguise_headers_json TEXT,
   disguise_system_prompt TEXT,
