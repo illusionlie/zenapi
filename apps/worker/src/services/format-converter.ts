@@ -2033,3 +2033,863 @@ export function createResponsesToChatStreamTransform(): TransformStream<
 		},
 	});
 }
+
+// --- Responses inbound (responses → chat) converters ---
+
+type ChatContentPart = { type: string; text?: string; [k: string]: unknown };
+
+// One Responses-side output item being assembled from chat stream deltas.
+// `text` accumulates either the message text or the function arguments.
+type ResponsesStreamItem = {
+	kind: "message" | "reasoning" | "function_call";
+	outputIndex: number;
+	itemId: string;
+	callId?: string;
+	name?: string;
+	text: string;
+};
+
+/**
+ * Derives a Responses-style id from a chat completion id, preserving the
+ * upstream suffix so repeated conversions stay deterministic.
+ */
+function toResponsesId(chatId: unknown, prefix: string): string {
+	const stripped =
+		typeof chatId === "string" ? chatId.replace(/^chatcmpl-/, "") : "";
+	return `${prefix}_${stripped || crypto.randomUUID()}`;
+}
+
+/**
+ * Converts chat completions usage into Responses usage semantics (inverse of
+ * responsesUsageToChat). Missing counters degrade to zero — never fabricated.
+ */
+function chatUsageToResponses(
+	usage: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+	const inputTokens = (usage?.prompt_tokens as number) ?? 0;
+	const outputTokens = (usage?.completion_tokens as number) ?? 0;
+	const result: Record<string, unknown> = {
+		input_tokens: inputTokens,
+		output_tokens: outputTokens,
+		total_tokens: (usage?.total_tokens as number) ?? inputTokens + outputTokens,
+	};
+	const cachedTokens = (
+		usage?.prompt_tokens_details as Record<string, unknown> | undefined
+	)?.cached_tokens;
+	if (typeof cachedTokens === "number") {
+		result.input_tokens_details = { cached_tokens: cachedTokens };
+	}
+	const reasoningTokens = (
+		usage?.completion_tokens_details as Record<string, unknown> | undefined
+	)?.reasoning_tokens;
+	if (typeof reasoningTokens === "number") {
+		result.output_tokens_details = { reasoning_tokens: reasoningTokens };
+	}
+	return result;
+}
+
+/**
+ * Converts a Responses message content (string or part array) into chat-style
+ * content parts: input_text/output_text → text, input_image → image_url
+ * (http and data URLs pass through untouched). Everything else is dropped
+ * with a warning (fail-open, spec §3.4).
+ */
+function convertResponsesContentParts(content: unknown): ChatContentPart[] {
+	if (typeof content === "string") {
+		return [{ type: "text", text: content }];
+	}
+	const parts: ChatContentPart[] = [];
+	if (!Array.isArray(content)) {
+		return parts;
+	}
+	for (const part of content) {
+		const p = part as Record<string, unknown>;
+		if (p?.type === "input_text" || p?.type === "output_text") {
+			parts.push({
+				type: "text",
+				text: typeof p.text === "string" ? p.text : "",
+			});
+			continue;
+		}
+		if (p?.type === "input_image") {
+			if (typeof p.image_url === "string" && p.image_url) {
+				parts.push({ type: "image_url", image_url: { url: p.image_url } });
+				continue;
+			}
+			console.warn("[format-converter] dropped unusable input_image part", {
+				reason: "missing_url",
+			});
+			continue;
+		}
+		console.warn(
+			"[format-converter] dropped unsupported message content part",
+			{
+				partType: String(p?.type ?? "unknown"),
+			},
+		);
+	}
+	return parts;
+}
+
+/** Joins a Responses message content into plain text (system/assistant side). */
+function responsesMessageContentText(content: unknown): string {
+	return convertResponsesContentParts(content)
+		.filter((p) => p.type === "text")
+		.map((p) => (typeof p.text === "string" ? p.text : ""))
+		.join("");
+}
+
+/** Chat-side user content: plain string when text-only, parts otherwise. */
+function convertResponsesUserContent(
+	content: unknown,
+): string | ChatContentPart[] {
+	const parts = convertResponsesContentParts(content);
+	if (parts.every((p) => p.type === "text")) {
+		return parts
+			.map((p) => (typeof p.text === "string" ? p.text : ""))
+			.join("");
+	}
+	return parts;
+}
+
+/**
+ * Converts one Responses `input` array item into chat messages. Items with a
+ * `role` but no `type` (SDK EasyInputMessage shape) count as messages;
+ * system/developer texts are hoisted into systemParts (mirroring
+ * openaiToAnthropicRequest); unknown item types are dropped with a warning.
+ */
+function convertResponsesInputItem(
+	item: Record<string, unknown>,
+	systemParts: string[],
+	rawMessages: OpenAIMessage[],
+): void {
+	if (!item || typeof item !== "object") {
+		return;
+	}
+	const itemType =
+		(item.type as string | undefined) ??
+		(item.role !== undefined ? "message" : undefined);
+
+	if (itemType === "message") {
+		const role = typeof item.role === "string" ? item.role : "user";
+		if (role === "system" || role === "developer") {
+			const text = responsesMessageContentText(item.content);
+			if (text) {
+				systemParts.push(text);
+			}
+			return;
+		}
+		if (role === "assistant") {
+			rawMessages.push({
+				role: "assistant",
+				content: responsesMessageContentText(item.content),
+			});
+			return;
+		}
+		rawMessages.push({
+			role: "user",
+			content: convertResponsesUserContent(item.content),
+		});
+		return;
+	}
+
+	if (itemType === "function_call") {
+		rawMessages.push({
+			role: "assistant",
+			content: "",
+			tool_calls: [
+				{
+					id:
+						(item.call_id as string) ??
+						(item.id as string) ??
+						`call_${crypto.randomUUID()}`,
+					type: "function",
+					function: {
+						name: (item.name as string) ?? "",
+						// Responses arguments are already a JSON string
+						arguments:
+							typeof item.arguments === "string"
+								? item.arguments
+								: JSON.stringify(item.arguments ?? {}),
+					},
+				},
+			],
+		});
+		return;
+	}
+
+	if (itemType === "function_call_output") {
+		rawMessages.push({
+			role: "tool",
+			tool_call_id: (item.call_id as string) ?? "",
+			content:
+				typeof item.output === "string"
+					? item.output
+					: JSON.stringify(item.output ?? ""),
+		});
+		return;
+	}
+
+	console.warn("[format-converter] dropped unsupported input item", {
+		itemType: String(item.type ?? "unknown"),
+	});
+}
+
+function toChatContentParts(
+	content: OpenAIMessage["content"],
+): ChatContentPart[] {
+	if (typeof content === "string") {
+		return content ? [{ type: "text", text: content }] : [];
+	}
+	return Array.isArray(content) ? (content as ChatContentPart[]) : [];
+}
+
+/**
+ * Merges consecutive same-role chat messages (mirrors openaiToAnthropicRequest)
+ * so parallel Responses function_call items collapse into one assistant
+ * message carrying multiple tool_calls. role:"tool" never merges — each tool
+ * message must pair with exactly one tool_call_id.
+ */
+function mergeConsecutiveMessages(
+	rawMessages: OpenAIMessage[],
+): OpenAIMessage[] {
+	const messages: OpenAIMessage[] = [];
+	for (const msg of rawMessages) {
+		const last = messages[messages.length - 1];
+		if (!last || last.role !== msg.role || msg.role === "tool") {
+			messages.push({ ...msg });
+			continue;
+		}
+		if (msg.role === "assistant") {
+			const textParts = [
+				typeof last.content === "string"
+					? last.content
+					: chatContentText(last.content, ""),
+				typeof msg.content === "string"
+					? msg.content
+					: chatContentText(msg.content, ""),
+			].filter((t) => t.length > 0);
+			last.content = textParts.join("\n\n");
+			const toolCalls = [
+				...((last.tool_calls as ChatContentPart[] | undefined) ?? []),
+				...((msg.tool_calls as ChatContentPart[] | undefined) ?? []),
+			];
+			if (toolCalls.length > 0) {
+				last.tool_calls = toolCalls;
+			}
+			continue;
+		}
+		// system / user: concatenate as content parts, collapsing back to a
+		// plain string when the result is text-only
+		const parts = [
+			...toChatContentParts(last.content),
+			...toChatContentParts(msg.content),
+		];
+		last.content = parts.every((p) => p.type === "text")
+			? parts.map((p) => (typeof p.text === "string" ? p.text : "")).join("")
+			: parts;
+	}
+	return messages;
+}
+
+/**
+ * Converts an OpenAI Responses API request body into a chat completions
+ * request body (responses inbound + openai target upstream). Whitelist
+ * conversion: unknown input items and fields are dropped with a warning
+ * (spec §3.4); stateful fields have no chat carrier and are reported once in
+ * aggregate; client-side stream_options is not forwarded.
+ */
+export function responsesToOpenaiRequest(
+	body: ResponsesRequest,
+): OpenAIChatRequest {
+	const result: OpenAIChatRequest = {};
+	if (body.model) {
+		result.model = body.model;
+	}
+	if (body.stream !== undefined) {
+		result.stream = body.stream;
+	}
+	if (body.temperature !== undefined) {
+		result.temperature = body.temperature;
+	}
+	if (body.top_p !== undefined) {
+		result.top_p = body.top_p;
+	}
+	if (body.parallel_tool_calls !== undefined) {
+		result.parallel_tool_calls = body.parallel_tool_calls as boolean;
+	}
+	if (body.user !== undefined) {
+		result.user = body.user as string;
+	}
+	if (body.max_output_tokens !== undefined) {
+		result.max_tokens = body.max_output_tokens;
+	}
+
+	// reasoning.effort carries over; summary etc. have no chat equivalent
+	const reasoning = body.reasoning as Record<string, unknown> | undefined;
+	if (reasoning && typeof reasoning === "object") {
+		if (typeof reasoning.effort === "string") {
+			result.reasoning_effort = reasoning.effort;
+		}
+		const dropped = Object.keys(reasoning).filter((key) => key !== "effort");
+		if (dropped.length > 0) {
+			console.warn("[format-converter] dropped unsupported reasoning fields", {
+				fields: dropped,
+			});
+		}
+	}
+
+	// Flat Responses function tools → nested chat tools; other tool types dropped
+	if (Array.isArray(body.tools)) {
+		const tools: Array<Record<string, unknown>> = [];
+		for (const tool of body.tools) {
+			if (tool?.type !== "function") {
+				console.warn("[format-converter] dropped unsupported tool", {
+					toolType: String(tool?.type ?? "unknown"),
+				});
+				continue;
+			}
+			tools.push({
+				type: "function",
+				function: {
+					name: tool.name as string,
+					description: (tool.description as string) ?? "",
+					parameters: (tool.parameters as Record<string, unknown>) ?? {
+						type: "object",
+					},
+				},
+			});
+		}
+		if (tools.length > 0) {
+			result.tools = tools;
+		}
+	}
+
+	// tool_choice: strings pass through; {type:"function", name} nests
+	if (typeof body.tool_choice === "string") {
+		result.tool_choice = body.tool_choice;
+	} else if (body.tool_choice && typeof body.tool_choice === "object") {
+		const tc = body.tool_choice as Record<string, unknown>;
+		if (tc.type === "function" && typeof tc.name === "string") {
+			result.tool_choice = { type: "function", function: { name: tc.name } };
+		} else {
+			console.warn("[format-converter] dropped unsupported tool_choice", {
+				toolChoiceType: String(tc.type ?? "unknown"),
+			});
+		}
+	}
+
+	// text.format → response_format (exact inverse of the response_format →
+	// text.format branch in openaiToResponsesRequest: same defaults and the
+	// same conditional strict field)
+	const format = body.text?.format;
+	if (format && typeof format === "object") {
+		if (format.type === "json_object") {
+			result.response_format = { type: "json_object" };
+		} else if (format.type === "json_schema") {
+			const jsonSchema: Record<string, unknown> = {
+				name: (format.name as string) ?? "response",
+				schema: (format.schema as Record<string, unknown>) ?? {},
+			};
+			if (format.strict !== undefined) {
+				jsonSchema.strict = format.strict;
+			}
+			result.response_format = {
+				type: "json_schema",
+				json_schema: jsonSchema,
+			};
+		} else if (format.type !== "text" && format.type !== undefined) {
+			console.warn("[format-converter] dropped unsupported text format", {
+				formatType: String(format.type),
+			});
+		}
+	}
+
+	// Stateful fields have no chat equivalent — one aggregate warning instead
+	// of one per field (same state semantics as the chat→responses direction)
+	const statefulFields = [
+		"store",
+		"previous_response_id",
+		"conversation",
+		"background",
+	].filter((field) => body[field] !== undefined);
+	if (statefulFields.length > 0) {
+		console.warn(
+			"[format-converter] dropped stateful responses fields (chat upstream is stateless)",
+			{ fields: statefulFields },
+		);
+	}
+
+	const systemParts: string[] = [];
+	const rawMessages: OpenAIMessage[] = [];
+
+	if (typeof body.instructions === "string" && body.instructions) {
+		systemParts.push(body.instructions);
+	}
+
+	const rawInput = body.input as
+		| string
+		| Array<Record<string, unknown>>
+		| undefined;
+	if (typeof rawInput === "string") {
+		rawMessages.push({ role: "user", content: rawInput });
+	} else if (Array.isArray(rawInput)) {
+		for (const item of rawInput) {
+			convertResponsesInputItem(item, systemParts, rawMessages);
+		}
+	}
+
+	if (systemParts.length > 0) {
+		rawMessages.unshift({ role: "system", content: systemParts.join("\n\n") });
+	}
+
+	result.messages = mergeConsecutiveMessages(rawMessages);
+	return result;
+}
+
+/**
+ * Converts an OpenAI chat completion response body into a Responses API
+ * response body (responses inbound + openai target, non-streaming). Shape is
+ * the inverse of responsesToChatResponse and its fixtures.
+ */
+export function openaiToResponsesResponse(
+	data: Record<string, unknown>,
+): ResponsesResponseBody {
+	const choices = data.choices as Array<Record<string, unknown>> | undefined;
+	const firstChoice = choices?.[0];
+	const message = firstChoice?.message as Record<string, unknown> | undefined;
+	const finishReason = firstChoice?.finish_reason as string | null | undefined;
+
+	const contentParts: Array<Record<string, unknown>> = [];
+	const contentText = (message?.content as string) ?? "";
+	if (contentText) {
+		contentParts.push({
+			type: "output_text",
+			text: contentText,
+			annotations: [],
+		});
+	}
+	const refusal = message?.refusal;
+	if (typeof refusal === "string" && refusal) {
+		contentParts.push({ type: "refusal", refusal });
+	}
+
+	const output: ResponsesOutputItem[] = [];
+	if (contentParts.length > 0) {
+		output.push({
+			type: "message",
+			id: `msg_${crypto.randomUUID()}`,
+			role: "assistant",
+			status: "completed",
+			content: contentParts,
+		});
+	}
+	const toolCalls = message?.tool_calls as
+		| Array<Record<string, unknown>>
+		| undefined;
+	if (Array.isArray(toolCalls)) {
+		for (const tc of toolCalls) {
+			const fn = tc.function as Record<string, unknown> | undefined;
+			output.push({
+				type: "function_call",
+				id: `fc_${crypto.randomUUID()}`,
+				call_id: (tc.id as string) ?? `call_${crypto.randomUUID()}`,
+				name: (fn?.name as string) ?? "",
+				arguments: (fn?.arguments as string) ?? "",
+				status: "completed",
+			});
+		}
+	}
+
+	// finish → status semantics mirror responsesFinishReason in reverse:
+	// only the max_tokens case has a Responses-side incomplete representation
+	const stopReason = mapFinishReason(finishReason);
+	const incomplete = stopReason === "max_tokens";
+
+	const usage = data.usage as Record<string, unknown> | undefined;
+	const result: ResponsesResponseBody = {
+		id: toResponsesId(data.id, "resp"),
+		object: "response",
+		created_at: (data.created as number) ?? Math.floor(Date.now() / 1000),
+		status: incomplete ? "incomplete" : "completed",
+		model: data.model as string,
+		output,
+		incomplete_details: incomplete ? { reason: "max_output_tokens" } : null,
+	};
+	if (usage && typeof usage === "object") {
+		result.usage = chatUsageToResponses(usage);
+	}
+	return result;
+}
+
+/**
+ * Creates a TransformStream that converts OpenAI chat completion SSE chunks
+ * into Responses API SSE events (responses inbound + openai target, streaming).
+ *
+ * - `data: [DONE]` is consumed as the end signal and never forwarded
+ *   (Responses SSE terminates via response.completed).
+ * - usage is emitted only on response.completed, with all three counters
+ *   present (zeros when the upstream sent none — spec §3.1 last-wins).
+ * - delta.reasoning_content surfaces as response.reasoning_summary_text.delta
+ *   inside a reasoning output item.
+ * - An in-stream upstream error payload emits response.failed and swallows
+ *   the rest (spec §3.5 philosophy: explicit termination beats hanging).
+ */
+export function createOpenaiToResponsesStreamTransform(): TransformStream<
+	Uint8Array,
+	Uint8Array
+> {
+	let buffer = "";
+	let sequenceNumber = 0;
+	let responseId = "";
+	let model = "";
+	const createdAt = Math.floor(Date.now() / 1000);
+	let sentCreated = false;
+	let finished = false;
+	let finishReason: string | null = null;
+	let usage: Record<string, unknown> | undefined;
+	const items: ResponsesStreamItem[] = [];
+	const itemByChatToolIndex = new Map<number, ResponsesStreamItem>();
+	const encoder = new TextEncoder();
+	const decoder = new TextDecoder();
+
+	const emit = (
+		controller: TransformStreamDefaultController<Uint8Array>,
+		event: Record<string, unknown>,
+	): void => {
+		event.sequence_number = sequenceNumber++;
+		controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+	};
+
+	const ensureCreated = (
+		controller: TransformStreamDefaultController<Uint8Array>,
+	): void => {
+		if (sentCreated) {
+			return;
+		}
+		sentCreated = true;
+		if (!responseId) {
+			responseId = `resp_${crypto.randomUUID()}`;
+		}
+		emit(controller, {
+			type: "response.created",
+			response: {
+				id: responseId,
+				object: "response",
+				created_at: createdAt,
+				model,
+				status: "in_progress",
+				output: [],
+			},
+		});
+	};
+
+	const itemAddedEnvelope = (
+		item: ResponsesStreamItem,
+	): Record<string, unknown> => {
+		if (item.kind === "message") {
+			return {
+				type: "message",
+				id: item.itemId,
+				status: "in_progress",
+				role: "assistant",
+				content: [],
+			};
+		}
+		if (item.kind === "reasoning") {
+			return { type: "reasoning", id: item.itemId, summary: [] };
+		}
+		return {
+			type: "function_call",
+			id: item.itemId,
+			call_id: item.callId,
+			name: item.name ?? "",
+			arguments: "",
+			status: "in_progress",
+		};
+	};
+
+	const itemDoneEnvelope = (
+		item: ResponsesStreamItem,
+	): Record<string, unknown> => {
+		if (item.kind === "message") {
+			return {
+				type: "message",
+				id: item.itemId,
+				status: "completed",
+				role: "assistant",
+				content: [{ type: "output_text", text: item.text, annotations: [] }],
+			};
+		}
+		if (item.kind === "reasoning") {
+			return {
+				type: "reasoning",
+				id: item.itemId,
+				summary: item.text ? [{ type: "summary_text", text: item.text }] : [],
+			};
+		}
+		return {
+			type: "function_call",
+			id: item.itemId,
+			call_id: item.callId,
+			name: item.name ?? "",
+			arguments: item.text,
+			status: "completed",
+		};
+	};
+
+	const addItem = (
+		controller: TransformStreamDefaultController<Uint8Array>,
+		item: ResponsesStreamItem,
+	): void => {
+		item.outputIndex = items.length;
+		items.push(item);
+		emit(controller, {
+			type: "response.output_item.added",
+			output_index: item.outputIndex,
+			item: itemAddedEnvelope(item),
+		});
+	};
+
+	const emitTerminal = (
+		controller: TransformStreamDefaultController<Uint8Array>,
+		failed: { code: unknown; message: unknown } | null,
+	): void => {
+		if (finished) {
+			return;
+		}
+		finished = true;
+		ensureCreated(controller);
+		for (const item of items) {
+			emit(controller, {
+				type: "response.output_item.done",
+				output_index: item.outputIndex,
+				item: itemDoneEnvelope(item),
+			});
+		}
+		if (failed) {
+			console.warn("[format-converter] upstream stream error", {
+				error_type: typeof failed.code === "string" ? failed.code : "unknown",
+				error_message: typeof failed.message === "string" ? failed.message : "",
+			});
+			emit(controller, {
+				type: "response.failed",
+				response: {
+					id: responseId,
+					object: "response",
+					created_at: createdAt,
+					model,
+					status: "failed",
+					error: {
+						code: failed.code ?? "upstream_error",
+						message: failed.message ?? "upstream stream error",
+					},
+					output: items.map(itemDoneEnvelope),
+					usage: chatUsageToResponses(usage),
+				},
+			});
+			return;
+		}
+		// mapFinishReason inverse of responsesFinishReason: only the max_tokens
+		// case has a Responses-side incomplete representation
+		const stopReason = mapFinishReason(finishReason);
+		const incomplete = stopReason === "max_tokens";
+		emit(controller, {
+			type: "response.completed",
+			response: {
+				id: responseId,
+				object: "response",
+				created_at: createdAt,
+				model,
+				status: incomplete ? "incomplete" : "completed",
+				incomplete_details: incomplete ? { reason: "max_output_tokens" } : null,
+				output: items.map(itemDoneEnvelope),
+				usage: chatUsageToResponses(usage),
+			},
+		});
+	};
+
+	const ensureMessageItem = (
+		controller: TransformStreamDefaultController<Uint8Array>,
+	): ResponsesStreamItem => {
+		const existing = items.find((item) => item.kind === "message");
+		if (existing) {
+			return existing;
+		}
+		const item: ResponsesStreamItem = {
+			kind: "message",
+			outputIndex: -1,
+			itemId: `msg_${crypto.randomUUID()}`,
+			text: "",
+		};
+		addItem(controller, item);
+		return item;
+	};
+
+	const ensureReasoningItem = (
+		controller: TransformStreamDefaultController<Uint8Array>,
+	): ResponsesStreamItem => {
+		const existing = items.find((item) => item.kind === "reasoning");
+		if (existing) {
+			return existing;
+		}
+		const item: ResponsesStreamItem = {
+			kind: "reasoning",
+			outputIndex: -1,
+			itemId: `rs_${crypto.randomUUID()}`,
+			text: "",
+		};
+		addItem(controller, item);
+		return item;
+	};
+
+	const handleChunk = (
+		data: Record<string, unknown>,
+		controller: TransformStreamDefaultController<Uint8Array>,
+	): void => {
+		// In-stream upstream error payload → response.failed, then swallow the rest
+		if (data.error && typeof data.error === "object") {
+			const err = data.error as Record<string, unknown>;
+			emitTerminal(controller, { code: err.code, message: err.message });
+			return;
+		}
+		if (finished) {
+			return;
+		}
+		if (!responseId && typeof data.id === "string" && data.id) {
+			responseId = toResponsesId(data.id, "resp");
+		}
+		if (!model && typeof data.model === "string") {
+			model = data.model;
+		}
+
+		const choices = data.choices as Array<Record<string, unknown>> | undefined;
+		const firstChoice = choices?.[0];
+		const delta = firstChoice?.delta as Record<string, unknown> | undefined;
+		const chunkFinish = firstChoice?.finish_reason;
+		if (typeof chunkFinish === "string" && chunkFinish) {
+			finishReason = chunkFinish;
+		}
+		const chunkUsage = data.usage as Record<string, unknown> | undefined;
+		if (chunkUsage && typeof chunkUsage === "object") {
+			usage = chunkUsage;
+		}
+
+		ensureCreated(controller);
+
+		if (!delta) {
+			// usage-only terminal chunk (choices: []) or otherwise empty
+			return;
+		}
+
+		// reasoning increments surface as reasoning summary text deltas
+		const reasoningDelta = delta.reasoning_content;
+		if (typeof reasoningDelta === "string" && reasoningDelta) {
+			const item = ensureReasoningItem(controller);
+			item.text += reasoningDelta;
+			emit(controller, {
+				type: "response.reasoning_summary_text.delta",
+				item_id: item.itemId,
+				output_index: item.outputIndex,
+				summary_index: 0,
+				delta: reasoningDelta,
+			});
+		}
+
+		const contentDelta = delta.content;
+		if (typeof contentDelta === "string" && contentDelta) {
+			const item = ensureMessageItem(controller);
+			item.text += contentDelta;
+			emit(controller, {
+				type: "response.output_text.delta",
+				item_id: item.itemId,
+				output_index: item.outputIndex,
+				content_index: 0,
+				delta: contentDelta,
+			});
+		}
+
+		// tool_calls increments (index-keyed) aggregate into distinct
+		// function_call items
+		const toolCalls = delta.tool_calls as
+			| Array<Record<string, unknown>>
+			| undefined;
+		if (Array.isArray(toolCalls)) {
+			for (const tc of toolCalls) {
+				const chatIndex = (tc.index as number) ?? 0;
+				const fn = tc.function as Record<string, unknown> | undefined;
+				let item = itemByChatToolIndex.get(chatIndex);
+				if (!item && tc.id && fn?.name != null) {
+					item = {
+						kind: "function_call",
+						outputIndex: -1,
+						itemId: `fc_${crypto.randomUUID()}`,
+						callId: (tc.id as string) ?? `call_${crypto.randomUUID()}`,
+						name: (fn.name as string) ?? "",
+						text: "",
+					};
+					itemByChatToolIndex.set(chatIndex, item);
+					addItem(controller, item);
+				}
+				if (!item) {
+					continue;
+				}
+				const argsDelta = fn?.arguments;
+				if (typeof argsDelta === "string" && argsDelta) {
+					item.text += argsDelta;
+					emit(controller, {
+						type: "response.function_call_arguments.delta",
+						item_id: item.itemId,
+						output_index: item.outputIndex,
+						delta: argsDelta,
+					});
+				}
+			}
+		}
+	};
+
+	return new TransformStream({
+		transform(chunk, controller) {
+			buffer += decoder.decode(chunk, { stream: true });
+			let newlineIndex = buffer.indexOf("\n");
+
+			while (newlineIndex !== -1) {
+				const line = buffer.slice(0, newlineIndex).trim();
+				buffer = buffer.slice(newlineIndex + 1);
+
+				if (!line.startsWith("data:")) {
+					newlineIndex = buffer.indexOf("\n");
+					continue;
+				}
+
+				const payload = line.slice(5).trim();
+				if (!payload) {
+					newlineIndex = buffer.indexOf("\n");
+					continue;
+				}
+				if (payload === "[DONE]") {
+					// End signal only — Responses SSE terminates via response.completed
+					emitTerminal(controller, null);
+					newlineIndex = buffer.indexOf("\n");
+					continue;
+				}
+
+				try {
+					const data = JSON.parse(payload) as Record<string, unknown>;
+					if (data && typeof data === "object") {
+						handleChunk(data, controller);
+					}
+				} catch {
+					// Skip invalid JSON
+				}
+
+				newlineIndex = buffer.indexOf("\n");
+			}
+		},
+		flush(controller) {
+			// Upstream ended without [DONE]: terminate explicitly rather than
+			// leaving the client hanging (spec §3.5 philosophy)
+			emitTerminal(controller, null);
+		},
+	});
+}
