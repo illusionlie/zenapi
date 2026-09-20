@@ -420,3 +420,26 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+
+## Session 16: Chat Completions↔Anthropic Messages 转换器补全
+
+**Date**: 2026-09-20
+**Task**: 09-20-chat-anthropic-converter
+**Branch**: `main`
+
+### Summary
+
+修复 chat completions 入站 → anthropic 渠道方向的转换缺陷（用户实测：reasoning_effort 未透传 + 流式「假非流式」体感）。根因三层：reasoning→thinking 映射缺失；thinking 块/delta 全吞致长静默 + `[DONE]` 双发；usage 拆两 chunk 叠加 parseUsageFromSse last-wins 致流式 prompt_tokens 恒 0（计费低估）。文档实抓（research/）定档：budget_tokens 主路径（adaptive 仅 4.6+，4.5 存量会 400）+ thinking 直通逃生舱 + 生成 thinking 时剥离 temperature/top_p；usage 三项和口径换算（两 API 缓存口径相反）；reasoning_content 回传；image/file 部件 fail-open 转换；stop_reason 七值补全。改动集中 format-converter.ts + 新建 29 例测试（共 321 全绿），proxy/anthropic-proxy/usage 零改动，零回归经运行时 A/B 实证。沉淀 format-conversion spec。已知限制（design §8）：工具往返 thinking 签名回传、temperature 4.6+ 代际、反方向多模态缺口。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cfca96a` | (see git log) |
+| `15cdc7e` | (see git log) |
+| `bdcf1ff` | (see git log) |
+
+### Status
+
+[OK] **Completed**
