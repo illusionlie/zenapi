@@ -78,9 +78,11 @@ if (executionCtx?.waitUntil) { ... }
 - 核心逻辑须有 Vitest 单测，放 `tests/`，文件名 `*.test.ts`（现有：model-allowlist、channel-models、filter-allowed-channels 等）。
 - 纯函数优先可测形态：输入输出明确、不依赖 `c`（Context）对象；路由壳薄、逻辑下沉 services/。
 
+> **Warning**：`tests/` 被 biome（`!tests`）与 tsconfig（`exclude`）**双重排除**——新测试不参与 lint/typecheck，正确性仅由 `bunx vitest run` 运行时保障。写完必须实跑，不能拿 `bun run typecheck` 全绿当测试没写错的证据（2026-09 converter 任务实勘）。
+
 ## Forbidden Patterns
 
 - 硬编码管理员密码/密钥（业务配置走 `settings` 表，平台配置走 env bindings）。
 - 跳过中间件鉴权清单直接加路由——新挂载点必须核对 `index.ts` 的 adminAuth 放行清单。
 - 在路由文件里写长业务逻辑（>50 行的分支应下沉 services/）。
-- `console.error/warn`（见 logging-guidelines：失败走 jsonError / 落库）。
+- `console.error/warn`（见 logging-guidelines：失败走 jsonError / 落库）。**例外**：无 Context 的 services 纯函数层（如 format-converter 转换器）无法走 jsonError，fail-open 丢弃/降级用 `console.warn("[模块前缀]", …)`——契约见 format-conversion.md §3.4/§3.5。

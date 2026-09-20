@@ -1,0 +1,90 @@
+# Format Conversion（services/format-converter.ts）
+
+> 协议转换器契约：OpenAI Chat Completions ↔ Anthropic Messages ↔ OpenAI Responses 的请求/响应/SSE 三面。改动此文件前必读；行为摘要见 AGENTS.md §8，本文件只写可执行契约与踩坑。
+> 沉淀自任务 09-20-chat-anthropic-converter（2026-09-20）。
+
+## 1. Scope / Trigger
+
+- 跨层协议契约变更（转换产物即上游/客户端请求体），命中 code-spec 强制深度。
+- 触发场景：新增转换字段、新增协议方向、改动 usage/thinking/多模态映射。
+
+## 2. Signatures
+
+| 导出 | 方向 | 消费方 |
+|------|------|--------|
+| `openaiToAnthropicRequest` / `anthropicToOpenaiResponse` / `createAnthropicToOpenaiStreamTransform` | chat→anthropic | `routes/proxy.ts` |
+| `anthropicToOpenaiRequest` / `openaiToAnthropicResponse` / `createOpenaiToAnthropicStreamTransform` | anthropic→chat | `routes/anthropic-proxy.ts` |
+| `openaiToResponsesRequest` / `responsesToChatResponse` / `createResponsesToChatStreamTransform` | chat↔responses | `routes/proxy.ts` |
+| `mapStopReason` / `mapFinishReason`（导出） | 共享停止原因映射 | 两侧响应/流式转换共用，改枚举必须两侧同看 |
+
+## 3. Contracts
+
+### 3.1 usage 必须「单末 chunk、完整三值」
+
+`utils/usage.ts` 的 `parseUsageFromSse` 对流内 usage 候选**取最后一个**（last-wins）。转换器产出的 OpenAI 格式流，usage 只允许出现在终止 chunk 且 prompt/completion/total 三值齐全——拆进 `message_start` 会导致落库 `prompt_tokens` 恒 0、计费低估（本任务修复的真实 bug）。
+
+### 3.2 usage 口径换算（两 API 相反，最易踩坑）
+
+Anthropic `input_tokens` **不含**缓存 token（`total_input = input + cache_read_input_tokens + cache_creation_input_tokens`）；OpenAI `prompt_tokens` 是**总量**（`cached_tokens` 是其中子集）。anthropic→chat 必须三项求和，并把 cache_read 映射进 `prompt_tokens_details.cached_tokens`、`output_tokens_details.thinking_tokens` 映射进 `completion_tokens_details.reasoning_tokens`。反向（openai→anthropic）无法精确拆分，不做。
+
+### 3.3 thinking 映射（chat→anthropic）
+
+- `reasoning_effort`/`reasoning.effort` 经 `utils/reasoning.ts` 的 `extractReasoningEffort`（优先级 `reasoning_effort` → `reasoningEffort` → `reasoning.effort`）→ `thinking:{type:"enabled", budget_tokens}`；档位 ratio minimal 0.1 / low 0.2 / medium 0.5 / high 0.8 / xhigh·max 0.95，clamp `[1024, max_tokens-1]`；`"none"` 与未知字符串**不发** thinking 字段；数字型视为显式 budget clamp 后直用。
+- 客户端直发 `thinking` 对象且 `type ∈ {enabled, adaptive, disabled}` → 直通逃生舱（覆盖 adaptive/精确预算；非法 type 回退 effort 映射）。
+- **产物含 thinking 时必须剥离 `temperature` / `top_p`**（映射与直通两路同一剥离点）：旧模型二者与 thinking 不兼容，新代模型非默认采样一律 400。
+- 不做 adaptive 自动选择：模型代际网关侧不可靠可知，adaptive 仅 4.6+ 支持，存量 4.5 代会 400（决策记录见任务 design.md D4）。
+
+### 3.4 fail-open 部件丢弃
+
+白名单式转换：不认识的部件/字段**丢弃并 `console.warn("[format-converter]", …)`**，绝不让单个脏部件 400 整个请求（与 client-disguise 同哲学）。image_url：http(s)→`url` source、data URL→`base64` source（mime 限 jpeg/png/gif/webp）；file：仅 PDF base64→`document`；input_audio 恒丢弃（Anthropic 无音频输入）。user content 转换后为空时回退单空 text 块（Anthropic 拒绝空 content）。
+
+### 3.5 流式输出不变量
+
+- `data: [DONE]` **恰好一次**（由 `message_stop` 分支负责；`flush()` 不得再补发）。
+- Anthropic 流内 `error` 事件 → 单个终止 chunk（`finish_reason:"stop"`、`delta:{}`）+ warn，此后吞掉迟到 delta——流已 200 无法改状态码，悬挂客户端比降级终止更糟。
+- `message_delta.usage` 是**累计值**非增量，直接取用，不得二次累加。
+
+## 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| 部件解析失败（畸形 data URL / 不支持的 mime） | 丢块 + warn，请求继续 |
+| `thinking.type` 非法 | 忽略直通值，走 effort 映射 |
+| effort = "none" | 不产 thinking 字段（非 `disabled`，兼容最老上游） |
+| `max_tokens` 极小致 clamp 区间为空 | 取严格上界 `max_tokens-1`（交由上游语义裁决，不上浮用户预算） |
+| 上游流 `error` 事件 | 终止 chunk + warn（见 3.5） |
+
+## 5. Good/Base/Bad Cases
+
+- Good：`reasoning_effort:"high"` + `max_tokens:8192` → `budget_tokens:6553` 且无 temperature/top_p。
+- Base：无 effort、无多模态的请求 → 除 usage 末 chunk 与 `[DONE]` 单发外与透传语义一致（零回归红线，tests A/B 锁定）。
+- Bad：给 thinking 请求保留 `temperature:0.7`；把 prompt usage 留在 `message_start` chunk；`flush()` 补发第二个 `[DONE]`。
+
+## 6. Tests Required
+
+`tests/format-converter-anthropic.test.ts`（模式照抄 `format-converter-responses.test.ts`：纯函数直调 + `runStreamTransform` + `parseSseData`）。关键断言点：档位表逐档值、clamp 双边界、采样剥离两分支、`[DONE]` 计数恰一、`thinking_delta`→`reasoning_content` 逐块、末 chunk usage 三项和 + `parseUsageFromSse` 联动（`promptTokens > 0`）、stop_reason 七值、`mapStopReason`/`mapFinishReason` 直测。注意：`tests/` 被 biome（`!tests`）与 tsconfig（`exclude`）双重排除，测试正确性**仅由 vitest 运行时保障**。
+
+## 7. Wrong vs Correct
+
+### Wrong（修复前的真实 bug）
+
+```typescript
+// message_start chunk 带一半 usage
+usage: { prompt_tokens: usage.input_tokens ?? 0, completion_tokens: 0, ... }
+// message_delta chunk 带另一半，prompt 恒 0
+usage: { prompt_tokens: 0, completion_tokens: usage.output_tokens ?? 0, ... }
+```
+
+### Correct
+
+```typescript
+// message_start 只发 role chunk，缓存三值；唯一 usage 在终止 chunk
+usage: {
+	prompt_tokens: input + cacheRead + cacheCreation,
+	completion_tokens: outputTokens, // message_delta.usage 为累计值
+	total_tokens: prompt + completion,
+	prompt_tokens_details: { cached_tokens: cacheRead },
+}
+```
+
+**Why**：`parseUsageFromSse` last-wins + OpenAI 官方惯例（usage 单 chunk 完整出现）共同决定；拆开即计费错。

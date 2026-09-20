@@ -15,6 +15,7 @@
 | [Logging Guidelines](./logging-guidelines.md) | console.* 前缀标签惯例、错误靠 jsonError/落库不打日志 | ✅ Filled |
 | [Proxy Headers](./proxy-headers.md) | 上游请求头策略契约（全局注入/剔除/渠道级）、settings 新增配置项标准链路 | ✅ Filled |
 | [Settings Config](./settings-config.md) | 数值型 settings 契约与 env→settings 迁移模式（三级回退链、读宽写严、clamp 三层一致） | ✅ Filled |
+| [Format Conversion](./format-conversion.md) | 协议转换器契约（chat↔anthropic↔responses）：usage 末 chunk 惯例与口径换算、thinking 映射、fail-open 部件丢弃、流式不变量 | ✅ Filled |
 | [PATCH Update Semantics](./patch-update-semantics.md) | 资源更新三态语义（undefined保留/null清除/值设置）与纯函数 resolver 模式 | ✅ Filled |
 | [Turnstile Auth](./turnstile-auth.md) | 登录入口人机验证契约（enforceTurnstile 接线、fail-open 边界、secret 零回显、错误码族） | ✅ Filled |
 
