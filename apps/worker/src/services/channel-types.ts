@@ -1,3 +1,5 @@
+import { normalizeBaseUrl } from "../utils/url";
+
 export type ChannelApiFormat = "openai" | "anthropic" | "custom" | "responses";
 
 export type ChannelRow = {
@@ -184,4 +186,91 @@ export function parseEndpointOverrides(
 		// 畸形 JSON → 视为无覆盖
 		return {};
 	}
+}
+
+export type NormalizeEndpointOverridesResult =
+	| { ok: true; value: string | null }
+	| {
+			ok: false;
+			reason:
+				| "not_object"
+				| "unknown_key"
+				| "custom_key"
+				| "undeclared_format"
+				| "invalid_url";
+			key?: string;
+	  };
+
+/**
+ * 端点覆盖写侧校验与规范化（CRUD 契约的「设置/清除」态；字段级三态的
+ * undefined → 保留现值由调用方在调用本函数前判定）。
+ *   - 字段级 null → 清除全部（value: null）；非对象（数组/标量）→ not_object
+ *   - 键白名单 {openai, responses, anthropic}：未知键显式拒绝（端点配置
+ *     错配静默失效 = 请求打到错误上游，fail-fast，design D2）；custom 键
+ *     单独拒绝（base_url 即完整 URL，语义冲突，design D3）
+ *   - 键对应格式必须在 declaredFormats（本次生效声明集：body 声明 ??
+ *     DB 现值，由调用方解析后传入）内，否则 undeclared_format
+ *   - 值：null / 空白串 → 删除该键（清除态）；非空白串必须以 http(s)://
+ *     开头（含非字符串值），否则 invalid_url
+ *   - 存储规范化（写前，与读侧 resolveEndpointBaseUrl 消费语义互逆）：
+ *     anthropic 走 normalizeBaseUrl（剥尾斜杠 + 剥 /v1）；openai/responses
+ *     仅 trim + 去尾斜杠（保留版本路径）
+ *   - 结果对象键序按规范序 openai → responses → anthropic 排列（确定性）；
+ *     规范化后为空对象 → NULL
+ */
+export function normalizeEndpointOverrides(
+	input: unknown,
+	declaredFormats: readonly ChannelApiFormat[],
+): NormalizeEndpointOverridesResult {
+	if (input === null) {
+		return { ok: true, value: null };
+	}
+	if (typeof input !== "object" || Array.isArray(input)) {
+		return { ok: false, reason: "not_object" };
+	}
+	const source = input as Record<string, unknown>;
+	const normalized: EndpointOverrides = {};
+	for (const key of Object.keys(source)) {
+		if (key === "custom") {
+			return { ok: false, reason: "custom_key", key };
+		}
+		if (!(ENDPOINT_OVERRIDE_KEYS as readonly string[]).includes(key)) {
+			return { ok: false, reason: "unknown_key", key };
+		}
+		if (!declaredFormats.includes(key as ChannelApiFormat)) {
+			return { ok: false, reason: "undeclared_format", key };
+		}
+		const raw = source[key];
+		// 清除态：该键不出现在结果对象（空白覆盖 = 未覆盖，与读侧同哲学）
+		if (
+			raw === null ||
+			raw === undefined ||
+			(typeof raw === "string" && raw.trim() === "")
+		) {
+			continue;
+		}
+		if (typeof raw !== "string") {
+			return { ok: false, reason: "invalid_url", key };
+		}
+		const value = raw.trim();
+		if (!value.startsWith("http://") && !value.startsWith("https://")) {
+			return { ok: false, reason: "invalid_url", key };
+		}
+		const format = key as EndpointOverrideKey;
+		normalized[format] =
+			format === "anthropic"
+				? normalizeBaseUrl(value)
+				: value.replace(/\/+$/, "");
+	}
+	if (Object.keys(normalized).length === 0) {
+		return { ok: true, value: null };
+	}
+	const ordered: EndpointOverrides = {};
+	for (const key of ENDPOINT_OVERRIDE_KEYS) {
+		const value = normalized[key];
+		if (value !== undefined) {
+			ordered[key] = value;
+		}
+	}
+	return { ok: true, value: JSON.stringify(ordered) };
 }

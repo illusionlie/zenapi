@@ -18,6 +18,7 @@ import {
 	type ChannelApiFormat,
 	type ChannelRecord,
 	normalizeApiFormats,
+	normalizeEndpointOverrides,
 	parseApiFormats,
 } from "../services/channel-types";
 import { saveChannelAliases } from "../services/model-aliases";
@@ -55,6 +56,7 @@ type ChannelPayload = {
 	models?: unknown[];
 	api_format?: string;
 	api_formats?: unknown;
+	endpoint_overrides?: unknown;
 	custom_headers?: string;
 	disguise_headers?: string;
 	disguise_system_prompt?: string;
@@ -81,6 +83,39 @@ function invalidFormatsError(reason: string): {
 	return {
 		message: FORMAT_REASON_MESSAGES[reason] ?? "invalid_api_formats",
 		code: "invalid_api_formats",
+	};
+}
+
+/**
+ * endpoint_overrides 校验失败时 400 响应的 message：说明具体原因并指出
+ * 问题键（fail-fast，design D2——端点配置错配静默失效 = 请求打到错误
+ * 上游）。code 固定 invalid_endpoint_overrides（snake_case，与同文件
+ * 既有错误码风格一致）。
+ */
+const OVERRIDE_REASON_MESSAGES: Record<string, string> = {
+	not_object:
+		"endpoint_overrides must be an object keyed by api format, or null to clear all",
+	unknown_key:
+		"endpoint_overrides keys must be within the {openai, responses, anthropic} whitelist",
+	custom_key:
+		"custom format cannot have an endpoint override (base_url is the full URL)",
+	undeclared_format:
+		"endpoint_overrides keys must be formats declared in api_formats",
+	invalid_url:
+		"endpoint_overrides values must be http(s) URL strings, or null/empty to clear",
+};
+
+function invalidOverridesError(
+	reason: string,
+	key?: string,
+): {
+	message: string;
+	code: string;
+} {
+	const base = OVERRIDE_REASON_MESSAGES[reason] ?? "invalid endpoint_overrides";
+	return {
+		message: key ? `${base} (key: ${key})` : base,
+		code: "invalid_endpoint_overrides",
 	};
 }
 
@@ -221,6 +256,20 @@ channels.post("/", async (c) => {
 		return jsonError(c, 400, error.message, error.code);
 	}
 	const apiFormats: ChannelApiFormat[] = formats.value ?? ["openai"];
+	// 端点覆盖三态（POST 无 DB 现值）：undefined → NULL；提供对象/null 时
+	// 以本次生效的声明集为校验基准（键必须是已声明格式）
+	let endpointOverridesJson: string | null = null;
+	if (body.endpoint_overrides !== undefined) {
+		const overrides = normalizeEndpointOverrides(
+			body.endpoint_overrides,
+			apiFormats,
+		);
+		if (!overrides.ok) {
+			const error = invalidOverridesError(overrides.reason, overrides.key);
+			return jsonError(c, 400, error.message, error.code);
+		}
+		endpointOverridesJson = overrides.value;
+	}
 	const customHeadersJson = body.custom_headers?.trim() || null;
 	const disguiseHeadersJson = body.disguise_headers?.trim() || null;
 	const disguiseSystemPrompt = body.disguise_system_prompt?.trim() || null;
@@ -239,8 +288,7 @@ channels.post("/", async (c) => {
 		priority: 0,
 		metadata_json: null,
 		api_formats: apiFormats,
-		// Phase A 占位：CRUD 校验/规范化随端点覆盖任务 Phase C 落地
-		endpoint_overrides: null,
+		endpoint_overrides: endpointOverridesJson,
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,
@@ -296,6 +344,21 @@ channels.patch("/:id", async (c) => {
 	}
 	const apiFormats: ChannelApiFormat[] =
 		formats.value ?? parseApiFormats(current);
+	// 端点覆盖三态（patch-update-semantics）：undefined → 保留现值；提供
+	// 对象/null 即整体替换（键级 null/空串 = 删除该键），校验基准同样是
+	// 本次生效的声明集（body 声明 ?? DB 现值）
+	let endpointOverridesJson: string | null = current.endpoint_overrides ?? null;
+	if (body.endpoint_overrides !== undefined) {
+		const overrides = normalizeEndpointOverrides(
+			body.endpoint_overrides,
+			apiFormats,
+		);
+		if (!overrides.ok) {
+			const error = invalidOverridesError(overrides.reason, overrides.key);
+			return jsonError(c, 400, error.message, error.code);
+		}
+		endpointOverridesJson = overrides.value;
+	}
 	const customHeadersJson =
 		body.custom_headers !== undefined
 			? body.custom_headers?.trim() || null
@@ -327,8 +390,7 @@ channels.patch("/:id", async (c) => {
 		priority: current.priority ?? 0,
 		metadata_json: current.metadata_json ?? null,
 		api_formats: apiFormats,
-		// Phase A 占位：保留现值（PATCH 三态语义随端点覆盖任务 Phase C 落地）
-		endpoint_overrides: current.endpoint_overrides ?? null,
+		endpoint_overrides: endpointOverridesJson,
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,
@@ -384,6 +446,20 @@ channels.post("/fetch_models", async (c) => {
 		return jsonError(c, 400, error.message, error.code);
 	}
 	const apiFormats: ChannelApiFormat[] = formats.value ?? ["openai"];
+	// 端点覆盖：无 DB 行（表单即真相），校验基准 = body 声明的格式集；
+	// undefined → 无覆盖（全部走 base_url 推导）
+	let endpointOverridesJson: string | null = null;
+	if (body.endpoint_overrides !== undefined) {
+		const overrides = normalizeEndpointOverrides(
+			body.endpoint_overrides,
+			apiFormats,
+		);
+		if (!overrides.ok) {
+			const error = invalidOverridesError(overrides.reason, overrides.key);
+			return jsonError(c, 400, error.message, error.code);
+		}
+		endpointOverridesJson = overrides.value;
+	}
 	const baseUrl = normalizeChannelBaseUrl(apiFormats, String(body.base_url));
 	const apiKey =
 		parseApiKeys(body.api_key ?? "")[0] ?? String(body.api_key ?? "");
@@ -394,6 +470,7 @@ channels.post("/fetch_models", async (c) => {
 		apiFormats,
 		body.custom_headers?.trim() || null,
 		body.disguise_headers?.trim() || null,
+		endpointOverridesJson,
 	);
 
 	if (!result.ok) {
@@ -414,6 +491,7 @@ type ModelTestPayload = {
 	base_url?: string;
 	api_key?: string;
 	api_format?: string;
+	endpoint_overrides?: unknown;
 	custom_headers?: string;
 	disguise_headers?: string;
 	disguise_system_prompt?: string;
@@ -497,16 +575,31 @@ channels.post("/test-model", async (c) => {
 		body?.disguise_system_prompt !== undefined
 			? body.disguise_system_prompt?.trim() || null
 			: (dbChannel?.disguise_system_prompt ?? null);
+	// 端点覆盖表单即真相：body 提供时按本次生效声明集校验规范化后采用，
+	// 缺席时回退 DB 行现值（与 api_formats 的覆盖语义一致）
+	let endpointOverridesJson: string | null =
+		dbChannel?.endpoint_overrides ?? null;
+	if (body?.endpoint_overrides !== undefined) {
+		const overrides = normalizeEndpointOverrides(
+			body.endpoint_overrides,
+			declaredFormats,
+		);
+		if (!overrides.ok) {
+			const error = invalidOverridesError(overrides.reason, overrides.key);
+			return jsonError(c, 400, error.message, error.code);
+		}
+		endpointOverridesJson = overrides.value;
+	}
 	const text =
 		typeof body?.text === "string" && body.text.trim().length > 0
 			? body.text
 			: await getModelTestPrompt(c.env.DB);
 
 	// Minimal ChannelRecord: buildChannelRequest only reads base_url /
-	// api_key / api_format / custom_headers_json / disguise_*（plus typing-required
-	// identity fields）. api_format 以 chat 偏好序选出的目标格式覆盖
-	// （与 proxy 路由矩阵的浅拷贝覆盖同构），api_formats 镜像按 repo 双写
-	// 约定取声明集 JSON。
+	// api_key / api_format / endpoint_overrides / custom_headers_json /
+	// disguise_*（plus typing-required identity fields）. api_format 以
+	// chat 偏好序选出的目标格式覆盖（与 proxy 路由矩阵的浅拷贝覆盖同构），
+	// api_formats 镜像按 repo 双写约定取声明集 JSON。
 	const channelLike: ChannelRecord = {
 		id: dbChannel?.id ?? "model-test",
 		name: dbChannel?.name ?? "model-test",
@@ -516,7 +609,7 @@ channels.post("/test-model", async (c) => {
 		status: dbChannel?.status ?? "active",
 		api_format: targetFormat,
 		api_formats: JSON.stringify(declaredFormats),
-		endpoint_overrides: dbChannel?.endpoint_overrides ?? null,
+		endpoint_overrides: endpointOverridesJson,
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,

@@ -11,6 +11,7 @@ import {
 	type ChannelRecord,
 } from "../apps/worker/src/services/channels";
 import {
+	normalizeEndpointOverrides,
 	parseEndpointOverrides,
 } from "../apps/worker/src/services/channel-types";
 
@@ -717,5 +718,371 @@ describe("channel repo — endpoint_overrides bind positions", () => {
 		expect(runs[0].args[13]).toBe(
 			'{"anthropic":"https://x.example/api/anthropic"}',
 		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// normalizeEndpointOverrides — CRUD 写侧校验与规范化（AC4）
+// ---------------------------------------------------------------------------
+
+describe("normalizeEndpointOverrides — validation matrix", () => {
+	it("rejects non-object input (array / string / number)", () => {
+		expect(
+			normalizeEndpointOverrides(["openai"], ["openai"]),
+		).toEqual({ ok: false, reason: "not_object" });
+		expect(
+			normalizeEndpointOverrides("https://x.com", ["openai"]),
+		).toEqual({ ok: false, reason: "not_object" });
+		expect(normalizeEndpointOverrides(42, ["openai"])).toEqual({
+			ok: false,
+			reason: "not_object",
+		});
+	});
+
+	it("field-level null clears everything", () => {
+		expect(normalizeEndpointOverrides(null, ["openai"])).toEqual({
+			ok: true,
+			value: null,
+		});
+	});
+
+	it("rejects keys outside the {openai, responses, anthropic} whitelist", () => {
+		expect(
+			normalizeEndpointOverrides({ grpc: "https://g.example" }, ["openai"]),
+		).toEqual({ ok: false, reason: "unknown_key", key: "grpc" });
+	});
+
+	it("rejects the custom key explicitly (base_url is the full URL)", () => {
+		expect(
+			normalizeEndpointOverrides(
+				{ custom: "https://c.example/full" },
+				["custom"],
+			),
+		).toEqual({ ok: false, reason: "custom_key", key: "custom" });
+	});
+
+	it("rejects keys for formats not in the effective declared formats", () => {
+		expect(
+			normalizeEndpointOverrides(
+				{ anthropic: "https://x.example" },
+				["openai"],
+			),
+		).toEqual({ ok: false, reason: "undeclared_format", key: "anthropic" });
+	});
+
+	it("rejects values without an http(s) prefix (incl. non-string values)", () => {
+		expect(
+			normalizeEndpointOverrides({ openai: "x.example/v1" }, ["openai"]),
+		).toEqual({ ok: false, reason: "invalid_url", key: "openai" });
+		expect(
+			normalizeEndpointOverrides(
+				{ responses: "ftp://resp.example" },
+				["responses"],
+			),
+		).toEqual({ ok: false, reason: "invalid_url", key: "responses" });
+		expect(normalizeEndpointOverrides({ openai: 42 }, ["openai"])).toEqual({
+			ok: false,
+			reason: "invalid_url",
+			key: "openai",
+		});
+	});
+});
+
+describe("normalizeEndpointOverrides — three states & storage normalization", () => {
+	it("drops null / blank values (per-key clear)", () => {
+		expect(
+			normalizeEndpointOverrides(
+				{ anthropic: null, openai: "", responses: "   " },
+				["openai", "responses", "anthropic"],
+			),
+		).toEqual({ ok: true, value: null });
+	});
+
+	it("normalizes anthropic overrides with normalizeBaseUrl semantics", () => {
+		expect(
+			normalizeEndpointOverrides(
+				{ anthropic: "https://x.example/api/anthropic/v1/" },
+				["anthropic"],
+			),
+		).toEqual({
+			ok: true,
+			value: '{"anthropic":"https://x.example/api/anthropic"}',
+		});
+	});
+
+	it("keeps version paths for openai / responses (trim + trailing slashes only)", () => {
+		expect(
+			normalizeEndpointOverrides(
+				{
+					openai: "  https://oai.example/v1//  ",
+					responses: "https://resp.example/api/",
+				},
+				["openai", "responses"],
+			),
+		).toEqual({
+			ok: true,
+			value:
+				'{"openai":"https://oai.example/v1","responses":"https://resp.example/api"}',
+		});
+	});
+
+	it("emits canonical key order regardless of input order", () => {
+		expect(
+			normalizeEndpointOverrides(
+				{ anthropic: "https://a.example", openai: "https://o.example/v1" },
+				["openai", "anthropic"],
+			),
+		).toEqual({
+			ok: true,
+			value:
+				'{"openai":"https://o.example/v1","anthropic":"https://a.example"}',
+		});
+	});
+
+	it("returns null for an empty overrides object", () => {
+		expect(normalizeEndpointOverrides({}, ["openai"])).toEqual({
+			ok: true,
+			value: null,
+		});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// CRUD 接线 — POST / PATCH / fetch_models / test-model（AC4 / R4）
+// ---------------------------------------------------------------------------
+
+const overridesRow = {
+	id: "ch1",
+	name: "agg",
+	base_url: "https://main.example/v1",
+	api_key: "sk-test",
+	weight: 1,
+	status: "active",
+	models_json: "[]",
+	api_format: "openai",
+	api_formats: '["openai","anthropic"]',
+	endpoint_overrides: JSON.stringify({
+		openai: "https://oai.example/v1",
+		anthropic: "https://x.example/api/anthropic",
+	}),
+	custom_headers_json: null,
+	disguise_headers_json: null,
+};
+
+describe("POST /api/channels — endpoint_overrides storage", () => {
+	it("stores normalized overrides JSON at args[14]", async () => {
+		const { env, runs } = makeChannelsEnv();
+		const res = await channelsApp.request(
+			"/",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					name: "agg",
+					base_url: "https://x.com/v1/",
+					api_formats: ["openai", "anthropic"],
+					endpoint_overrides: {
+						anthropic: "https://x.example/api/anthropic/",
+						openai: "https://oai.example/v1//",
+					},
+				}),
+			},
+			env,
+		);
+		expect(res.status).toBe(200);
+		expect(runs[0].sql).toContain("INSERT INTO channels");
+		// 规范化：首尾空白/尾斜杠剥除 + 规范键序（openai → responses → anthropic）
+		expect(runs[0].args[14]).toBe(
+			'{"openai":"https://oai.example/v1","anthropic":"https://x.example/api/anthropic"}',
+		);
+	});
+
+	it("rejects an unknown key with 400 invalid_endpoint_overrides and writes nothing", async () => {
+		const { env, runs } = makeChannelsEnv();
+		const res = await channelsApp.request(
+			"/",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					name: "c",
+					base_url: "https://x.com/v1",
+					api_formats: ["openai"],
+					endpoint_overrides: { grpc: "https://g.example" },
+				}),
+			},
+			env,
+		);
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.code).toBe("invalid_endpoint_overrides");
+		expect(String(body.error)).toContain("grpc");
+		expect(runs).toHaveLength(0);
+	});
+});
+
+describe("PATCH /api/channels/:id — endpoint_overrides three-state", () => {
+	it("clears a single key via null while keeping the rest", async () => {
+		const { env, runs } = makeChannelsEnv({
+			channelRow: { ...overridesRow },
+		});
+		const res = await channelsApp.request(
+			"/ch1",
+			{
+				method: "PATCH",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					endpoint_overrides: {
+						openai: "https://oai.example/v1",
+						anthropic: null,
+					},
+				}),
+			},
+			env,
+		);
+		expect(res.status).toBe(200);
+		expect(runs[0].sql).toContain("endpoint_overrides = ?");
+		expect(runs[0].args[13]).toBe('{"openai":"https://oai.example/v1"}');
+	});
+
+	it("keeps the stored value when the field is absent", async () => {
+		const { env, runs } = makeChannelsEnv({
+			channelRow: { ...overridesRow },
+		});
+		const res = await channelsApp.request(
+			"/ch1",
+			{
+				method: "PATCH",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ name: "renamed" }),
+			},
+			env,
+		);
+		expect(res.status).toBe(200);
+		expect(runs[0].args[13]).toBe(
+			'{"openai":"https://oai.example/v1","anthropic":"https://x.example/api/anthropic"}',
+		);
+	});
+});
+
+describe("POST /api/channels/fetch_models — endpoint_overrides probe routing", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("probes the anthropic override endpoint while openai stays on base_url", async () => {
+		const calls: string[] = [];
+		const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+			calls.push(String(input));
+			return jsonResponse({ data: [{ id: "gpt-4o" }] });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const { env } = makeChannelsEnv();
+
+		const res = await channelsApp.request(
+			"/fetch_models",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					base_url: "https://x.com/v1",
+					api_key: "sk",
+					api_formats: ["openai", "anthropic"],
+					endpoint_overrides: {
+						anthropic: "https://x.example/api/anthropic",
+					},
+				}),
+			},
+			env,
+		);
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.ok).toBe(true);
+		expect(calls.sort()).toEqual([
+			"https://x.com/v1/models",
+			"https://x.example/api/anthropic/v1/models",
+		]);
+	});
+});
+
+describe("POST /api/channels/test-model — endpoint_overrides precedence", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("body overrides win over the DB row for the upstream target", async () => {
+		const fetchMock = vi.fn(async () =>
+			jsonResponse({
+				id: "msg_1",
+				type: "message",
+				role: "assistant",
+				model: "test-model",
+				content: [{ type: "text", text: "Hi" }],
+				stop_reason: "end_turn",
+				usage: { input_tokens: 1, output_tokens: 2 },
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const { env } = makeChannelsEnv({
+			channelRow: {
+				...overridesRow,
+				api_format: "anthropic",
+				api_formats: '["anthropic"]',
+				endpoint_overrides: JSON.stringify({
+					anthropic: "https://old.example/anthropic",
+				}),
+			},
+		});
+
+		const res = await channelsApp.request(
+			"/test-model",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					id: "ch1",
+					model: "test-model",
+					endpoint_overrides: {
+						anthropic: "https://new.example/anthropic",
+					},
+				}),
+			},
+			env,
+		);
+
+		expect(res.status).toBe(200);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const [target] = fetchMock.mock.calls[0] as [string, RequestInit];
+		// anthropic 目标格式：normalizeBaseUrl(body 覆盖) + /v1/messages，
+		// DB 行的旧覆盖被表单值取代（表单即真相）
+		expect(target).toBe("https://new.example/anthropic/v1/messages");
+	});
+
+	it("rejects invalid body overrides with 400 without contacting upstream", async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+		const { env } = makeChannelsEnv({
+			channelRow: { ...overridesRow },
+		});
+
+		const res = await channelsApp.request(
+			"/test-model",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					id: "ch1",
+					model: "test-model",
+					endpoint_overrides: { anthropic: "not-a-url" },
+				}),
+			},
+			env,
+		);
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.code).toBe("invalid_endpoint_overrides");
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });
