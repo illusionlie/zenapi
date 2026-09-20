@@ -443,3 +443,30 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+## Session 17: 渠道多 API 格式与 responses 自动降级转换
+
+**Date**: 2026-09-20
+**Task**: 09-20-channel-multi-api-format
+**Branch**: `main`
+
+### Summary
+
+渠道 `api_format` 单值升级为 `api_formats` 多格式能力声明（迁移 0022 加列回填 + `api_format` 镜像首元素双写，回滚可降级），`/v1/responses` 入站在渠道无 responses 原生格式时自动降级。核心架构：「格式即能力声明」——新增 `services/channel-routing.ts` 统一入站协议 × 格式集资格判定与每协议偏好序选择（chat: openai>responses>anthropic>custom；responses: responses>openai>custom；anthropic: anthropic>openai>custom；透传 openai>responses>custom），proxy / anthropic-proxy / playground 三处共用，目标格式经浅拷贝覆盖 `api_format` 贯穿请求构造/伪装/头策略/响应转换。新增 responses→chat 转换器三函数（请求/响应/流式，`text.format`↔`response_format` 双向互逆，usage 单末事件、`[DONE]` 仅消费不外泄、error→response.failed）。唯一明示行为变更：responses 入站 + openai 渠道从裸透传 + 400/404 路径回退改为自动转换（回退死代码整体移除）。配套：CRUD `api_formats` 校验（custom 独占、无清除态、legacy 双接受）、逐格式探测并集 + `probe_warnings`、test-model 偏好序选目标、UI 多选 chips 与全格式徽章、监控下发 `api_formats`。关键取舍：normalizeBaseUrl 剥 /v1 对 openai 端点有损，多格式渠道存 trim+去尾斜杠（子代理纠正了 dispatch 预设）；错误码沿用代码现实 snake_case `invalid_api_formats` 而非 design 字面 ERR_ 前缀。测试 292→416 全绿（+124），check/typecheck 全过；trellis-check 全范围验收 13/13 AC 通过、零 blocker。沉淀 channel-routing spec（新建）+ format-conversion 增补 responses→chat 方向。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f8a98a6` | (see git log) |
+| `8fe3cc2` | (see git log) |
+| `0e5a26c` | (see git log) |
+| `ac6792d` | (see git log) |
+| `5d34f59` | (see git log) |
+| `08afca5` | (see git log) |
+| `260495a` | (see git log) |
+| `2f2fa91` | (see git log) |
+
+### Status
+
+[OK] **Completed**
