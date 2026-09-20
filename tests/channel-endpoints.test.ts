@@ -321,6 +321,24 @@ describe("buildChannelRequest with endpoint overrides", () => {
 		expect(result.target).toBe("https://oai.example/v2/chat/completions");
 	});
 
+	it("openai target: passthrough path hits {override}{subPath} (AC3)", () => {
+		const channel = makeChannel({
+			api_format: "openai",
+			endpoint_overrides: JSON.stringify({ openai: "https://oai.example/v2" }),
+		});
+		const result = buildChannelRequest(
+			channel,
+			"/v1/embeddings",
+			"",
+			new Headers(),
+			JSON.stringify({ model: "m", input: [] }),
+			{ model: "m", input: [] },
+			false,
+			"sk-call",
+		);
+		expect(result.target).toBe("https://oai.example/v2/embeddings");
+	});
+
 	it("custom target ignores overrides entirely (base_url is the full URL)", () => {
 		const channel = makeChannel({
 			api_format: "custom",
