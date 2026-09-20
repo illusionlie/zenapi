@@ -14,7 +14,8 @@
 |------|------|--------|
 | `openaiToAnthropicRequest` / `anthropicToOpenaiResponse` / `createAnthropicToOpenaiStreamTransform` | chat→anthropic | `routes/proxy.ts` |
 | `anthropicToOpenaiRequest` / `openaiToAnthropicResponse` / `createOpenaiToAnthropicStreamTransform` | anthropic→chat | `routes/anthropic-proxy.ts` |
-| `openaiToResponsesRequest` / `responsesToChatResponse` / `createResponsesToChatStreamTransform` | chat↔responses | `routes/proxy.ts` |
+| `openaiToResponsesRequest` / `responsesToChatResponse` / `createResponsesToChatStreamTransform` | chat→responses | `routes/proxy.ts` |
+| `responsesToOpenaiRequest` / `openaiToResponsesResponse` / `createOpenaiToResponsesStreamTransform` | responses→chat（responses 入站降级，2026-09-20 增） | `routes/proxy.ts` |
 | `mapStopReason` / `mapFinishReason`（导出） | 共享停止原因映射 | 两侧响应/流式转换共用，改枚举必须两侧同看 |
 
 ## 3. Contracts
@@ -44,6 +45,12 @@ Anthropic `input_tokens` **不含**缓存 token（`total_input = input + cache_r
 - Anthropic 流内 `error` 事件 → 单个终止 chunk（`finish_reason:"stop"`、`delta:{}`）+ warn，此后吞掉迟到 delta——流已 200 无法改状态码，悬挂客户端比降级终止更糟。
 - `message_delta.usage` 是**累计值**非增量，直接取用，不得二次累加。
 
+### 3.6 responses→chat 方向（responses 入站降级，2026-09-20 增）
+
+- **请求侧 `responsesToOpenaiRequest`**：`instructions`→system 前置；`input` 字符串→单 user；`message` 项 text/image_url 映射、`function_call`→assistant.tool_calls（arguments 为 JSON 字符串）、`function_call_output`→`role:"tool"`（tool 消息**永不合并**——每条对应唯一 tool_call_id）；`text.format`→`response_format` 与反向 `openaiToResponsesRequest`（:1584 起）逐字段对称（json_schema 默认值 `name:"response"`/`schema:{}` 双向 `??` 补齐后仍须互逆）；`reasoning.effort`→`reasoning_effort`；`store`/`previous_response_id`/`conversation`/`background` 等 stateful 字段丢弃 + **单条汇总** warn（勿逐字段刷屏）；未知项 fail-open 丢弃 + `[format-converter]` warn。
+- **响应侧 `openaiToResponsesResponse`**：`status:"completed"`；`finish_reason:"length"`→`incomplete_details:{reason:"max_output_tokens"}`（`mapFinishReason` 的精确逆）；usage 口径 prompt→input、completion→output、cached→`input_tokens_details`、reasoning→`output_tokens_details`。
+- **流式 `createOpenaiToResponsesStreamTransform`**：事件序列 `response.created`→`output_item.added`→（`output_text.delta` | `function_call_arguments.delta`）*→`output_item.done`→`response.completed`，`sequence_number` 自 0 递增；**usage 仅 `response.completed` 单事件且三值齐全**（§3.1 last-wins 同款红线；上游无 usage → 零值对象不虚构）；`delta.reasoning_content`→`response.reasoning_summary_text.delta`；chat 上游 `data:[DONE]` **仅作终止信号消费、绝不外泄**（Responses 协议无 [DONE]）；流内 error 载荷→发 `response.failed` + warn 后 `finished` 守卫吞掉全部后续 delta，flush 不补发；**缺 `[DONE]` 但无 error 的截断流视为健康收尾**——正常发 `response.completed`，不误标 `response.failed`（显式终止优于悬挂，但不上报假失败）。
+
 ## 4. Validation & Error Matrix
 
 | 条件 | 行为 |
@@ -63,6 +70,8 @@ Anthropic `input_tokens` **不含**缓存 token（`total_input = input + cache_r
 ## 6. Tests Required
 
 `tests/format-converter-anthropic.test.ts`（模式照抄 `format-converter-responses.test.ts`：纯函数直调 + `runStreamTransform` + `parseSseData`）。关键断言点：档位表逐档值、clamp 双边界、采样剥离两分支、`[DONE]` 计数恰一、`thinking_delta`→`reasoning_content` 逐块、末 chunk usage 三项和 + `parseUsageFromSse` 联动（`promptTokens > 0`）、stop_reason 七值、`mapStopReason`/`mapFinishReason` 直测。注意：`tests/` 被 biome（`!tests`）与 tsconfig（`exclude`）双重排除，测试正确性**仅由 vitest 运行时保障**。
+
+responses→chat 方向：`tests/format-converter-responses-inbound.test.ts`（29+ 用例）——请求映射全分支（fail-open 丢弃 + warn 断言、stateful 汇总 warn）、`text.format`↔`response_format` 双向互逆（含 `??` 默认值对称往返）、响应 usage 口径、流式事件序列与 sequence_number、usage 仅 response.completed、无 `[DONE]` 外泄、error→`response.failed` + 吞后续；集成层在 `tests/proxy-responses.test.ts`（AC3 非流式/流式/tools 往返 + `parseUsageFromSse` prompt>0）。
 
 ## 7. Wrong vs Correct
 
