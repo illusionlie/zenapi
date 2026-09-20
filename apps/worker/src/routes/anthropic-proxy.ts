@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { type TokenRecord, tokenAuth } from "../middleware/tokenAuth";
 import { resolveChannelRoute } from "../services/channel-route";
+import { selectTargetFormat } from "../services/channel-routing";
+import { parseApiFormats } from "../services/channel-types";
 import { type ChannelRecord, createWeightedOrder } from "../services/channels";
 import {
 	anthropicToOpenaiRequest,
@@ -153,11 +155,16 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 		return jsonError(c, 503, "no_available_channels", "no_available_channels");
 	}
 
-	// responses-format channels cannot serve Anthropic inbound — there is no
-	// responses→anthropic conversion this phase (design.md D2/D5)
-	candidates = candidates.filter(
-		(ch) => (ch.api_format ?? "openai") !== "responses",
-	);
+	// Routing matrix (design.md §3): pick each channel's target format for the
+	// Anthropic inbound protocol. responses-declared-only channels have no
+	// responses→anthropic conversion and are dropped (design.md D2/D5); a
+	// channel declaring ["anthropic","openai"] targets its native anthropic
+	// format. The target rides on a shallow copy (api_format overridden) so
+	// the per-format branches below act on it unchanged.
+	candidates = candidates.flatMap((ch) => {
+		const targetFormat = selectTargetFormat(parseApiFormats(ch), "anthropic");
+		return targetFormat ? [{ ...ch, api_format: targetFormat }] : [];
+	});
 	if (candidates.length === 0) {
 		return jsonError(c, 503, "no_available_channels", "no_available_channels");
 	}

@@ -3,7 +3,11 @@ import type { AppEnv } from "../env";
 import { type TokenRecord, tokenAuth } from "../middleware/tokenAuth";
 import { extractModelIds } from "../services/channel-models";
 import { resolveChannelRoute } from "../services/channel-route";
-import type { ChannelApiFormat } from "../services/channel-types";
+import {
+	inboundProtocolForPath,
+	selectTargetFormat,
+} from "../services/channel-routing";
+import { parseApiFormats } from "../services/channel-types";
 import {
 	type ChannelRecord,
 	createWeightedOrder,
@@ -12,10 +16,13 @@ import {
 import {
 	anthropicToOpenaiResponse,
 	createAnthropicToOpenaiStreamTransform,
+	createOpenaiToResponsesStreamTransform,
 	createResponsesToChatStreamTransform,
 	openaiToAnthropicRequest,
 	openaiToResponsesRequest,
+	openaiToResponsesResponse,
 	responsesToChatResponse,
+	responsesToOpenaiRequest,
 } from "../services/format-converter";
 import {
 	loadAllChannelAliasesGrouped,
@@ -108,32 +115,11 @@ function isChatPath(path: string): boolean {
 }
 
 /**
- * Routing matrix (design.md §2): channel api_formats eligible for an inbound
- * path. Returns null when every format is eligible (no filtering).
- * - /v1/responses inbound → openai / responses / custom (anthropic excluded:
- *   its converter cannot map `input` and would produce garbage upstream calls)
- * - /v1/chat/completions inbound → all formats (responses channels converted)
- * - other passthrough paths (embeddings etc.) → openai / responses / custom
- *   (anthropic excluded; responses passes through like openai, design D4)
- */
-export function allowedFormatsForPath(
-	path: string,
-): Set<ChannelApiFormat> | null {
-	const lower = path.toLowerCase();
-	if (lower.startsWith("/v1/responses")) {
-		return new Set<ChannelApiFormat>(["openai", "responses", "custom"]);
-	}
-	if (isChatPath(lower)) {
-		return null;
-	}
-	return new Set<ChannelApiFormat>(["openai", "responses", "custom"]);
-}
-
-/**
- * Whether an inbound path triggers the chat↔responses request conversion.
- * Only chat completions inbound is converted — /v1/responses is part of
- * CHAT_PATHS but its body passes through untouched (R4), so its response
- * must too.
+ * Whether the inbound path is a chat completions call that gets converted for
+ * responses-format channels. In the target-format world (design.md §3) this
+ * is equivalent to "target format is responses AND inbound is chat": the
+ * responses-target conversion branch only ever evaluates it under that target,
+ * and the openai-target disguise gate uses it to keep injections chat-only.
  */
 function isConvertedChatPath(path: string): boolean {
 	const lower = path.toLowerCase();
@@ -143,10 +129,15 @@ function isConvertedChatPath(path: string): boolean {
 /**
  * Builds per-channel fetch target and body based on channel api_format.
  * Returns the target URL, headers, and request body.
+ * `channel.api_format` is the selected **target format**: the proxy /
+ * anthropic-proxy / playground handlers pick it per inbound protocol via
+ * `selectTargetFormat` and pass a shallow copy with api_format overridden, so
+ * every branch here (URL rules, headers, disguise) acts on the target.
  * policy 为 null 时跳过全局注入/剔除（Playground 豁免），渠道级 custom_headers
  * 与伪装头经 applyHeaderPolicy 统一在各格式分支生效（剔除 → 全局注入 →
  * 伪装头 → 渠道级）。disguisePrompt 为渠道伪装系统提示词（design §3.1 矩阵）：
  * openai 透传仅 chat 入站注入（messages 为数组时，mutate 后重新 stringify）；
+ * openai 目标 + /v1/responses 入站在转换后的 chat 体 messages 注入；
  * anthropic / responses 分支转换完成后注入；/v1/responses 透传注入
  * instructions；custom 分支不解释 body 仅注入头。
  */
@@ -274,9 +265,37 @@ export function buildChannelRequest(
 		return { target, headers, body: requestText || undefined };
 	}
 
-	// Default: openai pass-through
+	// Default: openai target pass-through
 	// base_url already includes version path (e.g. /v1), so strip /v1 from incoming path
 	const baseUrl = channel.base_url.replace(/\/+$/, "");
+	if (targetPath.toLowerCase().startsWith("/v1/responses")) {
+		// Responses inbound + openai target (design.md §5): the channel declares
+		// no native Responses endpoint, so the request converts into a chat
+		// completions call — the old transparent forward plus its 400/404 path
+		// fallback retry was removed along with that combination (AC8).
+		const target = cfSafeUrl(`${baseUrl}/chat/completions${querySuffix}`);
+		const chatBody = parsedBody ? responsesToOpenaiRequest(parsedBody) : {};
+		if (isStream) {
+			(chatBody as Record<string, unknown>).stream = true;
+			// Chat-only usage injection rides on the fresh converted body (spec
+			// §3.1 last-wins): the original Responses body is never mutated and
+			// the converter never forwards stream_options, so one upstream call
+			// cannot see the field twice.
+			(chatBody as Record<string, unknown>).stream_options = {
+				include_usage: true,
+			};
+		}
+		// Disguise prompt: the converted body is fresh per call — inject into
+		// messages directly (same post-conversion pattern as the anthropic and
+		// responses branches, design §3.1 #2/#3).
+		if (disguisePrompt) {
+			injectSystemPromptOpenAI(
+				chatBody as Record<string, unknown>,
+				disguisePrompt,
+			);
+		}
+		return { target, headers, body: JSON.stringify(chatBody) };
+	}
 	const subPath = targetPath.replace(/^\/v1\b/, "");
 	const target = cfSafeUrl(`${baseUrl}${subPath}${querySuffix}`);
 	headers.set("Authorization", `Bearer ${effectiveKey}`);
@@ -310,10 +329,14 @@ export function buildChannelRequest(
 }
 
 /**
- * Converts upstream response based on channel format back to OpenAI format.
- * inboundPath is the path the upstream request was sent under: responses-format
- * channels only convert when the request was a converted chat completion call —
- * Responses-native (/v1/responses) and passthrough paths return as-is (R4).
+ * Converts upstream response based on the channel's target format back to the
+ * inbound protocol. `channel.api_format` is the target format selected by the
+ * caller; inboundPath is the inbound protocol path:
+ * - responses target + chat inbound → Responses→chat conversion (existing)
+ * - openai target + /v1/responses inbound → chat→Responses conversion (the
+ *   request side was converted to a chat completions call)
+ * - anthropic target → Anthropic→chat conversion
+ * Responses-native (/v1/responses target) and passthrough paths return as-is.
  */
 export async function convertResponse(
 	channel: ChannelRecord,
@@ -344,6 +367,32 @@ export async function convertResponse(
 		const responsesData = (await response.json()) as Record<string, unknown>;
 		const chatData = responsesToChatResponse(responsesData);
 		return new Response(JSON.stringify(chatData), {
+			status: 200,
+			headers: { "content-type": "application/json" },
+		});
+	}
+
+	if (
+		apiFormat === "openai" &&
+		response.ok &&
+		inboundPath.toLowerCase().startsWith("/v1/responses")
+	) {
+		if (isStream && response.body) {
+			const transform = createOpenaiToResponsesStreamTransform();
+			const transformed = response.body.pipeThrough(transform);
+			return new Response(transformed, {
+				status: response.status,
+				headers: {
+					"content-type": "text/event-stream",
+					"cache-control": "no-cache",
+					connection: "keep-alive",
+				},
+			});
+		}
+
+		const chatData = (await response.json()) as Record<string, unknown>;
+		const responsesData = openaiToResponsesResponse(chatData);
+		return new Response(JSON.stringify(responsesData), {
 			status: 200,
 			headers: { "content-type": "application/json" },
 		});
@@ -484,7 +533,6 @@ proxy.get("/models", tokenAuth, async (c) => {
 proxy.all("/*", tokenAuth, async (c) => {
 	const tokenRecord = c.get("tokenRecord") as TokenRecord;
 	let requestText = await c.req.text();
-	const originalRequestText = requestText;
 	const parsedBody = requestText
 		? safeJsonParse<Record<string, unknown> | null>(requestText, null)
 		: null;
@@ -518,10 +566,13 @@ proxy.all("/*", tokenAuth, async (c) => {
 	const perChannelAliasOnlyMap = await loadChannelAliasOnlyMap(c.env.DB);
 
 	const reasoningEffort = extractReasoningEffort(parsedBody);
-	let mutatedStreamOptions = false;
-	// /v1/responses inbound is a Responses-API passthrough (R4): that protocol
-	// has no stream_options parameter (usage arrives in the response.completed
-	// event), so the chat-only usage injection must not mutate its body.
+	// Chat-only stream_options usage injection happens here for chat-shaped
+	// inbound bodies (spec §3.1). /v1/responses inbound is exempt — that
+	// protocol has no stream_options parameter. For responses inbound bodies
+	// the equivalent injection happens post-conversion inside
+	// buildChannelRequest (openai target converts the body into a chat
+	// completions call and injects stream_options on the fresh converted
+	// body), so the final upstream body carries it exactly once.
 	const isResponsesInbound = c.req.path
 		.toLowerCase()
 		.startsWith("/v1/responses");
@@ -537,12 +588,10 @@ proxy.all("/*", tokenAuth, async (c) => {
 			(parsedBody as Record<string, unknown>).stream_options = {
 				include_usage: true,
 			};
-			mutatedStreamOptions = true;
 		} else if (
 			(streamOptions as Record<string, unknown>).include_usage !== true
 		) {
 			(streamOptions as Record<string, unknown>).include_usage = true;
-			mutatedStreamOptions = true;
 		}
 		requestText = JSON.stringify(parsedBody);
 	}
@@ -622,22 +671,27 @@ proxy.all("/*", tokenAuth, async (c) => {
 
 	const targetPath = c.req.path;
 
-	// Routing matrix (design.md §2): drop candidates whose api_format cannot
-	// serve this inbound protocol (null = every format eligible)
-	const allowedFormats = allowedFormatsForPath(targetPath);
-	if (allowedFormats) {
-		candidates = candidates.filter((ch) =>
-			allowedFormats.has(ch.api_format ?? "openai"),
+	// Routing matrix (design.md §3): pick each channel's target format for the
+	// inbound protocol via the shared preference matrix; channels with no
+	// serviceable declared format are dropped. The target rides on a shallow
+	// copy (api_format overridden) so every downstream branch keyed on
+	// channel.api_format — request building, disguise, header policy, response
+	// conversion — naturally acts on the target format.
+	const inboundProtocol = inboundProtocolForPath(targetPath);
+	const routed: ChannelRecord[] = [];
+	for (const ch of candidates) {
+		const targetFormat = selectTargetFormat(
+			parseApiFormats(ch),
+			inboundProtocol,
 		);
-		if (candidates.length === 0) {
-			return jsonError(
-				c,
-				503,
-				"no_available_channels",
-				"no_available_channels",
-			);
+		if (targetFormat) {
+			routed.push({ ...ch, api_format: targetFormat });
 		}
 	}
+	if (routed.length === 0) {
+		return jsonError(c, 503, "no_available_channels", "no_available_channels");
+	}
+	candidates = routed;
 
 	// stream_only channels should not serve non-streaming requests
 	if (!isStream) {
@@ -653,15 +707,12 @@ proxy.all("/*", tokenAuth, async (c) => {
 	}
 
 	const ordered = createWeightedOrder(candidates);
-	const fallbackSubPath =
-		targetPath.toLowerCase() === "/v1/responses" ? "/responses" : null;
 	const querySuffix = c.req.url.includes("?")
 		? `?${c.req.url.split("?")[1]}`
 		: "";
 	const { rounds: retryRounds, delayMs: retryDelayMs } = retryConfig;
 	let lastResponse: Response | null = null;
 	let lastChannel: ChannelRecord | null = null;
-	let lastRequestPath = targetPath;
 	const start = Date.now();
 	let selectedChannel: ChannelRecord | null = null;
 	let selectedModelName: string | null = effectiveModel;
@@ -710,43 +761,20 @@ proxy.all("/*", tokenAuth, async (c) => {
 				);
 
 				try {
-					let response = await fetch(target, {
+					const response = await fetch(target, {
 						method: c.req.method,
 						headers,
 						body: channelBody,
 					});
-					let responsePath = targetPath;
-
-					// Fallback only applies to openai-format channels
-					if (
-						(channel.api_format ?? "openai") === "openai" &&
-						(response.status === 400 || response.status === 404) &&
-						fallbackSubPath
-					) {
-						const strippedBase = normalizeBaseUrl(channel.base_url);
-						const fallbackTarget = cfSafeUrl(
-							`${strippedBase}${fallbackSubPath}${querySuffix}`,
-						);
-						const fallbackBody = mutatedStreamOptions
-							? originalRequestText
-							: channelRequestText;
-						response = await fetch(fallbackTarget, {
-							method: c.req.method,
-							headers,
-							body: fallbackBody || undefined,
-						});
-						responsePath = fallbackSubPath;
-					}
 
 					lastResponse = response;
-					lastRequestPath = responsePath;
 					if (response.ok) {
-						// Convert response based on channel format
+						// Convert response based on the channel's target format
 						lastResponse = await convertResponse(
 							channel,
 							response,
 							isStream,
-							responsePath,
+							targetPath,
 						);
 						selectedChannel = channel;
 						selectedModelName = channelModelName;
@@ -789,7 +817,7 @@ proxy.all("/*", tokenAuth, async (c) => {
 		await recordUsage(c.env.DB, {
 			tokenId: tokenRecord.id,
 			model: effectiveModel,
-			requestPath: lastRequestPath,
+			requestPath: targetPath,
 			totalTokens: 0,
 			latencyMs,
 			firstTokenLatencyMs: isStream ? null : latencyMs,
@@ -841,7 +869,7 @@ proxy.all("/*", tokenAuth, async (c) => {
 				tokenId: tokenRecord.id,
 				channelId: channelForUsage.id,
 				model: effectiveModel,
-				requestPath: lastRequestPath,
+				requestPath: targetPath,
 				totalTokens: normalized.totalTokens,
 				promptTokens: normalized.promptTokens,
 				completionTokens: normalized.completionTokens,

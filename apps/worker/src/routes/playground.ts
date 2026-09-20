@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { collectUniqueModelIds } from "../services/channel-models";
+import { selectTargetFormat } from "../services/channel-routing";
+import { parseApiFormats } from "../services/channel-types";
 import { type ChannelRecord, createWeightedOrder } from "../services/channels";
 import { loadProxyRetryConfig } from "../services/settings";
 import { jsonError } from "../utils/http";
@@ -68,9 +70,20 @@ playground.post("/chat", async (c) => {
 		.bind("active")
 		.all();
 	const activeChannels = (channelResult.results ?? []) as ChannelRecord[];
-	const candidates = activeChannels.filter((ch) =>
-		channelSupportsModel(ch, model),
-	);
+	// Chat inbound (design.md §3.1): playground targets the chat completions
+	// protocol, so each channel's target format comes from the shared routing
+	// matrix with inbound="chat" (every declared format is serviceable —
+	// openai/custom natively, responses/anthropic via the existing conversion
+	// branches — so single-format routing is unchanged, AC13). The target
+	// rides on a shallow copy (api_format overridden) for
+	// buildChannelRequest/convertResponse.
+	const candidates = activeChannels.flatMap((ch) => {
+		if (!channelSupportsModel(ch, model)) {
+			return [];
+		}
+		const targetFormat = selectTargetFormat(parseApiFormats(ch), "chat");
+		return targetFormat ? [{ ...ch, api_format: targetFormat }] : [];
+	});
 
 	if (candidates.length === 0) {
 		return jsonError(c, 503, "no_available_channels", "no_available_channels");

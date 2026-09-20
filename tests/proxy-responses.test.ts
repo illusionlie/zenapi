@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import anthropicApp from "../apps/worker/src/routes/anthropic-proxy";
 import proxyApp, {
-	allowedFormatsForPath,
 	buildChannelRequest,
 	convertResponse,
 } from "../apps/worker/src/routes/proxy";
 import type { ChannelRecord } from "../apps/worker/src/services/channels";
+import { parseUsageFromSse } from "../apps/worker/src/utils/usage";
 
 function makeChannel(
 	overrides: Partial<ChannelRecord> = {},
@@ -139,36 +139,35 @@ const RESPONSES_UPSTREAM_BODY = {
 	usage: { input_tokens: 4, output_tokens: 6, total_tokens: 10 },
 };
 
-describe("allowedFormatsForPath (routing matrix)", () => {
-	it("allows openai/responses/custom for /v1/responses inbound and excludes anthropic", () => {
-		const formats = allowedFormatsForPath("/v1/responses");
-		expect(formats).not.toBeNull();
-		expect(formats?.has("openai")).toBe(true);
-		expect(formats?.has("responses")).toBe(true);
-		expect(formats?.has("custom")).toBe(true);
-		expect(formats?.has("anthropic")).toBe(false);
-	});
+const CHAT_UPSTREAM_BODY = {
+	id: "chatcmpl-1",
+	object: "chat.completion",
+	created: 1730000000,
+	model: "test-model",
+	choices: [
+		{
+			index: 0,
+			message: { role: "assistant", content: "Hello!" },
+			finish_reason: "stop",
+		},
+	],
+	usage: { prompt_tokens: 5, completion_tokens: 7, total_tokens: 12 },
+};
 
-	it("matches /v1/responses case-insensitively", () => {
-		const formats = allowedFormatsForPath("/V1/Responses");
-		expect(formats?.has("anthropic")).toBe(false);
-		expect(formats?.has("responses")).toBe(true);
-	});
+/** Parses `data: {...}` payloads out of an SSE stream, skipping [DONE]. */
+function parseSseEvents(text: string): Array<Record<string, unknown>> {
+	return text
+		.split("\n\n")
+		.filter((block) => block.startsWith("data: "))
+		.map((block) => block.slice(6))
+		.filter((payload) => payload !== "[DONE]")
+		.map((payload) => JSON.parse(payload) as Record<string, unknown>);
+}
 
-	it("does not filter for /v1/chat/completions inbound (all formats eligible)", () => {
-		expect(allowedFormatsForPath("/v1/chat/completions")).toBeNull();
-	});
-
-	it("excludes anthropic but allows responses for non-chat passthrough paths", () => {
-		for (const path of ["/v1/embeddings", "/v1/audio/speech", "/v1/moderations"]) {
-			const formats = allowedFormatsForPath(path);
-			expect(formats?.has("anthropic")).toBe(false);
-			expect(formats?.has("openai")).toBe(true);
-			expect(formats?.has("responses")).toBe(true);
-			expect(formats?.has("custom")).toBe(true);
-		}
-	});
-});
+// Routing matrix unit coverage moved to tests/channel-routing.test.ts
+// (selectTargetFormat: 4 formats × 4 protocols behaviour-preservation grid +
+// multi-format preference). The integration suites below lock the proxy-level
+// outcomes: 503 exclusions, native passthrough and converted calls.
 
 describe("buildChannelRequest responses branch", () => {
 	const channel = makeChannel({ api_format: "responses" });
@@ -700,6 +699,302 @@ describe("OpenAI proxy handler routing matrix (integration)", () => {
 	});
 });
 
+describe("responses inbound + openai-only channel auto-conversion (AC3/AC4)", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("non-stream: upstream gets {base}/chat/completions with a chat body, client gets a Responses body (AC3)", async () => {
+		const fetchMock = vi.fn(async () => jsonResponse(CHAT_UPSTREAM_BODY));
+		vi.stubGlobal("fetch", fetchMock);
+		const { env, runs } = makeEnv([
+			makeChannel({ api_formats: JSON.stringify(["openai"]) }),
+		]);
+		const res = await proxyApp.request(
+			"/v1/responses",
+			{
+				method: "POST",
+				headers: {
+					authorization: "Bearer test-token",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({ model: "test-model", input: "hi" }),
+			},
+			env,
+		);
+		expect(res.status).toBe(200);
+		// Exactly one upstream call — the removed 400/404 path-fallback retry
+		// no longer exists for this combination (AC8)
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		const [target, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		expect(target).toBe("https://upstream.example/v1/chat/completions");
+		const upstreamBody = JSON.parse(String(init.body)) as Record<
+			string,
+			unknown
+		>;
+		expect(upstreamBody.model).toBe("test-model");
+		expect(upstreamBody.messages).toEqual([{ role: "user", content: "hi" }]);
+		expect(upstreamBody.input).toBeUndefined();
+		// Non-stream call: no stream_options injection
+		expect(upstreamBody.stream_options).toBeUndefined();
+
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.object).toBe("response");
+		expect(body.status).toBe("completed");
+		const output = body.output as Array<Record<string, unknown>>;
+		expect(output[0].type).toBe("message");
+		const content = output[0].content as Array<Record<string, unknown>>;
+		expect(content[0]).toEqual({
+			type: "output_text",
+			text: "Hello!",
+			annotations: [],
+		});
+		expect(body.usage).toEqual({
+			input_tokens: 5,
+			output_tokens: 7,
+			total_tokens: 12,
+		});
+
+		// Usage recorded from the Responses JSON (input/output → prompt/completion)
+		const insert = runs.find((r) =>
+			r.sql.includes("INSERT INTO usage_logs"),
+		);
+		expect(insert).toBeDefined();
+		expect(insert?.args[5]).toBe(12);
+		expect(insert?.args[6]).toBe(5);
+		expect(insert?.args[7]).toBe(7);
+	});
+
+	it("stream: upstream chat body carries stream_options.include_usage, client sees Responses events with usage only in response.completed (AC3)", async () => {
+		const chatSseUpstream = [
+			'{"id":"chatcmpl-9","object":"chat.completion.chunk","created":1730000000,"model":"test-model","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}',
+			'{"id":"chatcmpl-9","object":"chat.completion.chunk","created":1730000000,"model":"test-model","choices":[{"index":0,"delta":{"content":"Hel"},"finish_reason":null}]}',
+			'{"id":"chatcmpl-9","object":"chat.completion.chunk","created":1730000000,"model":"test-model","choices":[{"index":0,"delta":{"content":"lo"},"finish_reason":null}]}',
+			'{"id":"chatcmpl-9","object":"chat.completion.chunk","created":1730000000,"model":"test-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}',
+			'{"id":"chatcmpl-9","object":"chat.completion.chunk","created":1730000000,"model":"test-model","choices":[],"usage":{"prompt_tokens":7,"completion_tokens":3,"total_tokens":10}}',
+		]
+			.map((payload) => `data: ${payload}\n\n`)
+			.join("") + "data: [DONE]\n\n";
+		const fetchMock = vi.fn(async () =>
+			new Response(chatSseUpstream, {
+				status: 200,
+				headers: { "content-type": "text/event-stream" },
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const { env, runs } = makeEnv([
+			makeChannel({ api_formats: JSON.stringify(["openai"]) }),
+		]);
+		const mockCtx = makeMockCtx();
+		const res = await proxyApp.request(
+			"/v1/responses",
+			{
+				method: "POST",
+				headers: {
+					authorization: "Bearer test-token",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({
+					model: "test-model",
+					input: "hi",
+					stream: true,
+				}),
+			},
+			env,
+			mockCtx.ctx,
+		);
+		expect(res.status).toBe(200);
+		expect(res.headers.get("content-type")).toBe("text/event-stream");
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		// Upstream received a converted streaming chat call with the usage
+		// injection riding on the converted body (design §4.4)
+		const [target, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		expect(target).toBe("https://upstream.example/v1/chat/completions");
+		const upstreamBody = JSON.parse(String(init.body)) as Record<
+			string,
+			unknown
+		>;
+		expect(upstreamBody.stream).toBe(true);
+		expect(upstreamBody.stream_options).toEqual({ include_usage: true });
+
+		// Client stream speaks Responses protocol and never leaks [DONE]
+		const text = await res.text();
+		expect(text.trimEnd()).not.toMatch(/data: \[DONE\]$/);
+		const events = parseSseEvents(text);
+		expect(events[0].type).toBe("response.created");
+		expect(
+			events.some((e) => e.type === "response.output_text.delta"),
+		).toBe(true);
+		expect(events[events.length - 1].type).toBe("response.completed");
+
+		// Usage rides exactly once, on response.completed, with all three values
+		const withUsage = events.filter(
+			(e) => (e.response as Record<string, unknown> | undefined)?.usage,
+		);
+		expect(withUsage).toHaveLength(1);
+		expect(withUsage[0].type).toBe("response.completed");
+		expect((withUsage[0].response as Record<string, unknown>).usage).toEqual({
+			input_tokens: 7,
+			output_tokens: 3,
+			total_tokens: 10,
+		});
+
+		// parseUsageFromSse over the converted client stream recovers the usage
+		const sseUsage = await parseUsageFromSse(
+			new Response(text, {
+				headers: { "content-type": "text/event-stream" },
+			}),
+		);
+		expect(sseUsage.usage).not.toBeNull();
+		expect(sseUsage.usage?.promptTokens).toBe(7);
+		expect(sseUsage.usage?.promptTokens).toBeGreaterThan(0);
+
+		await mockCtx.awaitTasks();
+		const insert = runs.find((r) =>
+			r.sql.includes("INSERT INTO usage_logs"),
+		);
+		expect(insert).toBeDefined();
+		expect(insert?.args[5]).toBe(10);
+		expect(insert?.args[6]).toBe(7);
+		expect(insert?.args[7]).toBe(3);
+	});
+
+	it("tools round-trip: flat Responses tools convert to nested chat tools and tool_calls come back as function_call output (AC3)", async () => {
+		const fetchMock = vi.fn(async () =>
+			jsonResponse({
+				id: "chatcmpl-2",
+				object: "chat.completion",
+				created: 1730000000,
+				model: "test-model",
+				choices: [
+					{
+						index: 0,
+						message: {
+							role: "assistant",
+							content: null,
+							tool_calls: [
+								{
+									id: "call_1",
+									type: "function",
+									function: {
+										name: "get_weather",
+										arguments: '{"city":"Paris"}',
+									},
+								},
+							],
+						},
+						finish_reason: "tool_calls",
+					},
+				],
+				usage: { prompt_tokens: 9, completion_tokens: 4, total_tokens: 13 },
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const { env } = makeEnv([
+			makeChannel({ api_formats: JSON.stringify(["openai"]) }),
+		]);
+		const res = await proxyApp.request(
+			"/v1/responses",
+			{
+				method: "POST",
+				headers: {
+					authorization: "Bearer test-token",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({
+					model: "test-model",
+					input: "What is the weather in Paris?",
+					tools: [
+						{
+							type: "function",
+							name: "get_weather",
+							description: "Get current weather",
+							parameters: {
+								type: "object",
+								properties: { city: { type: "string" } },
+							},
+						},
+					],
+					tool_choice: "auto",
+				}),
+			},
+			env,
+		);
+		expect(res.status).toBe(200);
+
+		const [target, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		expect(target).toBe("https://upstream.example/v1/chat/completions");
+		const upstreamBody = JSON.parse(String(init.body)) as Record<
+			string,
+			unknown
+		>;
+		expect(upstreamBody.tools).toEqual([
+			{
+				type: "function",
+				function: {
+					name: "get_weather",
+					description: "Get current weather",
+					parameters: {
+						type: "object",
+						properties: { city: { type: "string" } },
+					},
+				},
+			},
+		]);
+		expect(upstreamBody.tool_choice).toBe("auto");
+
+		const body = (await res.json()) as Record<string, unknown>;
+		const output = body.output as Array<Record<string, unknown>>;
+		const functionCall = output.find((item) => item.type === "function_call");
+		expect(functionCall).toMatchObject({
+			call_id: "call_1",
+			name: "get_weather",
+			arguments: '{"city":"Paris"}',
+			status: "completed",
+		});
+	});
+
+	it("responses inbound + [openai,responses] channel: native passthrough to {base}/responses, no path fallback (AC4)", async () => {
+		const fetchMock = vi.fn(async () => jsonResponse(RESPONSES_UPSTREAM_BODY));
+		vi.stubGlobal("fetch", fetchMock);
+		const { env } = makeEnv([
+			makeChannel({
+				api_format: "openai",
+				api_formats: JSON.stringify(["openai", "responses"]),
+			}),
+		]);
+		const rawBody = JSON.stringify({
+			model: "test-model",
+			input: "hi",
+			store: true,
+		});
+		const res = await proxyApp.request(
+			"/v1/responses",
+			{
+				method: "POST",
+				headers: {
+					authorization: "Bearer test-token",
+					"content-type": "application/json",
+				},
+				body: rawBody,
+			},
+			env,
+		);
+		expect(res.status).toBe(200);
+		// Native passthrough wins over the openai conversion (preference order),
+		// and the removed 400/404 path-fallback retry never fires
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const [target, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		expect(target).toBe("https://upstream.example/v1/responses");
+		expect(String(init.body)).toBe(rawBody);
+
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.object).toBe("response");
+	});
+});
+
 describe("Anthropic proxy handler routing (integration)", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
@@ -788,5 +1083,124 @@ describe("Anthropic proxy handler routing (integration)", () => {
 		expect(content[0].type).toBe("text");
 		expect(content[0].text).toBe("Hello!");
 		expect(body.usage).toEqual({ input_tokens: 2, output_tokens: 3 });
+	});
+
+	it("anthropic inbound + [anthropic,openai] channel: native /v1/messages passthrough, no openai conversion (AC6)", async () => {
+		const fetchMock = vi.fn(async () =>
+			jsonResponse({
+				id: "msg_1",
+				type: "message",
+				model: "claude-3",
+				role: "assistant",
+				content: [{ type: "text", text: "Hi" }],
+				stop_reason: "end_turn",
+				usage: { input_tokens: 1, output_tokens: 2 },
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const { env } = makeEnv([
+			makeChannel({
+				api_format: "openai",
+				api_formats: JSON.stringify(["anthropic", "openai"]),
+			}),
+		]);
+		const res = await anthropicApp.request(
+			"/messages",
+			{
+				method: "POST",
+				headers: {
+					authorization: "Bearer test-token",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({
+					model: "test-model",
+					max_tokens: 16,
+					messages: [{ role: "user", content: "hi" }],
+				}),
+			},
+			env,
+		);
+		expect(res.status).toBe(200);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		// Native anthropic endpoint (normalizeBaseUrl strips the /v1 mirror
+		// suffix), authenticated via x-api-key — not the openai conversion path
+		const [target, init] = fetchMock.mock.calls[0] as [
+			string,
+			RequestInit,
+		];
+		expect(target).toBe("https://upstream.example/v1/messages");
+		const headers = init.headers as Headers;
+		expect(headers.get("x-api-key")).toBe("sk-channel");
+		expect(headers.get("authorization")).toBeNull();
+
+		// Original Anthropic body forwarded untouched (no chat conversion)
+		const upstreamBody = JSON.parse(String(init.body)) as Record<
+			string,
+			unknown
+		>;
+		expect(upstreamBody.model).toBe("test-model");
+		expect(upstreamBody.max_tokens).toBe(16);
+		expect(upstreamBody.messages).toEqual([
+			{ role: "user", content: "hi" },
+		]);
+
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.type).toBe("message");
+	});
+
+	it("chat inbound + [openai,anthropic] channel: openai preferred, native passthrough without conversion traces (AC7)", async () => {
+		const fetchMock = vi.fn(async () => jsonResponse(CHAT_UPSTREAM_BODY));
+		vi.stubGlobal("fetch", fetchMock);
+		const { env } = makeEnv([
+			makeChannel({
+				api_format: "anthropic",
+				api_formats: JSON.stringify(["openai", "anthropic"]),
+			}),
+		]);
+		const res = await proxyApp.request(
+			"/v1/chat/completions",
+			{
+				method: "POST",
+				headers: {
+					authorization: "Bearer test-token",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({
+					model: "test-model",
+					messages: [{ role: "user", content: "hi" }],
+				}),
+			},
+			env,
+		);
+		expect(res.status).toBe(200);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		// Preference order picks openai → native chat completions passthrough
+		const [target, init] = fetchMock.mock.calls[0] as [
+			string,
+			RequestInit,
+		];
+		expect(target).toBe("https://upstream.example/v1/chat/completions");
+		const headers = init.headers as Headers;
+		// openai branch keeps Bearer auth; the anthropic branch would have
+		// swapped it for x-api-key only
+		expect(headers.get("authorization")).toBe("Bearer sk-channel");
+		expect(headers.get("x-api-key")).toBe("sk-channel");
+
+		// Chat body verbatim — no anthropic conversion artifacts
+		const upstreamBody = JSON.parse(String(init.body)) as Record<
+			string,
+			unknown
+		>;
+		expect(upstreamBody.model).toBe("test-model");
+		expect(upstreamBody.messages).toEqual([
+			{ role: "user", content: "hi" },
+		]);
+		expect(upstreamBody.system).toBeUndefined();
+
+		// Response returned untouched in chat protocol
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.object).toBe("chat.completion");
 	});
 });

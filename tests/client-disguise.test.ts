@@ -267,6 +267,38 @@ describe("buildChannelRequest disguise wiring (design §3.1)", () => {
 		expect(headers.get("user-agent")).toBe("disguise-cli/1");
 	});
 
+	it("#1b openai target + /v1/responses inbound: prompt lands in the converted chat messages (design §3.1 post-conversion pattern)", () => {
+		const channel = makeChannel({ api_format: "openai" });
+		const parsedBody: Record<string, unknown> = {
+			model: "m",
+			input: "hi",
+		};
+		const { body } = buildChannelRequest(
+			channel,
+			"/v1/responses",
+			"",
+			new Headers(),
+			JSON.stringify(parsedBody),
+			parsedBody,
+			false,
+			"sk-call",
+			null,
+			PROMPT,
+		);
+		const parsed = JSON.parse(body as string) as {
+			messages: Array<{ role: string; content: string }>;
+			input?: unknown;
+		};
+		expect(parsed.messages).toEqual([
+			{ role: "system", content: PROMPT },
+			{ role: "user", content: "hi" },
+		]);
+		// Responses-only fields do not survive the conversion
+		expect(parsed.input).toBeUndefined();
+		// caller's parsed body stays pristine
+		expect(parsedBody.input).toBe("hi");
+	});
+
 	it("#3 responses chat inbound: instructions prefixed", () => {
 		const channel = makeChannel({ api_format: "responses" });
 		const parsedBody: Record<string, unknown> = {
