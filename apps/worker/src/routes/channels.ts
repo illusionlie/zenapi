@@ -239,6 +239,8 @@ channels.post("/", async (c) => {
 		priority: 0,
 		metadata_json: null,
 		api_formats: apiFormats,
+		// Phase A 占位：CRUD 校验/规范化随端点覆盖任务 Phase C 落地
+		endpoint_overrides: null,
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,
@@ -325,6 +327,8 @@ channels.patch("/:id", async (c) => {
 		priority: current.priority ?? 0,
 		metadata_json: current.metadata_json ?? null,
 		api_formats: apiFormats,
+		// Phase A 占位：保留现值（PATCH 三态语义随端点覆盖任务 Phase C 落地）
+		endpoint_overrides: current.endpoint_overrides ?? null,
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,
@@ -512,6 +516,7 @@ channels.post("/test-model", async (c) => {
 		status: dbChannel?.status ?? "active",
 		api_format: targetFormat,
 		api_formats: JSON.stringify(declaredFormats),
+		endpoint_overrides: dbChannel?.endpoint_overrides ?? null,
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,
@@ -586,6 +591,8 @@ channels.post("/:id/test", async (c) => {
 		parseApiFormats(channel),
 		channel.custom_headers_json,
 		channel.disguise_headers_json ?? null,
+		// 逐格式端点覆盖：各声明格式用其解析后端点探测（AC6）
+		channel.endpoint_overrides ?? null,
 	);
 
 	if (!result.ok) {

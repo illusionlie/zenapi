@@ -5,13 +5,16 @@ import {
 } from "../utils/client-disguise";
 import { safeJsonParse } from "../utils/json";
 import { nowIso } from "../utils/time";
-import { normalizeBaseUrl } from "../utils/url";
 import {
 	extractModelPricings,
 	type ModelPricing,
 	modelsToJson,
 	normalizeModelsInput,
 } from "./channel-models";
+import {
+	type EndpointBaseUrlSource,
+	resolveEndpointBaseUrl,
+} from "./channel-routing";
 import type { ChannelApiFormat } from "./channel-types";
 
 export type ChannelFormatProbe = {
@@ -42,18 +45,22 @@ type SingleProbeFailure = { ok: false; error: string };
 
 /**
  * 单格式探测：URL / 头规则与既有单格式实现逐字保持。
+ * baseUrl 前缀经 resolveEndpointBaseUrl 按格式解析（无覆盖时与既有
+ * 逐字行为一致；有 endpoint_overrides 覆盖时命中该格式专用端点）。
  * 语义与现状一致——服务器有响应（任意状态码）即视为可达（该格式探测
  * 成功，模型列表可能为空）；仅网络层失败（fetch reject）才算该格式失败。
  * 伪装头对所有格式生效，但全局头策略从不在此生效（spec：探测不得收敛到
  * applyHeaderPolicy——避免全局注入/剔除泄漏进探测）。
  */
 async function probeChannelFormat(
-	baseUrl: string,
+	row: EndpointBaseUrlSource,
 	apiKey: string,
 	format: ChannelApiFormat,
 	customHeadersJson: string | null | undefined,
 	disguiseHeadersJson: string | null | undefined,
 ): Promise<SingleProbeSuccess | SingleProbeFailure> {
+	// custom：resolver 返回 base_url 原样（不接受覆盖），与既有行为一致
+	const baseUrl = resolveEndpointBaseUrl(row, format);
 	let target: string;
 	const headers: Record<string, string> = {
 		"Content-Type": "application/json",
@@ -63,10 +70,10 @@ async function probeChannelFormat(
 		target = baseUrl;
 	} else if (format === "openai" || format === "responses") {
 		// openai / responses format: base_url already includes version path (e.g. /v1)
-		target = `${baseUrl.replace(/\/+$/, "")}/models`;
+		target = `${baseUrl}/models`;
 	} else {
-		// anthropic format: normalizeBaseUrl strips /v1, then add /v1/models
-		target = `${normalizeBaseUrl(baseUrl)}/v1/models`;
+		// anthropic format: resolver already stripped /v1, then add /v1/models
+		target = `${baseUrl}/v1/models`;
 	}
 
 	if (format === "anthropic") {
@@ -121,7 +128,9 @@ async function probeChannelFormat(
 /**
  * Tests channel connectivity by probing each declared API format.
  * - custom 只能独占（写侧校验保证），单独探测 base_url 本身；
- *   其余格式经 Promise.allSettled 逐个探测。
+ *   其余格式经 Promise.allSettled 逐个探测，逐格式解析各自端点
+ *   （endpointOverridesJson 提供该渠道的每格式端点覆盖，缺省 = 无覆盖，
+ *   全部走 base_url 推导）。
  * - 成功结果按模型 id 去重取并集（按声明顺序先到先得）。
  * - 部分失败不整体失败：结果附 probe_warnings（含失败格式与原因）。
  * - 全部失败（所有探测均网络层失败）→ 整体 ok:false，与既有单格式
@@ -133,16 +142,22 @@ export async function fetchChannelModels(
 	apiFormats: ChannelApiFormat[],
 	customHeadersJson?: string | null,
 	disguiseHeadersJson?: string | null,
+	endpointOverridesJson?: string | null,
 ): Promise<ChannelTestResult> {
 	const nonCustom = apiFormats.filter((format) => format !== "custom");
 	const probeFormats: ChannelApiFormat[] =
 		nonCustom.length > 0 ? nonCustom : ["custom"];
 
+	const row: EndpointBaseUrlSource = {
+		base_url: baseUrl,
+		endpoint_overrides: endpointOverridesJson ?? null,
+	};
+
 	const start = Date.now();
 	const settled = await Promise.allSettled(
 		probeFormats.map((format) =>
 			probeChannelFormat(
-				baseUrl,
+				row,
 				apiKey,
 				format,
 				customHeadersJson,

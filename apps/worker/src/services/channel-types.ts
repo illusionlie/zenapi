@@ -18,6 +18,9 @@ export type ChannelRow = {
 	api_format: ChannelApiFormat;
 	// JSON 数组（能力声明）；api_format 为镜像列，存规范化数组首元素
 	api_formats: string | null;
+	// JSON 对象（每格式独立端点覆盖，键白名单 openai/responses/anthropic）；
+	// NULL = 全部格式走 base_url 推导
+	endpoint_overrides: string | null;
 	custom_headers_json?: string | null;
 	disguise_headers_json?: string | null;
 	disguise_system_prompt?: string | null;
@@ -124,4 +127,61 @@ export function normalizeApiFormats(input: unknown): NormalizeApiFormatsResult {
 	}
 	const ordered = CANONICAL_ORDER.filter((format) => formats.includes(format));
 	return { ok: true, value: ordered };
+}
+
+/** 可被端点覆盖的格式键：custom 的 base_url 即完整 URL，语义上不可覆盖。 */
+export type EndpointOverrideKey = Exclude<ChannelApiFormat, "custom">;
+
+export type EndpointOverrides = Partial<Record<EndpointOverrideKey, string>>;
+
+/** 端点覆盖键白名单（与 EndpointOverrideKey union 一一对应）。 */
+const ENDPOINT_OVERRIDE_KEYS: readonly EndpointOverrideKey[] = [
+	"openai",
+	"responses",
+	"anthropic",
+];
+
+/** parseEndpointOverrides 的输入源：wire 形态是 TEXT 原始 JSON 字符串。 */
+export type EndpointOverridesSource = {
+	endpoint_overrides?: string | null;
+};
+
+/**
+ * 读侧容错解析（与 parseApiFormats 同哲学，任何脏数据不抛错）：
+ *   - 列 NULL / 空串 / 非字符串 → {}
+ *   - JSON.parse 失败 / 顶层非对象（数组、标量、null）→ {}
+ *   - 键白名单过滤（未知键与 custom 键剔除）
+ *   - 值非字符串或空白串剔除（空白覆盖 = 未覆盖）
+ */
+export function parseEndpointOverrides(
+	row: EndpointOverridesSource,
+): EndpointOverrides {
+	if (
+		typeof row.endpoint_overrides !== "string" ||
+		row.endpoint_overrides.trim() === ""
+	) {
+		return {};
+	}
+	try {
+		const parsed: unknown = JSON.parse(row.endpoint_overrides);
+		if (
+			parsed === null ||
+			typeof parsed !== "object" ||
+			Array.isArray(parsed)
+		) {
+			return {};
+		}
+		const source = parsed as Record<string, unknown>;
+		const result: EndpointOverrides = {};
+		for (const key of ENDPOINT_OVERRIDE_KEYS) {
+			const value = source[key];
+			if (typeof value === "string" && value.trim() !== "") {
+				result[key] = value;
+			}
+		}
+		return result;
+	} catch {
+		// 畸形 JSON → 视为无覆盖
+		return {};
+	}
 }

@@ -1,4 +1,9 @@
-import type { ChannelApiFormat } from "./channel-types";
+import { normalizeBaseUrl } from "../utils/url";
+import {
+	type ChannelApiFormat,
+	type EndpointOverridesSource,
+	parseEndpointOverrides,
+} from "./channel-types";
 
 /**
  * 入站协议四分类（design.md §1）：
@@ -68,4 +73,34 @@ export function selectTargetFormat(
 		}
 	}
 	return null;
+}
+
+/** resolveEndpointBaseUrl 的输入源：目标格式 → 上游 URL 推导所需的行片段。 */
+export type EndpointBaseUrlSource = EndpointOverridesSource & {
+	base_url: string;
+};
+
+/**
+ * 目标格式 → 上游 base URL 的唯一解析入口（覆盖优先，兜底 base_url 推导）。
+ * 返回各消费分支「当前实际使用的形态」，无覆盖时与既有分支逻辑逐字节一致
+ * （AC1 红线）：
+ *   - anthropic:          normalizeBaseUrl(base_url)（剥尾斜杠 + 剥 /v1）
+ *   - openai / responses: base_url.replace(/\/+$/, "")（保留版本路径）
+ *   - custom:             base_url 原样（base_url 即完整 URL，不可覆盖）
+ * 有覆盖时按同一消费语义规范化覆盖值：anthropic 覆盖走 normalizeBaseUrl，
+ * openai/responses 覆盖仅去尾斜杠（保留用户声明的版本路径）。
+ * 代理 / anthropic 代理 / 探测的全部 URL 解析点共用，禁止自建推导。
+ */
+export function resolveEndpointBaseUrl(
+	row: EndpointBaseUrlSource,
+	format: ChannelApiFormat,
+): string {
+	if (format === "custom") {
+		return row.base_url;
+	}
+	const override = parseEndpointOverrides(row)[format];
+	if (format === "anthropic") {
+		return normalizeBaseUrl(override ?? row.base_url);
+	}
+	return (override ?? row.base_url).replace(/\/+$/, "");
 }

@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS channels (
   --   openai/responses/anthropic/custom，custom 独占）；api_format 为镜像列，
   --   存规范化数组的首元素（双写保证旧代码回滚可用）。
   api_formats TEXT,
+  -- endpoint_overrides: JSON 对象，每格式独立端点覆盖（键白名单
+  --   openai/responses/anthropic，custom 不可覆盖）；NULL = 全部格式走
+  --   base_url 推导（迁移 0023 加列，无回填）。
+  endpoint_overrides TEXT,
   custom_headers_json TEXT,
   disguise_headers_json TEXT,
   disguise_system_prompt TEXT,

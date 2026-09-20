@@ -177,6 +177,8 @@ export type ChannelInsertInput = {
 	priority: number;
 	metadata_json: string | null;
 	api_formats: ChannelApiFormat[];
+	// 规范化后的 JSON 串（键白名单 openai/responses/anthropic）；repo 不做键校验
+	endpoint_overrides: string | null;
 	custom_headers_json: string | null;
 	disguise_headers_json: string | null;
 	disguise_system_prompt: string | null;
@@ -191,7 +193,7 @@ export async function insertChannel(
 	const apiFormatColumns = toApiFormatColumns(input.api_formats);
 	await db
 		.prepare(
-			"INSERT INTO channels (id, name, base_url, api_key, weight, status, rate_limit, models_json, type, group_name, priority, metadata_json, api_format, api_formats, custom_headers_json, disguise_headers_json, disguise_system_prompt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO channels (id, name, base_url, api_key, weight, status, rate_limit, models_json, type, group_name, priority, metadata_json, api_format, api_formats, endpoint_overrides, custom_headers_json, disguise_headers_json, disguise_system_prompt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		)
 		.bind(
 			input.id,
@@ -208,6 +210,7 @@ export async function insertChannel(
 			input.metadata_json,
 			apiFormatColumns.api_format,
 			apiFormatColumns.api_formats,
+			input.endpoint_overrides,
 			input.custom_headers_json,
 			input.disguise_headers_json,
 			input.disguise_system_prompt,
@@ -230,6 +233,8 @@ export type ChannelUpdateInput = {
 	priority: number;
 	metadata_json: string | null;
 	api_formats: ChannelApiFormat[];
+	// 规范化后的 JSON 串；repo 不做键校验（三态语义由调用方解析）
+	endpoint_overrides: string | null;
 	custom_headers_json: string | null;
 	disguise_headers_json: string | null;
 	disguise_system_prompt: string | null;
@@ -244,7 +249,7 @@ export async function updateChannel(
 	const apiFormatColumns = toApiFormatColumns(input.api_formats);
 	await db
 		.prepare(
-			"UPDATE channels SET name = ?, base_url = ?, api_key = ?, weight = ?, status = ?, rate_limit = ?, models_json = ?, type = ?, group_name = ?, priority = ?, metadata_json = ?, api_format = ?, api_formats = ?, custom_headers_json = ?, disguise_headers_json = ?, disguise_system_prompt = ?, updated_at = ? WHERE id = ?",
+			"UPDATE channels SET name = ?, base_url = ?, api_key = ?, weight = ?, status = ?, rate_limit = ?, models_json = ?, type = ?, group_name = ?, priority = ?, metadata_json = ?, api_format = ?, api_formats = ?, endpoint_overrides = ?, custom_headers_json = ?, disguise_headers_json = ?, disguise_system_prompt = ?, updated_at = ? WHERE id = ?",
 		)
 		.bind(
 			input.name,
@@ -260,6 +265,7 @@ export async function updateChannel(
 			input.metadata_json,
 			apiFormatColumns.api_format,
 			apiFormatColumns.api_formats,
+			input.endpoint_overrides,
 			input.custom_headers_json,
 			input.disguise_headers_json,
 			input.disguise_system_prompt,

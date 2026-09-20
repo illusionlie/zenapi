@@ -2,7 +2,10 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { type TokenRecord, tokenAuth } from "../middleware/tokenAuth";
 import { resolveChannelRoute } from "../services/channel-route";
-import { selectTargetFormat } from "../services/channel-routing";
+import {
+	resolveEndpointBaseUrl,
+	selectTargetFormat,
+} from "../services/channel-routing";
 import { parseApiFormats } from "../services/channel-types";
 import { type ChannelRecord, createWeightedOrder } from "../services/channels";
 import {
@@ -30,7 +33,7 @@ import {
 	loadProxyHeaderPolicy,
 } from "../utils/proxy-headers";
 import { isRetryableStatus, sleep } from "../utils/retry";
-import { cfSafeUrl, normalizeBaseUrl } from "../utils/url";
+import { cfSafeUrl } from "../utils/url";
 import {
 	type NormalizedUsage,
 	normalizeUsage,
@@ -224,7 +227,9 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 
 					if (apiFormat === "anthropic") {
 						// Pass-through: send original Anthropic body directly
-						const baseUrl = normalizeBaseUrl(channel.base_url);
+						// 每格式端点覆盖：无覆盖 = normalizeBaseUrl(base_url)，与既有
+						// 行为逐字节一致；有 anthropic 覆盖 = normalizeBaseUrl(override)
+						const baseUrl = resolveEndpointBaseUrl(channel, "anthropic");
 						const target = cfSafeUrl(`${baseUrl}/v1/messages`);
 						const headers = new Headers();
 						headers.set("x-api-key", String(apiKey));
@@ -277,7 +282,9 @@ anthropicProxy.post("/messages", tokenAuth, async (c) => {
 						}
 					} else if (apiFormat === "openai") {
 						// Convert Anthropic -> OpenAI, send to OpenAI upstream
-						const baseUrl = channel.base_url.replace(/\/+$/, "");
+						// 每格式端点覆盖：无覆盖 = base_url 保留版本路径去尾斜杠，
+						// 与既有行为逐字节一致；有 openai 覆盖 = 覆盖值去尾斜杠
+						const baseUrl = resolveEndpointBaseUrl(channel, "openai");
 						const target = cfSafeUrl(`${baseUrl}/chat/completions`);
 						const headers = new Headers();
 						headers.set("Authorization", `Bearer ${apiKey}`);

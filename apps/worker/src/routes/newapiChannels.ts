@@ -295,6 +295,8 @@ newapi.post("/", async (c) => {
 		priority: parsed.priority ?? 0,
 		metadata_json: parsed.metadata_json ?? null,
 		api_formats: ["openai"],
+		// New API 兼容层不透传端点覆盖（Out of Scope）：POST 固定 NULL
+		endpoint_overrides: null,
 		custom_headers_json: null,
 		disguise_headers_json: null,
 		disguise_system_prompt: null,
@@ -348,6 +350,8 @@ newapi.put("/", async (c) => {
 		metadata_json: mergedMetadata,
 		// PUT 不接受格式声明（New API 兼容层行为不变）：保留现值走读侧兜底链
 		api_formats: parseApiFormats(current),
+		// New API 兼容层不透传端点覆盖（Out of Scope）：PUT 保留现值
+		endpoint_overrides: current.endpoint_overrides ?? null,
 		custom_headers_json: current.custom_headers_json ?? null,
 		disguise_headers_json: current.disguise_headers_json ?? null,
 		disguise_system_prompt: current.disguise_system_prompt ?? null,
@@ -379,6 +383,9 @@ newapi.get("/test/:id", async (c) => {
 		parseApiKeys(String(channel.api_key))[0] ?? String(channel.api_key),
 		parseApiFormats(channel),
 		channel.custom_headers_json,
+		null,
+		// New API 兼容层不透传覆盖，但渠道行可带覆盖（管理端配置）：逐格式解析
+		channel.endpoint_overrides ?? null,
 	);
 	if (!result.ok) {
 		await updateChannelTestResult(c.env.DB, id, {
@@ -423,6 +430,9 @@ newapi.post("/test", async (c) => {
 		parseApiKeys(String(channel.api_key))[0] ?? String(channel.api_key),
 		parseApiFormats(channel),
 		channel.custom_headers_json,
+		null,
+		// New API 兼容层不透传覆盖，但渠道行可带覆盖（管理端配置）：逐格式解析
+		channel.endpoint_overrides ?? null,
 	);
 	if (!result.ok) {
 		await updateChannelTestResult(c.env.DB, String(id), {
@@ -464,6 +474,9 @@ newapi.get("/fetch_models/:id", async (c) => {
 		parseApiKeys(String(channel.api_key))[0] ?? String(channel.api_key),
 		parseApiFormats(channel),
 		channel.custom_headers_json,
+		null,
+		// New API 兼容层不透传覆盖，但渠道行可带覆盖（管理端配置）：逐格式解析
+		channel.endpoint_overrides ?? null,
 	);
 	if (!result.ok) {
 		await updateChannelTestResult(c.env.DB, id, {

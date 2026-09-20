@@ -5,6 +5,7 @@ import { extractModelIds } from "../services/channel-models";
 import { resolveChannelRoute } from "../services/channel-route";
 import {
 	inboundProtocolForPath,
+	resolveEndpointBaseUrl,
 	selectTargetFormat,
 } from "../services/channel-routing";
 import { parseApiFormats } from "../services/channel-types";
@@ -51,7 +52,7 @@ import {
 } from "../utils/proxy-headers";
 import { extractReasoningEffort } from "../utils/reasoning";
 import { isRetryableStatus, sleep } from "../utils/retry";
-import { cfSafeUrl, normalizeBaseUrl } from "../utils/url";
+import { cfSafeUrl } from "../utils/url";
 import {
 	type NormalizedUsage,
 	parseUsageFromHeaders,
@@ -161,7 +162,9 @@ export function buildChannelRequest(
 	headers.delete("content-length");
 
 	if (apiFormat === "anthropic") {
-		const baseUrl = normalizeBaseUrl(channel.base_url);
+		// 每格式端点覆盖（design.md §1）：无覆盖 = normalizeBaseUrl(base_url)，
+		// 与既有行为逐字节一致；有 anthropic 覆盖 = normalizeBaseUrl(override)
+		const baseUrl = resolveEndpointBaseUrl(channel, "anthropic");
 		const target = cfSafeUrl(`${baseUrl}/v1/messages`);
 		headers.set("x-api-key", String(effectiveKey));
 		headers.set("anthropic-version", "2023-06-01");
@@ -193,8 +196,10 @@ export function buildChannelRequest(
 	}
 
 	if (apiFormat === "responses") {
-		// base_url keeps its version path (e.g. /v1), same rule as openai
-		const baseUrl = channel.base_url.replace(/\/+$/, "");
+		// Endpoint resolver: no override → base_url keeps its version path
+		// (e.g. /v1), same rule as openai; a responses override replaces the
+		// prefix (trailing slashes stripped, version path preserved)
+		const baseUrl = resolveEndpointBaseUrl(channel, "responses");
 		const lower = targetPath.toLowerCase();
 		let target: string;
 		let body: string | undefined;
@@ -266,8 +271,10 @@ export function buildChannelRequest(
 	}
 
 	// Default: openai target pass-through
-	// base_url already includes version path (e.g. /v1), so strip /v1 from incoming path
-	const baseUrl = channel.base_url.replace(/\/+$/, "");
+	// Endpoint resolver: no override → base_url already includes version path
+	// (e.g. /v1), so strip /v1 from incoming path; an openai override replaces
+	// the prefix (trailing slashes stripped, version path preserved)
+	const baseUrl = resolveEndpointBaseUrl(channel, "openai");
 	if (targetPath.toLowerCase().startsWith("/v1/responses")) {
 		// Responses inbound + openai target (design.md §5): the channel declares
 		// no native Responses endpoint, so the request converts into a chat
