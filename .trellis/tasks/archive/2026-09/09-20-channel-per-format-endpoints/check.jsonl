@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/09-20-channel-per-format-endpoints/research/recon-endpoints.md", "reason": "验收对照基线：6 处解析点锚点、既有 URL 断言用例位置（AC1 护栏不得弱化断言）、INSERT 位置断言清单"}
+{"file": ".trellis/spec/api-worker/backend/channel-routing.md", "reason": "检查端点解析是否与能力声明契约冲突；无覆盖回退是否 byte-identical；custom 不可覆盖语义"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "质量门禁验收：check/typecheck/test 全绿标准、错误码风格（snake_case 代码现实）"}
+{"file": ".trellis/spec/api-worker/backend/database-guidelines.md", "reason": "检查 0023 迁移幂等性与 schema.sql 同步"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端 0-error 门禁与 a11y 标准；UI 改动验收遵循"}

@@ -1,0 +1,7 @@
+{"file": ".trellis/tasks/09-20-channel-per-format-endpoints/research/recon-endpoints.md", "reason": "格式→URL 全部解析点（6 处）与规范化函数的 file:line 锚点；INSERT 位置断言位移警告；UI 表单/提交链路结构"}
+{"file": ".trellis/spec/api-worker/backend/channel-routing.md", "reason": "前置契约：能力声明语义、偏好序、双写与读侧兜底、base_url 规范化陷阱（design 的端点解析是其延伸，无覆盖分支必须 byte-identical）"}
+{"file": ".trellis/spec/api-worker/backend/database-guidelines.md", "reason": "D1 迁移与 schema.sql 同步、迁移幂等性分层；0023 迁移遵循"}
+{"file": ".trellis/spec/api-worker/backend/patch-update-semantics.md", "reason": "PATCH 三态语义；endpoint_overrides 的 undefined 保留/空清除/值设置设计遵循"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "提交门禁（check/typecheck/test）、错误码 snake_case 代码现实、命名禁则"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "UI 类型集中在 core/types.ts、wire 形态 TEXT JSON 字符串解析惯例（api_formats 同款）"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "表单 a11y（label/htmlFor）、语义化元素、Tailwind 色系；端点覆盖输入框遵循"}
