@@ -14,31 +14,46 @@ import {
 } from "./channel-models";
 import type { ChannelApiFormat } from "./channel-types";
 
+export type ChannelFormatProbe = {
+	api_format: ChannelApiFormat;
+	ok: boolean;
+	model_count: number;
+	error?: string;
+};
+
 export type ChannelTestResult = {
 	ok: boolean;
 	elapsed: number;
 	models: string[];
 	payload?: unknown[] | { data?: unknown[] };
+	/** 部分格式探测失败时的警告（"{format}: {原因}"）；全部成功时缺席 */
+	probe_warnings?: string[];
+	/** 逐格式探测结果（多格式渠道按声明格式逐项给出） */
+	results?: ChannelFormatProbe[];
 };
 
+type SingleProbeSuccess = {
+	ok: true;
+	models: string[];
+	payload?: unknown[] | { data?: unknown[] };
+};
+
+type SingleProbeFailure = { ok: false; error: string };
+
 /**
- * Tests channel connectivity via GET /v1/models.
- * If the server responds (any status), the channel is considered reachable.
- * Models are only populated when the endpoint returns a valid list.
- * For custom format, probes the base_url directly.
- * Disguise headers (D4/AC5) are sent for every format, but the global header
- * policy never applies here (spec: the probe must not converge onto
- * applyHeaderPolicy — that would leak global inject/remove into probes).
+ * 单格式探测：URL / 头规则与既有单格式实现逐字保持。
+ * 语义与现状一致——服务器有响应（任意状态码）即视为可达（该格式探测
+ * 成功，模型列表可能为空）；仅网络层失败（fetch reject）才算该格式失败。
+ * 伪装头对所有格式生效，但全局头策略从不在此生效（spec：探测不得收敛到
+ * applyHeaderPolicy——避免全局注入/剔除泄漏进探测）。
  */
-export async function fetchChannelModels(
+async function probeChannelFormat(
 	baseUrl: string,
 	apiKey: string,
-	apiFormat?: ChannelApiFormat,
-	customHeadersJson?: string | null,
-	disguiseHeadersJson?: string | null,
-): Promise<ChannelTestResult> {
-	const format = apiFormat ?? "openai";
-
+	format: ChannelApiFormat,
+	customHeadersJson: string | null | undefined,
+	disguiseHeadersJson: string | null | undefined,
+): Promise<SingleProbeSuccess | SingleProbeFailure> {
 	let target: string;
 	const headers: Record<string, string> = {
 		"Content-Type": "application/json",
@@ -79,14 +94,12 @@ export async function fetchChannelModels(
 		}
 	}
 
-	const start = Date.now();
 	try {
 		const response = await fetch(target, { method: "GET", headers });
-		const elapsed = Date.now() - start;
 
 		if (!response.ok) {
 			// Server responded — channel is reachable, just no model list
-			return { ok: true, elapsed, models: [] };
+			return { ok: true, models: [] };
 		}
 
 		const payload = (await response.json().catch(() => ({ data: [] }))) as
@@ -95,12 +108,119 @@ export async function fetchChannelModels(
 		const models = normalizeModelsInput(
 			Array.isArray(payload) ? payload : (payload.data ?? payload),
 		);
-		return { ok: true, elapsed, models, payload };
-	} catch {
-		// Network error — truly unreachable
-		const elapsed = Date.now() - start;
-		return { ok: false, elapsed, models: [] };
+		return { ok: true, models, payload };
+	} catch (error) {
+		// Network error — this format's probe failed
+		return {
+			ok: false,
+			error: error instanceof Error ? error.message : String(error),
+		};
 	}
+}
+
+/**
+ * Tests channel connectivity by probing each declared API format.
+ * - custom 只能独占（写侧校验保证），单独探测 base_url 本身；
+ *   其余格式经 Promise.allSettled 逐个探测。
+ * - 成功结果按模型 id 去重取并集（按声明顺序先到先得）。
+ * - 部分失败不整体失败：结果附 probe_warnings（含失败格式与原因）。
+ * - 全部失败（所有探测均网络层失败）→ 整体 ok:false，与既有单格式
+ *   「网络不可达」语义一致，路由侧继续走 502 channel_unreachable。
+ */
+export async function fetchChannelModels(
+	baseUrl: string,
+	apiKey: string,
+	apiFormats: ChannelApiFormat[],
+	customHeadersJson?: string | null,
+	disguiseHeadersJson?: string | null,
+): Promise<ChannelTestResult> {
+	const nonCustom = apiFormats.filter((format) => format !== "custom");
+	const probeFormats: ChannelApiFormat[] =
+		nonCustom.length > 0 ? nonCustom : ["custom"];
+
+	const start = Date.now();
+	const settled = await Promise.allSettled(
+		probeFormats.map((format) =>
+			probeChannelFormat(
+				baseUrl,
+				apiKey,
+				format,
+				customHeadersJson,
+				disguiseHeadersJson,
+			),
+		),
+	);
+	const elapsed = Date.now() - start;
+
+	const results: ChannelFormatProbe[] = [];
+	const warnings: string[] = [];
+	const models: string[] = [];
+	const seen = new Set<string>();
+	let firstPayload: unknown[] | { data?: unknown[] } | undefined;
+	let firstError: string | null = null;
+
+	for (let i = 0; i < probeFormats.length; i++) {
+		const format = probeFormats[i];
+		const outcome = settled[i];
+		// probeChannelFormat 自捕获网络错误，reject 分支纯防御
+		const probe: SingleProbeSuccess | SingleProbeFailure =
+			outcome.status === "fulfilled"
+				? outcome.value
+				: {
+						ok: false,
+						error:
+							outcome.reason instanceof Error
+								? outcome.reason.message
+								: String(outcome.reason),
+					};
+		if (probe.ok) {
+			results.push({
+				api_format: format,
+				ok: true,
+				model_count: probe.models.length,
+			});
+			for (const model of probe.models) {
+				if (!seen.has(model)) {
+					seen.add(model);
+					models.push(model);
+				}
+			}
+			if (probe.payload !== undefined && firstPayload === undefined) {
+				firstPayload = probe.payload;
+			}
+		} else {
+			results.push({
+				api_format: format,
+				ok: false,
+				model_count: 0,
+				error: probe.error,
+			});
+			warnings.push(`${format}: ${probe.error}`);
+			if (firstError === null) {
+				firstError = probe.error;
+			}
+		}
+	}
+
+	const allFailed = results.every((entry) => !entry.ok);
+	if (allFailed) {
+		return {
+			ok: false,
+			elapsed,
+			models: [],
+			probe_warnings: warnings,
+			results,
+		};
+	}
+
+	return {
+		ok: true,
+		elapsed,
+		models,
+		payload: firstPayload,
+		...(warnings.length > 0 ? { probe_warnings: warnings } : {}),
+		results,
+	};
 }
 
 export async function updateChannelTestResult(

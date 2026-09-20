@@ -20,6 +20,7 @@ import {
 	fetchChannelModels,
 	updateChannelTestResult,
 } from "../services/channel-testing";
+import { parseApiFormats } from "../services/channel-types";
 import {
 	mergeMetadata,
 	modelsToJson,
@@ -345,7 +346,8 @@ newapi.put("/", async (c) => {
 		group_name: parsed.group_name ?? current.group_name ?? null,
 		priority: parsed.priority ?? current.priority ?? 0,
 		metadata_json: mergedMetadata,
-		api_formats: [current.api_format ?? "openai"],
+		// PUT 不接受格式声明（New API 兼容层行为不变）：保留现值走读侧兜底链
+		api_formats: parseApiFormats(current),
 		custom_headers_json: current.custom_headers_json ?? null,
 		disguise_headers_json: current.disguise_headers_json ?? null,
 		disguise_system_prompt: current.disguise_system_prompt ?? null,
@@ -375,7 +377,7 @@ newapi.get("/test/:id", async (c) => {
 	const result = await fetchChannelModels(
 		String(channel.base_url),
 		parseApiKeys(String(channel.api_key))[0] ?? String(channel.api_key),
-		channel.api_format,
+		parseApiFormats(channel),
 		channel.custom_headers_json,
 	);
 	if (!result.ok) {
@@ -419,7 +421,7 @@ newapi.post("/test", async (c) => {
 	const result = await fetchChannelModels(
 		String(channel.base_url),
 		parseApiKeys(String(channel.api_key))[0] ?? String(channel.api_key),
-		channel.api_format,
+		parseApiFormats(channel),
 		channel.custom_headers_json,
 	);
 	if (!result.ok) {
@@ -460,7 +462,7 @@ newapi.get("/fetch_models/:id", async (c) => {
 	const result = await fetchChannelModels(
 		String(channel.base_url),
 		parseApiKeys(String(channel.api_key))[0] ?? String(channel.api_key),
-		channel.api_format,
+		parseApiFormats(channel),
 		channel.custom_headers_json,
 	);
 	if (!result.ok) {
@@ -504,6 +506,8 @@ newapi.post("/fetch_models", async (c) => {
 	const result = await fetchChannelModels(
 		String(body.base_url),
 		String(body.key),
+		// 无渠道行（表单探测）：固定默认格式，行为与既有实现一致
+		["openai"],
 	);
 	if (!result.ok) {
 		return newApiFailure(c, 502, "获取模型失败");

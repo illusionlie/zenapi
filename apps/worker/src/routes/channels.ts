@@ -9,13 +9,16 @@ import {
 	listChannels,
 	updateChannel,
 } from "../services/channel-repo";
+import { selectTargetFormat } from "../services/channel-routing";
 import {
 	fetchChannelModels,
 	updateChannelTestResult,
 } from "../services/channel-testing";
-import type {
-	ChannelApiFormat,
-	ChannelRecord,
+import {
+	type ChannelApiFormat,
+	type ChannelRecord,
+	normalizeApiFormats,
+	parseApiFormats,
 } from "../services/channel-types";
 import { saveChannelAliases } from "../services/model-aliases";
 import {
@@ -51,11 +54,78 @@ type ChannelPayload = {
 	rate_limit?: number;
 	models?: unknown[];
 	api_format?: string;
+	api_formats?: unknown;
 	custom_headers?: string;
 	disguise_headers?: string;
 	disguise_system_prompt?: string;
 	model_aliases?: Record<string, AliasConfig>;
 };
+
+/**
+ * 校验失败时 400 响应的 message：说明具体原因（格式声明不可为空、不给
+ * 「清除」态——null/[]/非法值一律 400，遵循 patch-update-semantics 的
+ * 「非法值不静默回退」精神）。code 固定 invalid_api_formats（snake_case，
+ * 与同文件既有错误码风格一致）。
+ */
+const FORMAT_REASON_MESSAGES: Record<string, string> = {
+	not_array: "api_formats must be an array of format strings",
+	empty:
+		"api_formats cannot be empty or contain no valid format; omit the field to keep current values",
+	custom_exclusive: "custom format cannot be combined with other formats",
+};
+
+function invalidFormatsError(reason: string): {
+	message: string;
+	code: string;
+} {
+	return {
+		message: FORMAT_REASON_MESSAGES[reason] ?? "invalid_api_formats",
+		code: "invalid_api_formats",
+	};
+}
+
+/**
+ * 解析请求体声明的格式集：api_formats 优先，legacy 单值 api_format 映射
+ * 为单元素数组，两者都缺 → value: null（由调用方决定默认值或保留现值）。
+ * 提供了任一字段但校验失败（非数组 / 空 / custom 组合）→ ok:false。
+ */
+function resolveBodyApiFormats(
+	body: ChannelPayload,
+):
+	| { ok: true; value: ChannelApiFormat[] | null }
+	| { ok: false; reason: string } {
+	if (body.api_formats !== undefined) {
+		const normalized = normalizeApiFormats(body.api_formats);
+		return normalized.ok
+			? { ok: true, value: normalized.value }
+			: { ok: false, reason: normalized.reason };
+	}
+	if (body.api_format !== undefined) {
+		const normalized = normalizeApiFormats([body.api_format]);
+		return normalized.ok
+			? { ok: true, value: normalized.value }
+			: { ok: false, reason: normalized.reason };
+	}
+	return { ok: true, value: null };
+}
+
+/**
+ * base_url 存储规范化。纯 anthropic 渠道沿用 normalizeBaseUrl（存量单格式
+ * 行为逐字节不变）；其余（含多格式）trim + 去尾斜杠——openai/responses
+ * 端点的存储约定要求 base_url 保留版本路径（如 /v1），normalizeBaseUrl
+ * 会剥离 /v1 造成有损转换；而 anthropic 端点在请求时（buildChannelRequest
+ * anthropic 分支与探测均再做 normalizeBaseUrl）自会剥离，因此多格式渠道
+ * 存储带版本路径的 base_url 对两类端点均可用。
+ */
+function normalizeChannelBaseUrl(
+	formats: ChannelApiFormat[],
+	rawBaseUrl: string,
+): string {
+	if (formats.length === 1 && formats[0] === "anthropic") {
+		return normalizeBaseUrl(rawBaseUrl);
+	}
+	return String(rawBaseUrl).trim().replace(/\/+$/, "");
+}
 
 /**
  * Resolves a channel id from request payload.
@@ -143,7 +213,14 @@ channels.post("/", async (c) => {
 
 	const id = requestedId ?? generateToken("ch_");
 	const now = nowIso();
-	const apiFormat = (body.api_format ?? "openai") as ChannelApiFormat;
+	// 格式声明：api_formats 优先，legacy api_format 映射单元素数组，
+	// 都没有 → 默认 ["openai"]（历史默认值）
+	const formats = resolveBodyApiFormats(body);
+	if (!formats.ok) {
+		const error = invalidFormatsError(formats.reason);
+		return jsonError(c, 400, error.message, error.code);
+	}
+	const apiFormats: ChannelApiFormat[] = formats.value ?? ["openai"];
 	const customHeadersJson = body.custom_headers?.trim() || null;
 	const disguiseHeadersJson = body.disguise_headers?.trim() || null;
 	const disguiseSystemPrompt = body.disguise_system_prompt?.trim() || null;
@@ -151,10 +228,7 @@ channels.post("/", async (c) => {
 	await insertChannel(c.env.DB, {
 		id,
 		name: body.name,
-		base_url:
-			apiFormat === "anthropic"
-				? normalizeBaseUrl(String(body.base_url))
-				: String(body.base_url).trim().replace(/\/+$/, ""),
+		base_url: normalizeChannelBaseUrl(apiFormats, String(body.base_url)),
 		api_key: body.api_key ?? "",
 		weight: Number(body.weight ?? 1),
 		status: body.status ?? "active",
@@ -164,7 +238,7 @@ channels.post("/", async (c) => {
 		group_name: null,
 		priority: 0,
 		metadata_json: null,
-		api_formats: [apiFormat],
+		api_formats: apiFormats,
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,
@@ -210,9 +284,16 @@ channels.patch("/:id", async (c) => {
 	}
 
 	const models = body.models ?? safeJsonParse(current.models_json, []);
-	const apiFormat = (body.api_format ??
-		current.api_format ??
-		"openai") as ChannelApiFormat;
+	// 格式声明三态（patch-update-semantics）：undefined（api_formats 与
+	// legacy api_format 均缺席）→ 保留现值；提供任一字段即整体替换，且
+	// null / 空数组 / 非法值一律 400——格式声明不可为空，不提供「清除」态
+	const formats = resolveBodyApiFormats(body);
+	if (!formats.ok) {
+		const error = invalidFormatsError(formats.reason);
+		return jsonError(c, 400, error.message, error.code);
+	}
+	const apiFormats: ChannelApiFormat[] =
+		formats.value ?? parseApiFormats(current);
 	const customHeadersJson =
 		body.custom_headers !== undefined
 			? body.custom_headers?.trim() || null
@@ -226,12 +307,10 @@ channels.patch("/:id", async (c) => {
 		body.disguise_system_prompt !== undefined
 			? body.disguise_system_prompt?.trim() || null
 			: (current.disguise_system_prompt ?? null);
-	const baseUrl =
-		apiFormat === "anthropic"
-			? normalizeBaseUrl(String(body.base_url ?? current.base_url))
-			: String(body.base_url ?? current.base_url)
-					.trim()
-					.replace(/\/+$/, "");
+	const baseUrl = normalizeChannelBaseUrl(
+		apiFormats,
+		String(body.base_url ?? current.base_url),
+	);
 
 	await updateChannel(c.env.DB, id, {
 		name: body.name ?? current.name,
@@ -245,7 +324,7 @@ channels.patch("/:id", async (c) => {
 		group_name: current.group_name ?? null,
 		priority: current.priority ?? 0,
 		metadata_json: current.metadata_json ?? null,
-		api_formats: [apiFormat],
+		api_formats: apiFormats,
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,
@@ -293,18 +372,22 @@ channels.post("/fetch_models", async (c) => {
 		return jsonError(c, 400, "missing_fields", "missing_fields");
 	}
 
-	const apiFormat = (body.api_format ?? "openai") as ChannelApiFormat;
-	const baseUrl =
-		apiFormat === "anthropic"
-			? normalizeBaseUrl(String(body.base_url))
-			: String(body.base_url).trim().replace(/\/+$/, "");
+	// 表单即真相：body 声明的格式集优先（api_formats 优先于 legacy
+	// api_format），都缺 → 默认 ["openai"]
+	const formats = resolveBodyApiFormats(body);
+	if (!formats.ok) {
+		const error = invalidFormatsError(formats.reason);
+		return jsonError(c, 400, error.message, error.code);
+	}
+	const apiFormats: ChannelApiFormat[] = formats.value ?? ["openai"];
+	const baseUrl = normalizeChannelBaseUrl(apiFormats, String(body.base_url));
 	const apiKey =
 		parseApiKeys(body.api_key ?? "")[0] ?? String(body.api_key ?? "");
 
 	const result = await fetchChannelModels(
 		baseUrl,
 		apiKey,
-		apiFormat,
+		apiFormats,
 		body.custom_headers?.trim() || null,
 		body.disguise_headers?.trim() || null,
 	);
@@ -313,7 +396,13 @@ channels.post("/fetch_models", async (c) => {
 		return jsonError(c, 502, "channel_unreachable", "channel_unreachable");
 	}
 
-	return c.json({ ok: true, models: result.models, elapsed: result.elapsed });
+	return c.json({
+		ok: true,
+		models: result.models,
+		elapsed: result.elapsed,
+		results: result.results ?? [],
+		...(result.probe_warnings ? { probe_warnings: result.probe_warnings } : {}),
+	});
 });
 
 type ModelTestPayload = {
@@ -371,13 +460,22 @@ channels.post("/test-model", async (c) => {
 		}
 	}
 
-	const apiFormat = (body?.api_format ??
-		dbChannel?.api_format ??
-		"openai") as ChannelApiFormat;
+	// 表单即真相：body 声明的格式集优先（api_formats 优先于 legacy
+	// api_format），回退 DB 行（parseApiFormats 读侧兜底链）。目标格式 =
+	// chat 入站偏好序的首个声明格式（chat 可服务全部四格式，声明集经
+	// 兜底链非空，?? "openai" 仅为类型收窄的防御兜底）
+	const bodyFormats = body
+		? resolveBodyApiFormats(body)
+		: { ok: true as const, value: null };
+	if (!bodyFormats.ok) {
+		const error = invalidFormatsError(bodyFormats.reason);
+		return jsonError(c, 400, error.message, error.code);
+	}
+	const declaredFormats: ChannelApiFormat[] =
+		bodyFormats.value ?? (dbChannel ? parseApiFormats(dbChannel) : ["openai"]);
+	const targetFormat = selectTargetFormat(declaredFormats, "chat") ?? "openai";
 	const baseUrl = hasBodyBaseUrl
-		? apiFormat === "anthropic"
-			? normalizeBaseUrl(String(body?.base_url))
-			: String(body?.base_url).trim().replace(/\/+$/, "")
+		? normalizeChannelBaseUrl(declaredFormats, String(body?.base_url))
 		: String(dbChannel?.base_url ?? "");
 	const apiKey =
 		body?.api_key !== undefined
@@ -402,7 +500,9 @@ channels.post("/test-model", async (c) => {
 
 	// Minimal ChannelRecord: buildChannelRequest only reads base_url /
 	// api_key / api_format / custom_headers_json / disguise_*（plus typing-required
-	// identity fields）.
+	// identity fields）. api_format 以 chat 偏好序选出的目标格式覆盖
+	// （与 proxy 路由矩阵的浅拷贝覆盖同构），api_formats 镜像按 repo 双写
+	// 约定取声明集 JSON。
 	const channelLike: ChannelRecord = {
 		id: dbChannel?.id ?? "model-test",
 		name: dbChannel?.name ?? "model-test",
@@ -410,8 +510,8 @@ channels.post("/test-model", async (c) => {
 		api_key: apiKey,
 		weight: Number(dbChannel?.weight ?? 1),
 		status: dbChannel?.status ?? "active",
-		api_format: apiFormat,
-		api_formats: null,
+		api_format: targetFormat,
+		api_formats: JSON.stringify(declaredFormats),
 		custom_headers_json: customHeadersJson,
 		disguise_headers_json: disguiseHeadersJson,
 		disguise_system_prompt: disguiseSystemPrompt,
@@ -483,7 +583,7 @@ channels.post("/:id/test", async (c) => {
 	const result = await fetchChannelModels(
 		String(channel.base_url),
 		parseApiKeys(String(channel.api_key))[0] ?? String(channel.api_key),
-		channel.api_format,
+		parseApiFormats(channel),
 		channel.custom_headers_json,
 		channel.disguise_headers_json ?? null,
 	);
@@ -521,7 +621,12 @@ channels.post("/:id/test", async (c) => {
 	const models = hasModels
 		? result.models
 		: safeJsonParse(channel.models_json, []);
-	return c.json({ ok: true, models });
+	return c.json({
+		ok: true,
+		models,
+		results: result.results ?? [],
+		...(result.probe_warnings ? { probe_warnings: result.probe_warnings } : {}),
+	});
 });
 
 export default channels;
