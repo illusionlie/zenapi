@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/09-20-channel-multi-api-format/research/recon-api-format.md", "reason": "验收对照的事实基线：各消费点 file:line 锚点、单格式行为保持表、既有测试清单（哪些断言需更新）"}
+{"file": ".trellis/spec/api-worker/backend/format-conversion.md", "reason": "检查新增转换器是否违反契约：usage 末 chunk、口径换算、fail-open、[DONE] 单发、error 终止、tests 由 vitest 运行时保障（tests/ 被 biome 与 tsconfig 排除）"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "质量门禁验收：bun run check/typecheck/test 全绿标准与命名禁则"}
+{"file": ".trellis/spec/api-worker/backend/database-guidelines.md", "reason": "检查 0022 迁移幂等性与 schema.sql 同步"}
+{"file": ".trellis/spec/api-worker-ui/frontend/quality-guidelines.md", "reason": "前端 0-error 门禁与 a11y 清偿标准；UI 改动验收遵循"}

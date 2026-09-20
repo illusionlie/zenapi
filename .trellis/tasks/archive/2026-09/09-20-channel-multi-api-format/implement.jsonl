@@ -1,0 +1,9 @@
+{"file": ".trellis/tasks/09-20-channel-multi-api-format/research/recon-api-format.md", "reason": "全库侦察事实与 file:line 锚点：api_format 全部消费点、三套路由过滤、两套请求构造、转换器能力矩阵、测试覆盖清单，实现时的定位基准"}
+{"file": ".trellis/spec/api-worker/backend/format-conversion.md", "reason": "转换器契约红线：usage 单末 chunk 三值、口径换算、fail-open 丢弃、[DONE] 恰一次、error 降级终止；新增 responses→chat 三函数必须遵守"}
+{"file": ".trellis/spec/api-worker/backend/database-guidelines.md", "reason": "D1 迁移与 schema.sql 同步、迁移幂等性分层；0022 迁移遵循"}
+{"file": ".trellis/spec/api-worker/backend/directory-structure.md", "reason": "routes 薄壳 + services 下沉规范；channel-routing 新服务与端点描述函数的落位依据"}
+{"file": ".trellis/spec/api-worker/backend/patch-update-semantics.md", "reason": "PATCH 三态语义（undefined 保留/null 清除/值设置）与纯函数 resolver 模式；api_formats 更新语义设计遵循（不可空字段不给清除态）"}
+{"file": ".trellis/spec/api-worker/backend/logging-guidelines.md", "reason": "console.* 前缀标签惯例；fail-open 丢弃走 [format-converter] warn"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "提交门禁（check/typecheck/test）、Biome 规则、命名禁则"}
+{"file": ".trellis/spec/api-worker-ui/frontend/type-safety.md", "reason": "UI 类型集中在 core/types.ts、snake_case 直通；Channel/ChannelForm.api_formats 定义遵循"}
+{"file": ".trellis/spec/api-worker-ui/frontend/component-guidelines.md", "reason": "表单 a11y（htmlFor/aria）、语义化按钮、Tailwind 色系；格式多选 chips 交互实现遵循"}
