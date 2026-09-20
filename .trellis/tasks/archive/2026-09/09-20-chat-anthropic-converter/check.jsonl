@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "质量门禁：check/typecheck/test 全绿 + Biome 规则"}
+{"file": ".trellis/spec/api-worker/backend/error-handling.md", "reason": "核对保守丢弃语义未被反转（不因脏部件使整个请求失败）"}
+{"file": ".trellis/spec/api-worker/backend/logging-guidelines.md", "reason": "核对新增日志符合前缀标签惯例"}
+{"file": ".trellis/tasks/09-20-chat-anthropic-converter/research/anthropic-conversion-surface.md", "reason": "核对映射实现与文档事实一致（budget 下限、usage 三项和、stop 枚举、audio/video 不支持）"}

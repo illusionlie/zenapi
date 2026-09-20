@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/api-worker/backend/index.md", "reason": "后端规范索引：routes 薄壳 + services 下沉原则，转换器属 services 纯函数层"}
+{"file": ".trellis/spec/api-worker/backend/quality-guidelines.md", "reason": "提交门禁 check/typecheck/test、Biome tab 缩进双引号、命名禁则"}
+{"file": ".trellis/spec/api-worker/backend/directory-structure.md", "reason": "services 纯函数与 routes 职责边界：新映射辅助函数的落位依据"}
+{"file": ".trellis/spec/api-worker/backend/logging-guidelines.md", "reason": "丢弃不支持部件（audio 等）时 warn 日志的前缀标签惯例"}
+{"file": ".trellis/tasks/09-20-chat-anthropic-converter/research/anthropic-conversion-surface.md", "reason": "文档实抓转换面报告：thinking 形态/约束、多模态 source、usage 口径、stop_reason 枚举——映射表的事实依据"}
