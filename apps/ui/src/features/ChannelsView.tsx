@@ -6,13 +6,18 @@ import {
 	useState,
 } from "hono/jsx/dom";
 import { CLIENT_PRESETS, type ClientPreset } from "../core/client-presets";
+import {
+	CHANNEL_API_FORMATS,
+	formatBadgeColors,
+	formatLabels,
+} from "../core/constants";
 import type {
 	Channel,
 	ChannelApiFormat,
 	ChannelForm,
 	ModelTestResult,
 } from "../core/types";
-import { buildPageItems } from "../core/utils";
+import { buildPageItems, parseChannelApiFormats } from "../core/utils";
 import type { ModelAliasesMap } from "../UserApp";
 import { Modal } from "./Modal";
 
@@ -252,20 +257,6 @@ type ChannelsViewProps = {
 
 const pageSizeOptions = [10, 20, 50];
 
-const formatLabels: Record<ChannelApiFormat, string> = {
-	openai: "OpenAI",
-	anthropic: "Anthropic",
-	custom: "Custom",
-	responses: "Responses",
-};
-
-const formatBadgeColors: Record<ChannelApiFormat, string> = {
-	openai: "border-blue-100 bg-blue-50 text-blue-600",
-	anthropic: "border-orange-100 bg-orange-50 text-orange-600",
-	custom: "border-purple-100 bg-purple-50 text-purple-600",
-	responses: "border-teal-100 bg-teal-50 text-teal-600",
-};
-
 const baseUrlPlaceholders: Record<ChannelApiFormat, string> = {
 	openai: "https://api.openai.com/v1",
 	anthropic: "https://api.anthropic.com/anthropic",
@@ -387,6 +378,38 @@ export const ChannelsView = ({
 		[selectedFetched, existingModelIdSet],
 	);
 
+	// —— API 格式多选（custom 独占：勾选即清空其余并禁用其余 chip，切出后恢复可选） ——
+	const selectedFormats = channelForm.api_formats;
+	const hasCustom = selectedFormats.includes("custom");
+	const isPureAnthropic =
+		selectedFormats.length === 1 && selectedFormats[0] === "anthropic";
+	// base_url 存储约定：保留版本路径（如 /v1）；anthropic 端点在请求时自动
+	// 规范化，多格式含 anthropic 也沿用通用 openai 形态提示，仅纯 anthropic
+	// 渠道（存储经 normalizeBaseUrl）提示 anthropic 形态
+	const baseUrlPlaceholder = hasCustom
+		? baseUrlPlaceholders.custom
+		: isPureAnthropic
+			? baseUrlPlaceholders.anthropic
+			: baseUrlPlaceholders.openai;
+	const toggleApiFormat = useCallback(
+		(format: ChannelApiFormat) => {
+			const current = channelForm.api_formats;
+			if (format === "custom") {
+				// custom 独占：勾选即独占；再点取消 → 清空（提交前由「至少一项」校验兜底）
+				onFormChange({
+					api_formats: current.includes("custom") ? [] : ["custom"],
+				});
+				return;
+			}
+			onFormChange({
+				api_formats: current.includes(format)
+					? current.filter((item) => item !== format)
+					: [...current, format],
+			});
+		},
+		[channelForm.api_formats, onFormChange],
+	);
+
 	// —— 模型测试派生状态 ——
 	const visibleTestModels = useMemo(
 		() =>
@@ -404,9 +427,11 @@ export const ChannelsView = ({
 		channelForm.base_url.trim() !== "" && channelForm.api_key.trim() !== "";
 	const testDisabledHint = !hasTestTarget
 		? "请先填写 Base URL 与 API Key"
-		: selectedTestList.length === 0
-			? "请先勾选要测试的模型"
-			: "";
+		: selectedFormats.length === 0
+			? "请先选择至少一种 API 格式"
+			: selectedTestList.length === 0
+				? "请先勾选要测试的模型"
+				: "";
 	// 结果按候选模型顺序排列（不在候选中的残留结果排在末尾）
 	const testResultEntries = useMemo(() => {
 		const order = new Map(parsedModelIds.map((id, index) => [id, index]));
@@ -591,8 +616,6 @@ export const ChannelsView = ({
 						<div class="divide-y divide-stone-100">
 							{pagedChannels.map((channel) => {
 								const isActive = channel.status === "active";
-								const fmt = (channel.api_format ??
-									"openai") as ChannelApiFormat;
 								return (
 									<div
 										class={`grid grid-cols-[minmax(0,1.6fr)_minmax(0,0.5fr)_minmax(0,0.7fr)_minmax(0,0.6fr)_minmax(0,1.6fr)] items-center gap-3 px-4 py-4 text-sm ${
@@ -613,12 +636,15 @@ export const ChannelsView = ({
 												{channel.base_url}
 											</span>
 										</div>
-										<div>
-											<span
-												class={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${formatBadgeColors[fmt]}`}
-											>
-												{formatLabels[fmt]}
-											</span>
+										<div class="flex flex-wrap gap-1">
+											{parseChannelApiFormats(channel).map((format) => (
+												<span
+													key={format}
+													class={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${formatBadgeColors[format]}`}
+												>
+													{formatLabels[format]}
+												</span>
+											))}
 										</div>
 										<div>
 											<span
@@ -680,7 +706,6 @@ export const ChannelsView = ({
 					) : (
 						pagedChannels.map((channel) => {
 							const isActive = channel.status === "active";
-							const fmt = (channel.api_format ?? "openai") as ChannelApiFormat;
 							return (
 								<div
 									class={`rounded-xl border border-stone-200 p-4 ${
@@ -696,11 +721,14 @@ export const ChannelsView = ({
 												<span class="truncate font-semibold text-stone-900 text-sm">
 													{channel.name}
 												</span>
-												<span
-													class={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${formatBadgeColors[fmt]}`}
-												>
-													{formatLabels[fmt]}
-												</span>
+												{parseChannelApiFormats(channel).map((format) => (
+													<span
+														key={format}
+														class={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${formatBadgeColors[format]}`}
+													>
+														{formatLabels[format]}
+													</span>
+												))}
 											</div>
 											<span
 												class="block truncate text-xs text-stone-500 mt-1"
@@ -871,67 +899,55 @@ export const ChannelsView = ({
 							}
 						/>
 					</div>
-					<div>
-						<label
-							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
-							for="channel-format"
-						>
-							API 格式
-						</label>
-						<select
-							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-							id="channel-format"
-							value={channelForm.api_format}
-							onChange={(event) =>
-								onFormChange({
-									api_format: (event.currentTarget as HTMLSelectElement)
-										.value as ChannelApiFormat,
-								})
-							}
-						>
-							<option
-								value="openai"
-								selected={channelForm.api_format === "openai"}
-							>
-								OpenAI
-							</option>
-							<option
-								value="responses"
-								selected={channelForm.api_format === "responses"}
-							>
-								Responses (OpenAI /responses)
-							</option>
-							<option
-								value="anthropic"
-								selected={channelForm.api_format === "anthropic"}
-							>
-								Anthropic (Claude)
-							</option>
-							<option
-								value="custom"
-								selected={channelForm.api_format === "custom"}
-							>
-								Custom
-							</option>
-						</select>
-					</div>
+					<fieldset class="min-w-0">
+						<legend class="mb-1.5 text-xs uppercase tracking-widest text-stone-500">
+							API 格式（可多选）
+						</legend>
+						<div class="flex flex-wrap gap-2">
+							{CHANNEL_API_FORMATS.map((format) => {
+								const selected = selectedFormats.includes(format);
+								const disabled = hasCustom && format !== "custom";
+								return (
+									<button
+										type="button"
+										key={format}
+										aria-pressed={selected}
+										disabled={disabled}
+										onClick={() => toggleApiFormat(format)}
+										class={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${
+											selected
+												? formatBadgeColors[format]
+												: "border-stone-200 bg-white text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+										}`}
+									>
+										{formatLabels[format]}
+									</button>
+								);
+							})}
+						</div>
+						{selectedFormats.length === 0 && (
+							<p class="mt-1.5 text-xs text-amber-600">
+								请至少选择一种 API 格式
+							</p>
+						)}
+						{hasCustom && (
+							<p class="mt-1.5 text-xs text-stone-400">
+								Custom 为独占格式：Base URL 即完整请求 URL，不可与其他格式组合。
+							</p>
+						)}
+					</fieldset>
 					<div>
 						<label
 							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"
 							for="channel-base"
 						>
-							{channelForm.api_format === "custom"
-								? "完整请求 URL"
-								: "Base URL（含版本路径，如 /v1）"}
+							{hasCustom ? "完整请求 URL" : "Base URL（含版本路径，如 /v1）"}
 						</label>
 						<input
 							class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
 							id="channel-base"
 							name="base_url"
-							placeholder={
-								baseUrlPlaceholders[channelForm.api_format] ??
-								baseUrlPlaceholders.openai
-							}
+							placeholder={baseUrlPlaceholder}
 							value={channelForm.base_url}
 							required
 							onInput={(event) =>
@@ -940,6 +956,12 @@ export const ChannelsView = ({
 								})
 							}
 						/>
+						{selectedFormats.includes("anthropic") && !isPureAnthropic && (
+							<p class="mt-1 text-xs text-stone-400">
+								含 Anthropic 格式：/v1/messages 端点按请求自动规范化，Base URL
+								保留版本路径即可。
+							</p>
+						)}
 					</div>
 					<div>
 						<label

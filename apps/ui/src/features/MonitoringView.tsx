@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "hono/jsx/dom";
-import { apiBase } from "../core/constants";
+import { apiBase, formatBadgeColors, formatLabels } from "../core/constants";
 import type {
 	MonitoringChannelData,
 	MonitoringDailyTrend,
@@ -7,6 +7,7 @@ import type {
 	MonitoringErrorDetail,
 	MonitoringSlotModel,
 } from "../core/types";
+import { parseChannelApiFormats } from "../core/utils";
 import { DotLoader } from "./DotLoader";
 import { barColor, formatSlotLabel, generateSlots } from "./monitoring-shared";
 import { SkeletonBlock } from "./ViewSkeleton";
@@ -124,9 +125,14 @@ const ChannelBar = ({
 						class={`inline-block h-2.5 w-2.5 rounded-full ${statusDot(channel.success_rate)}`}
 					/>
 					<span class="font-medium text-stone-900">{channel.channel_name}</span>
-					<span class="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500">
-						{channel.api_format}
-					</span>
+					{parseChannelApiFormats(channel).map((format) => (
+						<span
+							key={format}
+							class={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${formatBadgeColors[format]}`}
+						>
+							{formatLabels[format]}
+						</span>
+					))}
 					{channel.channel_status !== "active" && (
 						<span class="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-400">
 							停用

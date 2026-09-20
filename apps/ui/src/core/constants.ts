@@ -1,5 +1,6 @@
 import type {
 	AdminData,
+	ChannelApiFormat,
 	ChannelForm,
 	SettingsForm,
 	TabItem,
@@ -44,11 +45,35 @@ export const initialChannelForm: ChannelForm = {
 	base_url: "",
 	api_key: "",
 	weight: 1,
-	api_format: "openai",
+	api_formats: ["openai"],
 	custom_headers: "",
 	disguise_headers: "",
 	disguise_system_prompt: "",
 	models: "",
+};
+
+/** 渠道可选 API 格式（custom 独占，不可与其他格式组合） */
+export const CHANNEL_API_FORMATS: ChannelApiFormat[] = [
+	"openai",
+	"responses",
+	"anthropic",
+	"custom",
+];
+
+/** API 格式展示名（渠道表单 chip / 列表与监控徽章共用） */
+export const formatLabels: Record<ChannelApiFormat, string> = {
+	openai: "OpenAI",
+	anthropic: "Anthropic",
+	custom: "Custom",
+	responses: "Responses",
+};
+
+/** API 格式徽章配色（与 formatLabels 同 key 共用） */
+export const formatBadgeColors: Record<ChannelApiFormat, string> = {
+	openai: "border-blue-100 bg-blue-50 text-blue-600",
+	anthropic: "border-orange-100 bg-orange-50 text-orange-600",
+	custom: "border-purple-100 bg-purple-50 text-purple-600",
+	responses: "border-teal-100 bg-teal-50 text-teal-600",
 };
 
 export const initialTokenForm: TokenForm = {

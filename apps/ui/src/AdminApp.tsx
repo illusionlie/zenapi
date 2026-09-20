@@ -18,6 +18,7 @@ import type {
 	AdminData,
 	Channel,
 	ChannelForm,
+	ChannelFormatProbeResult,
 	DashboardData,
 	InviteCode,
 	ModelItem,
@@ -31,7 +32,7 @@ import type {
 	UsageLog,
 	User,
 } from "./core/types";
-import { toggleStatus } from "./core/utils";
+import { parseChannelApiFormats, toggleStatus } from "./core/utils";
 import { AppLayout } from "./features/AppLayout";
 import { ChannelsView } from "./features/ChannelsView";
 import { DashboardView } from "./features/DashboardView";
@@ -438,7 +439,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				base_url: channel.base_url ?? "",
 				api_key: channel.api_key ?? "",
 				weight: channel.weight ?? 1,
-				api_format: channel.api_format ?? "openai",
+				// 读侧兜底链：api_formats JSON 串 → 镜像 api_format → ["openai"]
+				api_formats: parseChannelApiFormats(channel),
 				custom_headers: channel.custom_headers_json ?? "",
 				disguise_headers: channel.disguise_headers_json ?? "",
 				disguise_system_prompt: channel.disguise_system_prompt ?? "",
@@ -475,6 +477,11 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			);
 			if (nameExists) {
 				toast.error("渠道名称已存在，请使用其他名称");
+				return;
+			}
+			// 格式声明不可为空（后端对空数组返回 400 invalid_api_formats，前端先行拦截不发请求）
+			if (channelForm.api_formats.length === 0) {
+				toast.error("请至少选择一种 API 格式");
 				return;
 			}
 			try {
@@ -520,7 +527,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					base_url: channelForm.base_url.trim(),
 					api_key: channelForm.api_key.trim(),
 					weight: Number(channelForm.weight),
-					api_format: channelForm.api_format,
+					// 格式声明整体替换（api_formats 优先于 legacy 单值 api_format）
+					api_formats: channelForm.api_formats,
 					custom_headers: channelForm.custom_headers.trim() || undefined,
 					// 伪装字段恒传 trim 后的字符串：PATCH 空串 = 清除现值（AC1 清空保存即关闭伪装）
 					disguise_headers: channelForm.disguise_headers.trim(),
@@ -684,22 +692,35 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 			toast.error("请先填写 Base URL");
 			return;
 		}
+		if (channelForm.api_formats.length === 0) {
+			toast.error("请至少选择一种 API 格式");
+			return;
+		}
 		setFetchingModels(true);
 		try {
 			const result = await apiFetch<{
 				ok: boolean;
 				models: string[];
+				results?: ChannelFormatProbeResult[];
+				probe_warnings?: string[];
 			}>("/api/channels/fetch_models", {
 				method: "POST",
 				body: JSON.stringify({
 					base_url: channelForm.base_url.trim(),
 					api_key: channelForm.api_key.trim(),
-					api_format: channelForm.api_format,
+					api_formats: channelForm.api_formats,
 					custom_headers: channelForm.custom_headers.trim() || undefined,
 					disguise_headers: channelForm.disguise_headers.trim(),
 					disguise_system_prompt: channelForm.disguise_system_prompt.trim(),
 				}),
 			});
+			// 多格式逐格式探测：部分失败不整体失败，轻量一行提示失败格式
+			const failedFormats = (result.results ?? [])
+				.filter((probe) => !probe.ok)
+				.map((probe) => probe.api_format);
+			if (failedFormats.length > 0) {
+				toast.error(`部分格式探测失败：${failedFormats.join("、")}`);
+			}
 			setFetchedModels(result.models);
 			// 默认全不选；仅预勾选模型列表中已存在的模型
 			const existingIds = new Set(
@@ -811,7 +832,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 						id: editingChannel?.id,
 						base_url: channelForm.base_url.trim(),
 						api_key: channelForm.api_key.trim(),
-						api_format: channelForm.api_format,
+						// 目标格式由后端按 chat 偏好序从声明集选出
+						api_formats: channelForm.api_formats,
 						custom_headers: channelForm.custom_headers.trim(),
 						disguise_headers: channelForm.disguise_headers.trim(),
 						disguise_system_prompt: channelForm.disguise_system_prompt.trim(),

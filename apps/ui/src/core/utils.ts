@@ -1,3 +1,5 @@
+import type { ChannelApiFormat } from "./types";
+
 /**
  * Formats a datetime string for display.
  *
@@ -35,6 +37,58 @@ export const formatDateTime = (value?: string | null) => {
  */
 export const toggleStatus = (value: string) =>
 	value === "active" ? "disabled" : "active";
+
+const API_FORMAT_WHITELIST: readonly string[] = [
+	"openai",
+	"anthropic",
+	"custom",
+	"responses",
+];
+
+/**
+ * Parses a channel's declared API formats from the wire form.
+ * Fallback chain mirrors the worker's parseApiFormats read side:
+ * api_formats JSON array string (raw TEXT column) -> legacy mirror
+ * api_format single value -> default ["openai"].
+ *
+ * Args:
+ *   channel: Channel-like row carrying api_formats / api_format.
+ *
+ * Returns:
+ *   Deduplicated whitelist-filtered format array (never empty).
+ */
+export const parseChannelApiFormats = (channel: {
+	api_formats?: string | null;
+	api_format?: string | null;
+}): ChannelApiFormat[] => {
+	if (
+		typeof channel.api_formats === "string" &&
+		channel.api_formats.trim() !== ""
+	) {
+		try {
+			const parsed: unknown = JSON.parse(channel.api_formats);
+			if (Array.isArray(parsed)) {
+				const formats = parsed.filter(
+					(value): value is ChannelApiFormat =>
+						typeof value === "string" && API_FORMAT_WHITELIST.includes(value),
+				);
+				const deduped = [...new Set(formats)];
+				if (deduped.length > 0) {
+					return deduped;
+				}
+			}
+		} catch {
+			/* 畸形 JSON 落到下一级兜底 */
+		}
+	}
+	if (
+		typeof channel.api_format === "string" &&
+		API_FORMAT_WHITELIST.includes(channel.api_format)
+	) {
+		return [channel.api_format as ChannelApiFormat];
+	}
+	return ["openai"];
+};
 
 export type PageItem = number | "ellipsis";
 

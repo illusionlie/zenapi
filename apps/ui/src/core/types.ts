@@ -8,12 +8,23 @@ export type Channel = {
 	weight: number;
 	status: string;
 	models_json?: string;
+	/** 镜像列：规范化数组首元素（读侧请用 parseChannelApiFormats 解析 api_formats） */
 	api_format: ChannelApiFormat;
+	/** API 能力声明（JSON 数组字符串，TEXT 列原样透传，如 `"[\"openai\"]"`） */
+	api_formats?: string | null;
 	custom_headers_json?: string | null;
 	/** 伪装请求头（JSON 对象字符串；NULL/空 = 不伪装） */
 	disguise_headers_json?: string | null;
 	/** 伪装系统提示词（前置注入的首条 system；NULL/空 = 不伪装） */
 	disguise_system_prompt?: string | null;
+};
+
+/** fetch_models / :id/test 响应中的逐格式探测结果 */
+export type ChannelFormatProbeResult = {
+	api_format: ChannelApiFormat;
+	ok: boolean;
+	model_count: number;
+	error?: string;
 };
 
 export type Token = {
@@ -72,6 +83,8 @@ export type MonitoringChannelData = {
 	channel_name: string;
 	channel_status: string;
 	api_format: string;
+	/** API 能力声明（JSON 数组字符串；监控后端当前未下发时缺席，解析兜底到 api_format） */
+	api_formats?: string | null;
 	total_requests: number;
 	success_count: number;
 	error_count: number;
@@ -253,7 +266,8 @@ export type ChannelForm = {
 	base_url: string;
 	api_key: string;
 	weight: number;
-	api_format: ChannelApiFormat;
+	/** 声明的 API 格式集（custom 独占）；提交时整体替换，至少一项 */
+	api_formats: ChannelApiFormat[];
 	custom_headers: string;
 	/** 伪装请求头（JSON 文本，textarea 直读直写；空串 = 不伪装） */
 	disguise_headers: string;
