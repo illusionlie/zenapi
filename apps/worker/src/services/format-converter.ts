@@ -3,6 +3,8 @@
  * Responses APIs.
  */
 
+import { extractReasoningEffort } from "../utils/reasoning";
+
 type OpenAIMessage = {
 	role: string;
 	content:
@@ -85,6 +87,209 @@ type ResponsesResponseBody = {
 
 // --- Request converters ---
 
+// Thinking budget ratio per reasoning effort level (OpenRouter-style public
+// convention, research §2), applied against max_tokens and then clamped.
+const EFFORT_BUDGET_RATIOS: Record<string, number> = {
+	minimal: 0.1,
+	low: 0.2,
+	medium: 0.5,
+	high: 0.8,
+	xhigh: 0.95,
+	max: 0.95,
+};
+
+// Client-provided thinking objects pass through only for these documented
+// types; anything else falls back to effort mapping (invalid passthrough
+// payloads surface as transparent upstream 400s, never silent rewrites).
+const VALID_THINKING_TYPES = new Set(["enabled", "adaptive", "disabled"]);
+
+// Anthropic image sources accept base64 data only for these media types.
+const SUPPORTED_IMAGE_MEDIA_TYPES = new Set([
+	"image/jpeg",
+	"image/png",
+	"image/gif",
+	"image/webp",
+]);
+
+/**
+ * Clamps a thinking budget into Anthropic's constraints (>= 1024 and <
+ * max_tokens). When the client-provided max_tokens is too small for both to
+ * hold, the strict upper bound wins — max_tokens is never rewritten upward and
+ * the request is left for upstream semantics to judge.
+ */
+function clampThinkingBudget(budget: number, maxTokens: number): number {
+	return Math.min(Math.max(budget, 1024), maxTokens - 1);
+}
+
+/**
+ * Maps a reasoning effort value to an Anthropic thinking budget, or null when
+ * no thinking field should be sent: "none" explicitly disables reasoning,
+ * unknown strings are dropped, numeric values count as explicit budgets.
+ */
+function resolveThinkingBudget(
+	effort: string | number | null,
+	maxTokens: number,
+): number | null {
+	if (typeof effort === "number") {
+		return clampThinkingBudget(Math.floor(effort), maxTokens);
+	}
+	if (effort === null || effort === "none") {
+		return null;
+	}
+	const ratio = EFFORT_BUDGET_RATIOS[effort];
+	if (ratio === undefined) {
+		return null;
+	}
+	return clampThinkingBudget(Math.floor(maxTokens * ratio), maxTokens);
+}
+
+/**
+ * Parses a `data:<mime>;base64,<data>` URL into its media type and payload.
+ */
+function parseBase64DataUrl(
+	value: string,
+): { mediaType: string; data: string } | null {
+	const match = /^data:([^;,]+);base64,([\s\S]+)$/.exec(value);
+	if (!match) {
+		return null;
+	}
+	return { mediaType: match[1] ?? "", data: match[2] ?? "" };
+}
+
+/**
+ * Converts a chat user message content (string or part array) into Anthropic
+ * content. Unusable parts are dropped with a warning (design D7) instead of
+ * failing the whole request; a fully-dropped array falls back to an empty text
+ * block so Anthropic never receives an empty content array.
+ */
+function convertUserContentToAnthropic(
+	content: OpenAIMessage["content"],
+): string | AnthropicContentBlock[] {
+	if (typeof content === "string") {
+		return content;
+	}
+	const blocks: AnthropicContentBlock[] = [];
+	for (const part of Array.isArray(content) ? content : []) {
+		const block = convertContentPartToAnthropic(part);
+		if (block) {
+			blocks.push(block);
+		}
+	}
+	if (blocks.length === 0) {
+		blocks.push({ type: "text", text: "" });
+	}
+	return blocks;
+}
+
+function convertContentPartToAnthropic(
+	part: { type: string; text?: string; [k: string]: unknown } | undefined,
+): AnthropicContentBlock | null {
+	if (!part || typeof part !== "object") {
+		return null;
+	}
+	switch (part.type) {
+		case "text":
+			// Non-string text degrades to an empty string instead of dropping the block
+			return {
+				type: "text",
+				text: typeof part.text === "string" ? part.text : "",
+			};
+		case "image_url":
+			return convertImageUrlPartToAnthropic(part);
+		case "file":
+			return convertFilePartToAnthropic(part);
+		case "input_audio":
+			// Anthropic has no audio input (research §3)
+			console.warn("[format-converter] dropped unsupported content part", {
+				partType: "input_audio",
+				reason: "anthropic_has_no_audio_input",
+			});
+			return null;
+		default:
+			console.warn("[format-converter] dropped unknown content part", {
+				partType: String(part.type),
+			});
+			return null;
+	}
+}
+
+function convertImageUrlPartToAnthropic(
+	part: Record<string, unknown>,
+): AnthropicContentBlock | null {
+	const imageUrl = part.image_url;
+	const url =
+		typeof imageUrl === "string"
+			? imageUrl
+			: ((imageUrl as Record<string, unknown> | undefined)?.url as
+					| string
+					| undefined);
+	if (typeof url !== "string" || !url) {
+		console.warn("[format-converter] dropped unusable image_url part", {
+			reason: "missing_url",
+		});
+		return null;
+	}
+	if (/^https?:\/\//i.test(url)) {
+		return { type: "image", source: { type: "url", url } };
+	}
+	const dataUrl = parseBase64DataUrl(url);
+	if (dataUrl && SUPPORTED_IMAGE_MEDIA_TYPES.has(dataUrl.mediaType)) {
+		return {
+			type: "image",
+			source: {
+				type: "base64",
+				media_type: dataUrl.mediaType,
+				data: dataUrl.data,
+			},
+		};
+	}
+	// data: URIs in a url source are not documented as supported (research §8)
+	console.warn("[format-converter] dropped unusable image_url part", {
+		reason: "unsupported_url_scheme_or_media_type",
+	});
+	return null;
+}
+
+function convertFilePartToAnthropic(
+	part: Record<string, unknown>,
+): AnthropicContentBlock | null {
+	const file = part.file as Record<string, unknown> | undefined;
+	const fileData =
+		typeof file?.file_data === "string" ? file.file_data : undefined;
+	const filename = typeof file?.filename === "string" ? file.filename : "";
+	if (fileData) {
+		const dataUrl = parseBase64DataUrl(fileData);
+		if (dataUrl && dataUrl.mediaType === "application/pdf") {
+			return {
+				type: "document",
+				source: {
+					type: "base64",
+					media_type: "application/pdf",
+					data: dataUrl.data,
+				},
+			};
+		}
+		if (
+			!fileData.startsWith("data:") &&
+			filename.toLowerCase().endsWith(".pdf")
+		) {
+			return {
+				type: "document",
+				source: {
+					type: "base64",
+					media_type: "application/pdf",
+					data: fileData,
+				},
+			};
+		}
+	}
+	// Only base64 PDF documents are supported (research §3)
+	console.warn("[format-converter] dropped unusable file part", {
+		reason: "only_base64_pdf_is_supported",
+	});
+	return null;
+}
+
 /**
  * Converts an OpenAI chat completion request body to an Anthropic Messages request body.
  */
@@ -98,7 +303,14 @@ export function openaiToAnthropicRequest(
 	if (body.stream !== undefined) {
 		result.stream = body.stream;
 	}
-	result.max_tokens = body.max_tokens ?? 4096;
+	// max_tokens is required by Anthropic; max_completion_tokens wins when both
+	// are present (same priority as the responses direction). Default raised to
+	// 8192 — 4096 starves reasoning models (research §2).
+	const maxTokens =
+		(body.max_completion_tokens as number | undefined) ??
+		body.max_tokens ??
+		8192;
+	result.max_tokens = maxTokens;
 	if (body.temperature !== undefined) {
 		result.temperature = body.temperature;
 	}
@@ -133,8 +345,8 @@ export function openaiToAnthropicRequest(
 		} else if (body.tool_choice === "required") {
 			result.tool_choice = { type: "any" };
 		} else if (body.tool_choice === "none") {
-			// Anthropic doesn't have "none" — omit tool_choice and tools
-			delete result.tools;
+			// Native "none" value (2025+): tools stay declared, calls are forbidden
+			result.tool_choice = { type: "none" };
 		} else if (typeof body.tool_choice === "object") {
 			const tc = body.tool_choice as Record<string, unknown>;
 			const fn = tc.function as Record<string, unknown> | undefined;
@@ -144,6 +356,35 @@ export function openaiToAnthropicRequest(
 		}
 	}
 
+	// thinking (FR1): a client-provided Anthropic-style thinking object passes
+	// through with minimal validation (escape hatch covering adaptive and
+	// explicit budgets); otherwise reasoning effort maps onto
+	// {type:"enabled", budget_tokens}. "none" sends no thinking field at all.
+	const clientThinking = body.thinking as Record<string, unknown> | undefined;
+	if (
+		clientThinking &&
+		typeof clientThinking === "object" &&
+		typeof clientThinking.type === "string" &&
+		VALID_THINKING_TYPES.has(clientThinking.type)
+	) {
+		result.thinking = clientThinking;
+	} else {
+		const budget = resolveThinkingBudget(
+			extractReasoningEffort(body),
+			maxTokens,
+		);
+		if (budget !== null) {
+			result.thinking = { type: "enabled", budget_tokens: budget };
+		}
+	}
+	// Thinking requests must not carry sampling params (design D5): older model
+	// generations reject temperature/top_p together with thinking and newer ones
+	// reject non-default sampling outright — stripping is the common safe set.
+	if (result.thinking !== undefined) {
+		delete result.temperature;
+		delete result.top_p;
+	}
+
 	const systemParts: string[] = [];
 	const rawMessages: Array<{
 		role: string;
@@ -151,7 +392,7 @@ export function openaiToAnthropicRequest(
 	}> = [];
 
 	for (const msg of body.messages ?? []) {
-		if (msg.role === "system") {
+		if (msg.role === "system" || msg.role === "developer") {
 			const text =
 				typeof msg.content === "string"
 					? msg.content
@@ -199,9 +440,17 @@ export function openaiToAnthropicRequest(
 						: contentBlocks,
 			});
 		} else if (msg.role === "tool") {
-			// Tool result → user message with tool_result block
+			// Tool result → user message with tool_result block; array content
+			// contributes its text parts joined together (was silently emptied)
 			const toolCallId = msg.tool_call_id as string | undefined;
-			const contentText = typeof msg.content === "string" ? msg.content : "";
+			const contentText =
+				typeof msg.content === "string"
+					? msg.content
+					: Array.isArray(msg.content)
+						? (msg.content as Array<{ text?: string }>)
+								.map((c) => (typeof c?.text === "string" ? c.text : ""))
+								.join("")
+						: "";
 			rawMessages.push({
 				role: "user",
 				content: [
@@ -213,11 +462,12 @@ export function openaiToAnthropicRequest(
 				],
 			});
 		} else {
-			const content =
-				typeof msg.content === "string"
-					? msg.content
-					: (msg.content as AnthropicContentBlock[]);
-			rawMessages.push({ role: "user", content });
+			// user (and any other role): convert multimodal parts conservatively —
+			// unusable parts are dropped with a warning instead of a 400 (design D7)
+			rawMessages.push({
+				role: "user",
+				content: convertUserContentToAnthropic(msg.content),
+			});
 		}
 	}
 
@@ -409,22 +659,38 @@ export function anthropicToOpenaiRequest(
 
 // --- Response converters ---
 
-function mapStopReason(stopReason: string | null | undefined): string {
+/**
+ * Maps an Anthropic stop_reason to an OpenAI finish_reason. Shared by both
+ * conversion directions' call sites (the anthropic→chat response/stream path
+ * and tests); the full seven-value enum is covered (research §5).
+ */
+export function mapStopReason(stopReason: string | null | undefined): string {
 	if (!stopReason) return "stop";
 	switch (stopReason) {
 		case "end_turn":
 		case "stop_sequence":
+		case "pause_turn":
 			return "stop";
 		case "max_tokens":
+		case "model_context_window_exceeded":
 			return "length";
 		case "tool_use":
 			return "tool_calls";
+		case "refusal":
+			return "content_filter";
 		default:
 			return "stop";
 	}
 }
 
-function mapFinishReason(finishReason: string | null | undefined): string {
+/**
+ * Maps an OpenAI finish_reason to an Anthropic stop_reason. Shared by both
+ * conversion directions' call sites (the chat→anthropic response/stream path
+ * and tests).
+ */
+export function mapFinishReason(
+	finishReason: string | null | undefined,
+): string {
 	if (!finishReason) return "end_turn";
 	switch (finishReason) {
 		case "stop":
@@ -433,9 +699,51 @@ function mapFinishReason(finishReason: string | null | undefined): string {
 			return "max_tokens";
 		case "tool_calls":
 			return "tool_use";
+		case "content_filter":
+			return "refusal";
 		default:
 			return "end_turn";
 	}
+}
+
+/**
+ * Reads the thinking token count out of Anthropic's
+ * `usage.output_tokens_details.thinking_tokens`, when present as a number.
+ */
+function readThinkingTokens(
+	usage: Record<string, unknown> | undefined,
+): number | undefined {
+	const value = (
+		usage?.output_tokens_details as Record<string, unknown> | undefined
+	)?.thinking_tokens;
+	return typeof value === "number" ? value : undefined;
+}
+
+/**
+ * Converts Anthropic usage into OpenAI usage semantics (design D6): Anthropic
+ * `input_tokens` excludes cached tokens while OpenAI `prompt_tokens` is the
+ * total, so the cache_read/cache_creation counters are folded back in.
+ */
+function anthropicUsageToChat(
+	inputTokens: number,
+	cacheReadTokens: number,
+	cacheCreationTokens: number,
+	outputTokens: number,
+	thinkingTokens?: number,
+): Record<string, unknown> {
+	const promptTokens = inputTokens + cacheReadTokens + cacheCreationTokens;
+	const result: Record<string, unknown> = {
+		prompt_tokens: promptTokens,
+		completion_tokens: outputTokens,
+		total_tokens: promptTokens + outputTokens,
+	};
+	if (cacheReadTokens > 0) {
+		result.prompt_tokens_details = { cached_tokens: cacheReadTokens };
+	}
+	if (thinkingTokens !== undefined) {
+		result.completion_tokens_details = { reasoning_tokens: thinkingTokens };
+	}
+	return result;
 }
 
 /**
@@ -473,6 +781,17 @@ export function anthropicToOpenaiResponse(
 		role: "assistant",
 		content: text || null,
 	};
+	// Thinking blocks surface as reasoning_content (design D3, DeepSeek-style
+	// convention), each block's payload being its `thinking` field (`text` as a
+	// fallback for compat endpoints). redacted_thinking is never echoed back.
+	const reasoningContent = (content ?? [])
+		.filter((b) => b.type === "thinking")
+		.map((b) => (b.thinking as string) ?? b.text ?? "")
+		.filter((t) => t.length > 0)
+		.join("\n\n");
+	if (reasoningContent) {
+		message.reasoning_content = reasoningContent;
+	}
 	if (toolCalls) {
 		message.tool_calls = toolCalls;
 	}
@@ -492,13 +811,13 @@ export function anthropicToOpenaiResponse(
 			},
 		],
 		usage: usage
-			? {
-					prompt_tokens: (usage.input_tokens as number) ?? 0,
-					completion_tokens: (usage.output_tokens as number) ?? 0,
-					total_tokens:
-						((usage.input_tokens as number) ?? 0) +
-						((usage.output_tokens as number) ?? 0),
-				}
+			? anthropicUsageToChat(
+					(usage.input_tokens as number) ?? 0,
+					(usage.cache_read_input_tokens as number) ?? 0,
+					(usage.cache_creation_input_tokens as number) ?? 0,
+					(usage.output_tokens as number) ?? 0,
+					readThinkingTokens(usage),
+				)
 			: undefined,
 	};
 }
@@ -574,6 +893,15 @@ export function openaiToAnthropicResponse(
 
 // --- Stream converters ---
 
+// Input-side usage cached from message_start and merged into the single
+// terminal usage chunk (design D6). Anthropic input_tokens excludes cached
+// tokens, so all three counters must be carried.
+type AnthropicStartUsage = {
+	inputTokens: number;
+	cacheReadTokens: number;
+	cacheCreationTokens: number;
+};
+
 /**
  * Creates a TransformStream that converts Anthropic SSE events to OpenAI SSE chunks.
  */
@@ -586,6 +914,12 @@ export function createAnthropicToOpenaiStreamTransform(): TransformStream<
 	let messageId = "";
 	let model = "";
 	let toolCallIndex = -1;
+	let startUsage: AnthropicStartUsage = {
+		inputTokens: 0,
+		cacheReadTokens: 0,
+		cacheCreationTokens: 0,
+	};
+	let streamFinished = false;
 	const encoder = new TextEncoder();
 	const decoder = new TextDecoder();
 
@@ -613,29 +947,77 @@ export function createAnthropicToOpenaiStreamTransform(): TransformStream<
 						if (data.type === "message_start" && data.message) {
 							messageId = data.message.id ?? messageId;
 							model = data.message.model ?? model;
+							const msgUsage = data.message.usage as
+								| Record<string, unknown>
+								| undefined;
+							if (msgUsage) {
+								startUsage = {
+									inputTokens: (msgUsage.input_tokens as number) ?? 0,
+									cacheReadTokens:
+										(msgUsage.cache_read_input_tokens as number) ?? 0,
+									cacheCreationTokens:
+										(msgUsage.cache_creation_input_tokens as number) ?? 0,
+								};
+							}
 						}
 
-						// Track tool_use content blocks for index mapping
-						if (
-							(currentEventType === "content_block_start" ||
-								data.type === "content_block_start") &&
-							data.content_block?.type === "tool_use"
-						) {
-							toolCallIndex++;
+						// In-stream upstream error → one terminal chunk + warn (design D8).
+						// The stream is already 200 and OpenAI SSE has no error event type,
+						// so a terminal chunk is the only way not to leave the client
+						// hanging; afterwards only [DONE] (from a trailing message_stop)
+						// may still be emitted.
+						if (data.type === "error" || currentEventType === "error") {
+							const err = data.error as Record<string, unknown> | undefined;
+							console.warn("[format-converter] upstream stream error", {
+								error_type:
+									typeof err?.type === "string"
+										? err.type
+										: String(data.type ?? "unknown"),
+								error_message:
+									typeof err?.message === "string" ? err.message : "",
+							});
+							if (!streamFinished) {
+								streamFinished = true;
+								controller.enqueue(
+									encoder.encode(
+										`data: ${JSON.stringify({
+											id: `chatcmpl-${messageId || crypto.randomUUID()}`,
+											object: "chat.completion.chunk",
+											created: Math.floor(Date.now() / 1000),
+											model,
+											choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+										})}\n\n`,
+									),
+								);
+							}
+							newlineIndex = buffer.indexOf("\n");
+							continue;
 						}
 
-						const openaiChunk = convertAnthropicEventToOpenaiChunk(
-							currentEventType,
-							data,
-							messageId,
-							model,
-							toolCallIndex,
-						);
+						if (!streamFinished) {
+							// Track tool_use content blocks for index mapping
+							if (
+								(currentEventType === "content_block_start" ||
+									data.type === "content_block_start") &&
+								data.content_block?.type === "tool_use"
+							) {
+								toolCallIndex++;
+							}
 
-						if (openaiChunk) {
-							controller.enqueue(
-								encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`),
+							const openaiChunk = convertAnthropicEventToOpenaiChunk(
+								currentEventType,
+								data,
+								messageId,
+								model,
+								toolCallIndex,
+								startUsage,
 							);
+
+							if (openaiChunk) {
+								controller.enqueue(
+									encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`),
+								);
+							}
 						}
 
 						if (
@@ -661,17 +1043,20 @@ export function createAnthropicToOpenaiStreamTransform(): TransformStream<
 					if (payload && payload !== "[DONE]") {
 						try {
 							const data = JSON.parse(payload);
-							const openaiChunk = convertAnthropicEventToOpenaiChunk(
-								currentEventType,
-								data,
-								messageId,
-								model,
-								toolCallIndex,
-							);
-							if (openaiChunk) {
-								controller.enqueue(
-									encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`),
+							if (!streamFinished) {
+								const openaiChunk = convertAnthropicEventToOpenaiChunk(
+									currentEventType,
+									data,
+									messageId,
+									model,
+									toolCallIndex,
+									startUsage,
 								);
+								if (openaiChunk) {
+									controller.enqueue(
+										encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`),
+									);
+								}
 							}
 						} catch {
 							// Skip
@@ -679,7 +1064,8 @@ export function createAnthropicToOpenaiStreamTransform(): TransformStream<
 					}
 				}
 			}
-			controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+			// No [DONE] here: the upstream message_stop event already emitted it.
+			// (The old unconditional enqueue was the double-[DONE] defect.)
 		},
 	});
 }
@@ -690,6 +1076,7 @@ function convertAnthropicEventToOpenaiChunk(
 	messageId: string,
 	model: string,
 	toolCallIndex: number,
+	startUsage: AnthropicStartUsage,
 ): Record<string, unknown> | null {
 	const id = `chatcmpl-${messageId || crypto.randomUUID()}`;
 	const base = {
@@ -701,8 +1088,10 @@ function convertAnthropicEventToOpenaiChunk(
 
 	switch (eventType) {
 		case "message_start": {
+			// Role chunk only: usage is cached in the transform and merged into the
+			// single terminal usage chunk (design D6; OpenAI carries usage on the
+			// final chunk, and splitting it made prompt_tokens record as 0).
 			const msg = data.message as Record<string, unknown> | undefined;
-			const usage = msg?.usage as Record<string, unknown> | undefined;
 			return {
 				...base,
 				model: (msg?.model as string) ?? model,
@@ -713,13 +1102,6 @@ function convertAnthropicEventToOpenaiChunk(
 						finish_reason: null,
 					},
 				],
-				usage: usage
-					? {
-							prompt_tokens: usage.input_tokens ?? 0,
-							completion_tokens: 0,
-							total_tokens: (usage.input_tokens as number) ?? 0,
-						}
-					: undefined,
 			};
 		}
 		case "content_block_start": {
@@ -750,6 +1132,7 @@ function convertAnthropicEventToOpenaiChunk(
 					],
 				};
 			}
+			// text / thinking block starts produce no chunk
 			return null;
 		}
 		case "content_block_delta": {
@@ -787,11 +1170,28 @@ function convertAnthropicEventToOpenaiChunk(
 					],
 				};
 			}
+			if (delta?.type === "thinking_delta") {
+				// FR2 (design D3): thinking surfaces as reasoning_content increments
+				return {
+					...base,
+					choices: [
+						{
+							index: 0,
+							delta: { reasoning_content: (delta.thinking as string) ?? "" },
+							finish_reason: null,
+						},
+					],
+				};
+			}
+			// signature_delta / citations_delta are deliberately not forwarded (FR2)
 			return null;
 		}
 		case "message_delta": {
 			const delta = data.delta as Record<string, unknown> | undefined;
 			const usage = data.usage as Record<string, unknown> | undefined;
+			// The single complete usage chunk (design D6): the prompt side comes
+			// from the message_start cache, completion from the cumulative
+			// message_delta usage (documented as a running total, research §7).
 			return {
 				...base,
 				choices: [
@@ -804,11 +1204,13 @@ function convertAnthropicEventToOpenaiChunk(
 					},
 				],
 				usage: usage
-					? {
-							prompt_tokens: 0,
-							completion_tokens: usage.output_tokens ?? 0,
-							total_tokens: (usage.output_tokens as number) ?? 0,
-						}
+					? anthropicUsageToChat(
+							startUsage.inputTokens,
+							startUsage.cacheReadTokens,
+							startUsage.cacheCreationTokens,
+							(usage.output_tokens as number) ?? 0,
+							readThinkingTokens(usage),
+						)
 					: undefined,
 			};
 		}
