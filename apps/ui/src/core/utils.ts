@@ -1,4 +1,8 @@
-import type { ChannelApiFormat } from "./types";
+import type {
+	ChannelApiFormat,
+	ChannelEndpointOverrideKey,
+	ChannelEndpointOverrides,
+} from "./types";
 
 /**
  * Formats a datetime string for display.
@@ -88,6 +92,65 @@ export const parseChannelApiFormats = (channel: {
 		return [channel.api_format as ChannelApiFormat];
 	}
 	return ["openai"];
+};
+
+const ENDPOINT_OVERRIDE_KEYS: readonly ChannelEndpointOverrideKey[] = [
+	"openai",
+	"responses",
+	"anthropic",
+];
+
+/**
+ * Parses a channel's per-format endpoint overrides from the wire form
+ * (TEXT column carrying a raw JSON object string). Fallback philosophy
+ * mirrors the worker's parseEndpointOverrides: any dirty data degrades to
+ * "no override" instead of throwing.
+ *   - NULL / empty / non-string -> all empty strings
+ *   - JSON.parse failure / top-level non-object -> all empty strings
+ *   - key whitelist {openai, responses, anthropic}; blank / non-string
+ *     values degrade to empty string (blank override = no override)
+ *
+ * Args:
+ *   channel: Channel-like row carrying the raw endpoint_overrides column.
+ *
+ * Returns:
+ *   Flat form-shape overrides (empty string = not overridden).
+ */
+export const parseEndpointOverrides = (channel: {
+	endpoint_overrides?: string | null;
+}): ChannelEndpointOverrides => {
+	const result: ChannelEndpointOverrides = {
+		openai: "",
+		responses: "",
+		anthropic: "",
+	};
+	if (
+		typeof channel.endpoint_overrides !== "string" ||
+		channel.endpoint_overrides.trim() === ""
+	) {
+		return result;
+	}
+	try {
+		const parsed: unknown = JSON.parse(channel.endpoint_overrides);
+		if (
+			parsed === null ||
+			typeof parsed !== "object" ||
+			Array.isArray(parsed)
+		) {
+			return result;
+		}
+		const source = parsed as Record<string, unknown>;
+		for (const key of ENDPOINT_OVERRIDE_KEYS) {
+			const value = source[key];
+			if (typeof value === "string" && value.trim() !== "") {
+				result[key] = value;
+			}
+		}
+		return result;
+	} catch {
+		/* 畸形 JSON → 视为无覆盖 */
+		return result;
+	}
 };
 
 export type PageItem = number | "ellipsis";

@@ -7,6 +7,7 @@ import {
 } from "hono/jsx/dom";
 import { createApiFetch } from "./core/api";
 import {
+	CHANNEL_ENDPOINT_OVERRIDE_FORMATS,
 	initialChannelForm,
 	initialData,
 	initialSettingsForm,
@@ -17,6 +18,7 @@ import { toast } from "./core/toast";
 import type {
 	AdminData,
 	Channel,
+	ChannelEndpointOverrideKey,
 	ChannelForm,
 	ChannelFormatProbeResult,
 	DashboardData,
@@ -32,7 +34,11 @@ import type {
 	UsageLog,
 	User,
 } from "./core/types";
-import { parseChannelApiFormats, toggleStatus } from "./core/utils";
+import {
+	parseChannelApiFormats,
+	parseEndpointOverrides,
+	toggleStatus,
+} from "./core/utils";
 import { AppLayout } from "./features/AppLayout";
 import { ChannelsView } from "./features/ChannelsView";
 import { DashboardView } from "./features/DashboardView";
@@ -81,6 +87,30 @@ const adminPathToTab: Record<string, TabId> = {
 	"/admin/settings": "settings",
 	"/admin/users": "users",
 	"/admin/playground": "playground",
+};
+
+/**
+ * 端点覆盖提交体：仅含当前选中非 custom 格式的键（未选格式的键不出现，
+ * 规避后端 undeclared_format 400；custom 独占/全未选 → 空对象，无害）。
+ * 键值恒传（空串 = 触发后端清除该键），且整个字段恒不省略以表达「以表单
+ * 为准」——PATCH 语义中字段缺省 = 保留现值。
+ *
+ * Args:
+ *   form: Current channel form state.
+ *
+ * Returns:
+ *   endpoint_overrides payload object for POST/PATCH/fetch_models/test-model.
+ */
+const buildEndpointOverridesPayload = (
+	form: ChannelForm,
+): Partial<Record<ChannelEndpointOverrideKey, string>> => {
+	const payload: Partial<Record<ChannelEndpointOverrideKey, string>> = {};
+	for (const format of CHANNEL_ENDPOINT_OVERRIDE_FORMATS) {
+		if (form.api_formats.includes(format)) {
+			payload[format] = form.endpoint_overrides[format].trim();
+		}
+	}
+	return payload;
 };
 
 // tab → 骨架屏变体:按内容布局归类(与 adminTabToPath 同层,两端 tab 集合不同故不做全局常量)
@@ -441,6 +471,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 				weight: channel.weight ?? 1,
 				// 读侧兜底链：api_formats JSON 串 → 镜像 api_format → ["openai"]
 				api_formats: parseChannelApiFormats(channel),
+				// 读侧容错解析：endpoint_overrides JSON 串 → 扁平形态（畸形 → 全空串）
+				endpoint_overrides: parseEndpointOverrides(channel),
 				custom_headers: channel.custom_headers_json ?? "",
 				disguise_headers: channel.disguise_headers_json ?? "",
 				disguise_system_prompt: channel.disguise_system_prompt ?? "",
@@ -529,6 +561,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					weight: Number(channelForm.weight),
 					// 格式声明整体替换（api_formats 优先于 legacy 单值 api_format）
 					api_formats: channelForm.api_formats,
+					// 恒传对象（仅选中格式键）：空串 = 清除该键，缺省 = 保留现值
+					endpoint_overrides: buildEndpointOverridesPayload(channelForm),
 					custom_headers: channelForm.custom_headers.trim() || undefined,
 					// 伪装字段恒传 trim 后的字符串：PATCH 空串 = 清除现值（AC1 清空保存即关闭伪装）
 					disguise_headers: channelForm.disguise_headers.trim(),
@@ -709,6 +743,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 					base_url: channelForm.base_url.trim(),
 					api_key: channelForm.api_key.trim(),
 					api_formats: channelForm.api_formats,
+					// 与提交同构：仅选中格式键，让探测打在与保存一致的端点上
+					endpoint_overrides: buildEndpointOverridesPayload(channelForm),
 					custom_headers: channelForm.custom_headers.trim() || undefined,
 					disguise_headers: channelForm.disguise_headers.trim(),
 					disguise_system_prompt: channelForm.disguise_system_prompt.trim(),
@@ -834,6 +870,8 @@ export const AdminApp = ({ token, updateToken, onNavigate }: AdminAppProps) => {
 						api_key: channelForm.api_key.trim(),
 						// 目标格式由后端按 chat 偏好序从声明集选出
 						api_formats: channelForm.api_formats,
+						// 与提交同构：仅选中格式键，让测试打在与保存一致的端点上
+						endpoint_overrides: buildEndpointOverridesPayload(channelForm),
 						custom_headers: channelForm.custom_headers.trim(),
 						disguise_headers: channelForm.disguise_headers.trim(),
 						disguise_system_prompt: channelForm.disguise_system_prompt.trim(),

@@ -8,12 +8,14 @@ import {
 import { CLIENT_PRESETS, type ClientPreset } from "../core/client-presets";
 import {
 	CHANNEL_API_FORMATS,
+	CHANNEL_ENDPOINT_OVERRIDE_FORMATS,
 	formatBadgeColors,
 	formatLabels,
 } from "../core/constants";
 import type {
 	Channel,
 	ChannelApiFormat,
+	ChannelEndpointOverrideKey,
 	ChannelForm,
 	ModelTestResult,
 } from "../core/types";
@@ -263,6 +265,14 @@ const baseUrlPlaceholders: Record<ChannelApiFormat, string> = {
 	custom: "https://example.com/v1/chat/completions",
 	responses: "https://api.openai.com/v1",
 };
+
+/** 端点覆盖输入框 placeholder：留空时的 Base URL 推导形态（引导填写语义） */
+const endpointOverridePlaceholders: Record<ChannelEndpointOverrideKey, string> =
+	{
+		openai: "留空则按 Base URL 推导（…/chat/completions）",
+		responses: "留空则按 Base URL 推导（…/responses）",
+		anthropic: "留空则按 Base URL 推导（…/v1/messages，勿含 /v1）",
+	};
 
 /**
  * Renders the channels management view.
@@ -963,6 +973,35 @@ export const ChannelsView = ({
 							</p>
 						)}
 					</div>
+					{/* 每格式端点覆盖（可选，高级项）：仅按当前选中的非 custom 格式渲染；
+						未选格式不渲染也不提交，custom 独占时整体不出现 */}
+					{CHANNEL_ENDPOINT_OVERRIDE_FORMATS.filter((format) =>
+						selectedFormats.includes(format),
+					).map((format) => (
+						<div key={format}>
+							<label
+								class="mb-1 block text-xs uppercase tracking-widest text-stone-400"
+								for={`channel-endpoint-${format}`}
+							>
+								{formatLabels[format]} 端点覆盖（可选）
+							</label>
+							<input
+								class="w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+								id={`channel-endpoint-${format}`}
+								name={`endpoint_override_${format}`}
+								placeholder={endpointOverridePlaceholders[format]}
+								value={channelForm.endpoint_overrides[format]}
+								onInput={(event) =>
+									onFormChange({
+										endpoint_overrides: {
+											...channelForm.endpoint_overrides,
+											[format]: (event.currentTarget as HTMLInputElement).value,
+										},
+									})
+								}
+							/>
+						</div>
+					))}
 					<div>
 						<label
 							class="mb-1.5 block text-xs uppercase tracking-widest text-stone-500"

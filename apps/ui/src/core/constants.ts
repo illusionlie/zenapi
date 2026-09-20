@@ -1,6 +1,7 @@
 import type {
 	AdminData,
 	ChannelApiFormat,
+	ChannelEndpointOverrideKey,
 	ChannelForm,
 	SettingsForm,
 	TabItem,
@@ -46,6 +47,7 @@ export const initialChannelForm: ChannelForm = {
 	api_key: "",
 	weight: 1,
 	api_formats: ["openai"],
+	endpoint_overrides: { openai: "", responses: "", anthropic: "" },
 	custom_headers: "",
 	disguise_headers: "",
 	disguise_system_prompt: "",
@@ -58,6 +60,13 @@ export const CHANNEL_API_FORMATS: ChannelApiFormat[] = [
 	"responses",
 	"anthropic",
 	"custom",
+];
+
+/** 可配置端点覆盖的格式键（custom 独占语义不可覆盖；顺序与规范序一致） */
+export const CHANNEL_ENDPOINT_OVERRIDE_FORMATS: ChannelEndpointOverrideKey[] = [
+	"openai",
+	"responses",
+	"anthropic",
 ];
 
 /** API 格式展示名（渠道表单 chip / 列表与监控徽章共用） */

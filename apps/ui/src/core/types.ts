@@ -12,6 +12,8 @@ export type Channel = {
 	api_format: ChannelApiFormat;
 	/** API 能力声明（JSON 数组字符串，TEXT 列原样透传，如 `"[\"openai\"]"`） */
 	api_formats?: string | null;
+	/** 每格式端点覆盖（JSON 对象字符串，TEXT 列原样透传，如 `"{\"anthropic\":\"https://x/api/anthropic\"}"`；读侧请用 parseEndpointOverrides 解析） */
+	endpoint_overrides?: string | null;
 	custom_headers_json?: string | null;
 	/** 伪装请求头（JSON 对象字符串；NULL/空 = 不伪装） */
 	disguise_headers_json?: string | null;
@@ -261,6 +263,15 @@ export type TabItem = {
 	label: string;
 };
 
+/** 可被端点覆盖的格式键（与 worker EndpointOverrideKey 同构；custom 的 base_url 即完整 URL，不可覆盖） */
+export type ChannelEndpointOverrideKey = Exclude<ChannelApiFormat, "custom">;
+
+/** 渠道表单的每格式端点覆盖（扁平字符串形态；空串 = 未覆盖/提交时触发后端清除） */
+export type ChannelEndpointOverrides = Record<
+	ChannelEndpointOverrideKey,
+	string
+>;
+
 export type ChannelForm = {
 	name: string;
 	base_url: string;
@@ -268,6 +279,8 @@ export type ChannelForm = {
 	weight: number;
 	/** 声明的 API 格式集（custom 独占）；提交时整体替换，至少一项 */
 	api_formats: ChannelApiFormat[];
+	/** 每格式端点覆盖（空串 = 未覆盖）；提交时仅含当前选中非 custom 格式的键 */
+	endpoint_overrides: ChannelEndpointOverrides;
 	custom_headers: string;
 	/** 伪装请求头（JSON 文本，textarea 直读直写；空串 = 不伪装） */
 	disguise_headers: string;
