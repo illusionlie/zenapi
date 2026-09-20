@@ -470,3 +470,28 @@ Session summary was not supplied.
 ### Status
 
 [OK] **Completed**
+
+## Session 18: 渠道每格式独立端点覆盖
+
+**Date**: 2026-09-21
+**Task**: 09-20-channel-per-format-endpoints
+**Branch**: `main`
+
+### Summary
+
+上一任务（多格式能力声明）的延伸：coding plan 类上游不同协议挂在不同 URL（无推导关系），单 base_url + 路径推导表达不了。新增 `endpoint_overrides` JSON 列（迁移 0023，键白名单 openai/responses/anthropic，custom 不可覆盖，存量 NULL 零感知），`resolveEndpointBaseUrl` 统一收口全部 URL 解析点（buildChannelRequest 三分支、anthropic-proxy 两分支、逐格式探针）——**红线：无覆盖时与既有推导逐字节一致**，由既有 26+16 项 URL 断言用例零改动通过实证（新列排 api_formats 之后，INSERT 位置断言无位移）。CRUD `normalizeEndpointOverrides` 纯函数：键须在生效声明集内、值须 http(s)，三态 undefined 保留 / null·空串·空白清除 / 值设置；anthropic 覆盖入库 normalizeBaseUrl、其余保留版本路径；400 invalid_endpoint_overrides。UI 按选中格式渲染可选覆盖输入，提交仅含选中键（空串传 "" 触发清除）。测试 416→463（+47），check/typecheck/UI build 全绿；trellis-check 8/8 AC 通过，唯一 should-fix（openai 覆盖透传路径断言缺口）已补。channel-routing spec 增补 3.5 端点解析契约。范围外显式声明：每格式独立 API key、newapi 透传。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `994d31d` | (see git log) |
+| `c1d8d20` | (see git log) |
+| `6dbcdfb` | (see git log) |
+| `c40420d` | (see git log) |
+| `7514eed` | (see git log) |
+| `67165e1` | (see git log) |
+
+### Status
+
+[OK] **Completed**
