@@ -16,6 +16,7 @@ monitoring.get("/", async (c) => {
 			c.name AS channel_name,
 			c.status AS channel_status,
 			c.api_format,
+			c.api_formats,
 			COUNT(u.id) AS total_requests,
 			COALESCE(SUM(CASE WHEN u.status = 'ok' THEN 1 ELSE 0 END), 0) AS success_count,
 			COALESCE(SUM(CASE WHEN u.status != 'ok' THEN 1 ELSE 0 END), 0) AS error_count,
@@ -23,7 +24,7 @@ monitoring.get("/", async (c) => {
 			MAX(u.created_at) AS last_seen
 		FROM channels c
 		LEFT JOIN usage_logs u ON u.channel_id = c.id AND u.created_at >= ?
-		GROUP BY c.id, c.name, c.status, c.api_format
+		GROUP BY c.id, c.name, c.status, c.api_format, c.api_formats
 		ORDER BY total_requests DESC`,
 	)
 		.bind(since)
@@ -115,6 +116,7 @@ monitoring.get("/", async (c) => {
 			channel_name: row.channel_name,
 			channel_status: row.channel_status,
 			api_format: row.api_format,
+			api_formats: row.api_formats ?? null,
 			total_requests: total,
 			success_count: success,
 			error_count: Number(row.error_count),
